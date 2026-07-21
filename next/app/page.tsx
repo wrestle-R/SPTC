@@ -1,195 +1,173 @@
 import Link from "next/link";
 import {
-  BarChart3,
-  ClipboardCheck,
-  LockKeyhole,
+  ArrowRight,
+  CalendarDays,
+  Check,
   Radio,
-  Shield,
+  ScrollText,
+  ShieldCheck,
   Trophy,
+  Users,
 } from "lucide-react";
-import { events, fixtures, getTeam, sortedStandings, teamTotal, teams } from "@/lib/tournament-data";
-import { Card, Pill, RouteButton } from "@/components/ui";
+import { BrandLogo } from "@/components/brand-logo";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
+import { Separator } from "@/components/ui/separator";
 
-const problemStatement =
-  "Church-organized sports tournaments are often managed using paper score sheets, spreadsheets, and messaging apps, making it difficult to track live scores, fixtures, player statistics, and team standings in one place.";
+const features = [
+  {
+    icon: Radio,
+    title: "Live scoring",
+    description: "One clear view for scores and match events across every supported sport.",
+  },
+  {
+    icon: Trophy,
+    title: "Tournament progress",
+    description: "Fixtures, standings, brackets, and leaderboards stay connected.",
+  },
+  {
+    icon: ScrollText,
+    title: "Clear audit history",
+    description: "Organizer actions remain visible and accountable throughout the event.",
+  },
+] as const;
 
 export default function Home() {
-  const live = fixtures.find((fixture) => fixture.status === "Live") ?? fixtures[0];
-  const teamA = getTeam(live.teamAId);
-  const teamB = getTeam(live.teamBId);
-
   return (
-    <main className="min-h-screen text-foreground">
-      <nav className="sticky top-0 z-30 border-b border-white/10 bg-background/82 backdrop-blur-xl">
-        <div className="mx-auto flex min-h-16 max-w-7xl items-center justify-between gap-4 px-4 sm:px-6">
-          <Link href="/" className="flex min-w-0 items-center gap-3">
-            <span className="grid size-10 shrink-0 place-items-center rounded-lg bg-primary text-primary-foreground">
-              <Trophy className="size-5" aria-hidden="true" />
-            </span>
-            <span className="min-w-0">
-              <span className="block truncate text-base font-black text-white">Sports Fiesta S9</span>
-              <span className="hidden text-xs font-semibold text-muted sm:block">Church tournament command center</span>
-            </span>
+    <main>
+      <nav className="sticky top-0 z-30 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
+          <Link href="/" aria-label="Sports Fiesta S9 home">
+            <BrandLogo />
           </Link>
-          <div className="hidden items-center gap-6 text-sm font-bold text-muted-strong md:flex">
-            <a href="#problem" className="hover:text-white">Problem</a>
-            <a href="#features" className="hover:text-white">Features</a>
-            <a href="#teams" className="hover:text-white">Teams</a>
+          <div className="hidden items-center gap-6 text-sm text-muted-foreground md:flex">
+            <a href="#features" className="transition-colors hover:text-foreground">Features</a>
+            <a href="#about" className="transition-colors hover:text-foreground">About</a>
           </div>
-          <RouteButton href="/dashboard">Open Dashboard</RouteButton>
+          <Button nativeButton={false} render={<Link href="/dashboard" />}>
+            Open dashboard
+            <ArrowRight data-icon="inline-end" />
+          </Button>
         </div>
       </nav>
 
-      <section className="score-grid relative overflow-hidden border-b border-white/10">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_65%_8%,rgba(240,201,107,0.20),transparent_30rem)]" />
-        <div className="relative mx-auto grid min-h-[calc(100vh-4rem)] max-w-7xl items-center gap-8 px-4 py-10 sm:px-6 lg:grid-cols-[1.05fr_0.95fr]">
-          <div className="max-w-3xl">
-            <p className="mb-5 inline-flex min-h-10 items-center gap-2 rounded-lg border border-primary/35 bg-primary/12 px-3 text-sm font-black text-primary">
-              <Radio className="size-4" aria-hidden="true" />
-              Live scores for every age group
-            </p>
-            <h1 className="safe-text text-5xl font-black leading-[1.02] text-white sm:text-6xl lg:text-7xl">
-              Sports Fiesta S9
-            </h1>
-            <p className="mt-6 max-w-2xl text-lg leading-8 text-muted-strong sm:text-xl">
-              A centralized real-time tournament website for scores, fixtures, brackets, player stats, standings,
-              organizer audit trails, and read-only spectator access.
-            </p>
-            <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-              <RouteButton href="/dashboard">View Live Dashboard</RouteButton>
-              <a
-                href="#problem"
-                className="inline-flex min-h-11 items-center justify-center rounded-lg border border-white/12 bg-white/8 px-4 text-sm font-black text-white hover:bg-white/12"
-              >
-                Read Problem
-              </a>
+      <section className="border-b">
+        <div className="mx-auto grid min-h-[calc(100svh-8rem)] max-w-7xl items-center gap-12 px-4 py-16 sm:px-6 lg:grid-cols-[1.05fr_0.95fr] lg:px-8 lg:py-20">
+          <div className="flex max-w-2xl flex-col items-start gap-6">
+            <Badge variant="secondary">
+              <ShieldCheck data-icon="inline-start" />
+              Built for church tournaments
+            </Badge>
+            <div className="flex flex-col gap-4">
+              <h1 className="text-5xl font-semibold leading-[1.05] tracking-normal text-balance sm:text-6xl lg:text-7xl">
+                Sports Fiesta S9
+              </h1>
+              <p className="max-w-xl text-lg leading-8 text-muted-foreground sm:text-xl">
+                A simple tournament workspace for organizers, teams, and spectators to follow every match from one place.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-3">
+              <Button nativeButton={false} size="lg" render={<Link href="/dashboard" />}>
+                View tournament
+                <ArrowRight data-icon="inline-end" />
+              </Button>
+              <Button nativeButton={false} size="lg" variant="outline" render={<a href="#features" />}>
+                Explore features
+              </Button>
+            </div>
+            <div className="flex flex-wrap gap-x-5 gap-y-2 text-sm text-muted-foreground">
+              <span className="inline-flex items-center gap-2"><Check className="text-secondary" /> Live updates</span>
+              <span className="inline-flex items-center gap-2"><Check className="text-secondary" /> Read-only spectator view</span>
+              <span className="inline-flex items-center gap-2"><Check className="text-secondary" /> Multi-sport ready</span>
             </div>
           </div>
 
-          <Card className="p-4 sm:p-5">
-            <div className="flex items-start justify-between gap-4 border-b border-white/10 pb-4">
-              <div>
-                <p className="text-sm font-bold text-muted">Live now</p>
-                <h2 className="mt-1 text-2xl font-black text-white">{live.sport} {live.stage}</h2>
+          <Card className="min-h-[430px] justify-center bg-muted/30 shadow-lg">
+            <CardHeader className="border-b">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <CardTitle>Tournament overview</CardTitle>
+                  <CardDescription>Sports Fiesta S9</CardDescription>
+                </div>
+                <Badge variant="outline">Not started</Badge>
               </div>
-              <Pill tone="live">LIVE</Pill>
-            </div>
-
-            <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-4 py-7">
-              <LandingScore name={teamA.name} score={live.scoreA} color={teamA.accent} />
-              <span className="rounded-md bg-white/8 px-2 py-1 text-xs font-black text-muted">VS</span>
-              <LandingScore name={teamB.name} score={live.scoreB} color={teamB.accent} align="right" />
-            </div>
-
-            <div className="space-y-3">
-              {sortedStandings.map((row) => {
-                const team = getTeam(row.teamId);
-                const total = teamTotal(row.teamId);
-
-                return (
-                  <div key={team.id} className="rounded-lg border border-white/10 bg-white/[0.035] p-3">
-                    <div className="mb-2 flex items-center justify-between gap-3">
-                      <span className="safe-text font-black text-white">{team.name}</span>
-                      <span className="font-mono text-lg font-black text-white">{total}</span>
-                    </div>
-                    <div className="h-2 overflow-hidden rounded-full bg-black/35">
-                      <div className="h-full rounded-full" style={{ width: `${total * 3}%`, backgroundColor: team.accent }} />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+            </CardHeader>
+            <CardContent className="flex flex-1 items-center">
+              <Empty>
+                <EmptyHeader>
+                  <EmptyMedia variant="icon"><CalendarDays /></EmptyMedia>
+                  <EmptyTitle>The field is ready</EmptyTitle>
+                  <EmptyDescription>
+                    Fixtures and live scores will appear here when the tournament is configured.
+                  </EmptyDescription>
+                </EmptyHeader>
+              </Empty>
+            </CardContent>
           </Card>
         </div>
       </section>
 
-      <section id="problem" className="mx-auto max-w-7xl px-4 py-16 sm:px-6">
-        <div className="grid gap-6 lg:grid-cols-[0.85fr_1.15fr]">
-          <div>
-            <p className="text-sm font-black uppercase tracking-[0.16em] text-primary">Problem Statement</p>
-            <h2 className="mt-3 text-3xl font-black text-white sm:text-4xl">One shared source of truth for match day.</h2>
+      <section id="features" className="bg-muted/40">
+        <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
+          <div className="mb-8 max-w-2xl">
+            <p className="text-sm font-medium text-primary">Everything in one place</p>
+            <h2 className="mt-2 text-3xl font-semibold tracking-normal sm:text-4xl">Clear on match day. Calm behind the scenes.</h2>
           </div>
-          <p className="text-lg leading-8 text-muted-strong">
-            {problemStatement} Sports Fiesta S9 brings those flows into one reliable prototype: organizers see the
-            controls they need, and spectators get clear live progress without confusing edit buttons.
-          </p>
+          <div className="grid gap-4 md:grid-cols-3">
+            {features.map(({ icon: Icon, title, description }) => (
+              <Card key={title} className="shadow-none">
+                <CardHeader>
+                  <span className="mb-3 grid size-10 place-items-center rounded-lg bg-primary/10 text-primary">
+                    <Icon />
+                  </span>
+                  <CardTitle>{title}</CardTitle>
+                  <CardDescription className="leading-6">{description}</CardDescription>
+                </CardHeader>
+              </Card>
+            ))}
+          </div>
         </div>
       </section>
 
-      <section id="features" className="border-y border-white/10 bg-white/[0.025]">
-        <div className="mx-auto grid max-w-7xl gap-4 px-4 py-16 sm:px-6 md:grid-cols-3">
-          <FeatureCard icon={LockKeyhole} title="Organizer Access" text="Organizer-only scoring surfaces, Patrick admin preview, and a visible action trail." />
-          <FeatureCard icon={BarChart3} title="Sport Rules" text="Football, handball, and cricket views shaped around sport-specific scoring needs." />
-          <FeatureCard icon={ClipboardCheck} title="Spectator View" text="Read-only live scores, fixtures, brackets, standings, leaderboards, and discipline reasons." />
-        </div>
-      </section>
-
-      <section id="teams" className="mx-auto max-w-7xl px-4 py-16 sm:px-6">
-        <div className="mb-8 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <p className="text-sm font-black uppercase tracking-[0.16em] text-primary">Tournament</p>
-            <h2 className="mt-2 text-3xl font-black text-white">Seven events, four teams</h2>
+      <section id="about" className="border-y">
+        <div className="mx-auto grid max-w-7xl gap-10 px-4 py-16 sm:px-6 lg:grid-cols-2 lg:px-8">
+          <div className="flex flex-col gap-3">
+            <Badge className="w-fit" variant="outline">Why Sports Fiesta</Badge>
+            <h2 className="text-3xl font-semibold tracking-normal">A shared source of truth for the whole community.</h2>
           </div>
-          <RouteButton href="/dashboard" variant="secondary">Dashboard</RouteButton>
-        </div>
-
-        <div className="grid gap-4 md:grid-cols-4">
-          {teams.map((team) => (
-            <Card key={team.id}>
-              <div className="mb-4 h-2 rounded-full" style={{ backgroundColor: team.accent }} />
-              <h3 className="safe-text text-xl font-black text-white">{team.name}</h3>
-              <p className="mt-2 text-sm text-muted">{team.roster.length} roster players</p>
-            </Card>
-          ))}
-        </div>
-
-        <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          {events.map((event) => (
-            <div key={event.id} className="rounded-lg border border-white/10 bg-white/[0.035] p-4">
-              <p className="text-lg font-black text-white">{event.icon} {event.name}</p>
-              <p className="mt-2 text-sm leading-6 text-muted">{event.summary}</p>
+          <div className="flex flex-col gap-5 text-base leading-7 text-muted-foreground">
+            <p>
+              Paper sheets, spreadsheets, and message threads make tournament information difficult to keep consistent. Sports Fiesta brings fixtures, scores, standings, player records, and organizer activity into one focused system.
+            </p>
+            <Separator />
+            <div className="grid gap-4 sm:grid-cols-2">
+              <span className="flex items-center gap-3"><Users className="text-secondary" /> Simple for every age group</span>
+              <span className="flex items-center gap-3"><ShieldCheck className="text-secondary" /> Clear organizer access</span>
             </div>
-          ))}
+          </div>
         </div>
       </section>
+
+      <footer>
+        <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-8 sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8">
+          <BrandLogo />
+          <p className="text-sm text-muted-foreground">One tournament. One reliable view.</p>
+        </div>
+      </footer>
     </main>
-  );
-}
-
-function LandingScore({
-  name,
-  score,
-  color,
-  align = "left",
-}: {
-  name: string;
-  score: string;
-  color: string;
-  align?: "left" | "right";
-}) {
-  return (
-    <div className={align === "right" ? "text-right" : undefined}>
-      <div className="mb-3 h-2 w-16 rounded-full" style={{ backgroundColor: color, marginLeft: align === "right" ? "auto" : undefined }} />
-      <p className="safe-text text-sm font-black text-muted-strong">{name}</p>
-      <p className="font-mono text-6xl font-black text-white">{score}</p>
-    </div>
-  );
-}
-
-function FeatureCard({
-  icon: Icon,
-  title,
-  text,
-}: {
-  icon: typeof Shield;
-  title: string;
-  text: string;
-}) {
-  return (
-    <Card>
-      <Icon className="mb-5 size-8 text-primary" aria-hidden="true" />
-      <h3 className="text-xl font-black text-white">{title}</h3>
-      <p className="mt-3 leading-7 text-muted-strong">{text}</p>
-    </Card>
   );
 }
