@@ -15,7 +15,6 @@ const chartConfig = {
   football: { label: "Football", color: "var(--chart-1)" },
   handball: { label: "Handball", color: "var(--chart-2)" },
   cricket: { label: "Cricket", color: "var(--chart-3)" },
-  discipline: { label: "Discipline", color: "var(--chart-4)" },
 } satisfies ChartConfig;
 
 export function TeamStandings({ compact = false }: { compact?: boolean }) {
@@ -31,7 +30,6 @@ export function TeamStandings({ compact = false }: { compact?: boolean }) {
       football: stored?.football ?? 0,
       handball: stored?.handball ?? 0,
       cricket: stored?.cricket ?? 0,
-      discipline: stored?.discipline ?? 0,
       total: stored?.total ?? 0,
     };
   }).sort((a, b) => b.total - a.total || a.rank - b.rank);
@@ -54,7 +52,7 @@ export function TeamStandings({ compact = false }: { compact?: boolean }) {
           <Card className="shadow-none">
             <CardHeader>
               <CardTitle>Points breakdown</CardTitle>
-              <CardDescription>Sport placements plus discipline adjustments.</CardDescription>
+              <CardDescription>Placement points earned across all three sports.</CardDescription>
             </CardHeader>
             <CardContent>
               <ChartContainer config={chartConfig} className="h-64 w-full aspect-auto">
@@ -66,8 +64,7 @@ export function TeamStandings({ compact = false }: { compact?: boolean }) {
                   <ChartLegend content={<ChartLegendContent />} />
                   <Bar dataKey="football" stackId="points" fill="var(--color-football)" />
                   <Bar dataKey="handball" stackId="points" fill="var(--color-handball)" />
-                  <Bar dataKey="cricket" stackId="points" fill="var(--color-cricket)" />
-                  <Bar dataKey="discipline" stackId="points" fill="var(--color-discipline)" radius={[0, 4, 4, 0]} />
+                  <Bar dataKey="cricket" stackId="points" fill="var(--color-cricket)" radius={[0, 4, 4, 0]} />
                 </BarChart>
               </ChartContainer>
             </CardContent>
@@ -86,12 +83,11 @@ export function TeamStandings({ compact = false }: { compact?: boolean }) {
                 </TableHeader>
                 <TableBody>
                   {rows.map((row, index) => (
-                    <TableRow key={row.teamId}>
+                    <TableRow key={row.teamId} className="border-l-[5px] bg-card/60" style={{ borderLeftColor: row.accentColor }}>
                       <TableCell className="pl-6 font-medium">
                         <span className="flex items-center gap-3">
                           <span className="w-5 tabular-nums text-muted-foreground">{index + 1}</span>
-                          <span className="size-2.5 shrink-0 rounded-sm border" style={{ backgroundColor: row.accentColor }} />
-                          <span>{row.name}</span>
+                          <span className="text-base font-semibold">{row.name}</span>
                         </span>
                       </TableCell>
                       <TableCell className="text-right tabular-nums">{row.football}</TableCell>

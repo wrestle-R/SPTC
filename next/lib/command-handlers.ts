@@ -1,6 +1,7 @@
 import {
   createCricketInnings,
   createFieldMatch,
+  nextMatchNumber,
   recalculateCricketInnings,
   recordCricketDelivery as applyCricketDelivery,
   recordFieldEvent,
@@ -22,7 +23,6 @@ import { CommandError, getRefs, FieldValue } from "./firebase-admin";
 
 const ACTOR = { uid: "organizer", name: "Organizer" };
 const _r = () => getRefs();
-type Actor = { uid: string; name: string };
 type CallableData = Record<string, unknown>;
 
 function asString(value: unknown, label: string, max = 160) {
@@ -39,7 +39,9 @@ function asStringArray(value: unknown, label: string) {
 }
 
 function publicMatch(match: DocumentData) {
-  const { createdBy: _createdBy, updatedBy: _updatedBy, ...projection } = match;
+  const projection = { ...match };
+  delete projection.createdBy;
+  delete projection.updatedBy;
   return projection;
 }
 
@@ -90,7 +92,7 @@ export async function handleBootstrap() {
     batch.set(_r().publicCollection("sports").doc(sport.id), { ...sport, fixturesConfirmed: false });
   }
 
-  const emptyRows = S9_TEAMS.map((team, index) => ({ rank: index + 1, teamId: team.id, football: 0, handball: 0, cricket: 0, discipline: 0, total: 0 }));
+  const emptyRows = S9_TEAMS.map((team, index) => ({ rank: index + 1, teamId: team.id, football: 0, handball: 0, cricket: 0, total: 0 }));
   const emptyFieldRows = S9_TEAMS.map((team, index) => ({ rank: index + 1, teamId: team.id, played: 0, wins: 0, draws: 0, losses: 0, goalsFor: 0, goalsAgainst: 0, goalDifference: 0, points: 0 }));
   const emptyCricketRows = S9_TEAMS.map((team, index) => ({ rank: index + 1, teamId: team.id, played: 0, wins: 0, ties: 0, losses: 0, points: 0, runsFor: 0, runsAgainst: 0, ballsFaced: 0, ballsBowled: 0, netRunRate: 0 }));
 
@@ -114,7 +116,8 @@ export async function handleSaveTournamentSettings(data: CallableData) {
     updatedBy: ACTOR.name,
   };
   await _r().privateRoot.set(allowed, { merge: true });
-  const { updatedBy: _updatedBy, ...publicValue } = allowed;
+  const publicValue = { ...allowed };
+  delete publicValue.updatedBy;
   await _r().publicRoot.set(publicValue, { merge: true });
   return { ok: true };
 }
@@ -163,31 +166,30 @@ export async function handleCreateMatch(data: CallableData) {
     sport: asString(data.sport, "Sport") as "football" | "handball" | "cricket",
     homeTeamId: asString(data.homeTeamId, "Home team"),
     awayTeamId: asString(data.awayTeamId, "Away team"),
-    startsAt: asString(data.startsAt, "Start date"),
-    venue: asString(data.venue, "Venue"),
     stage: (data.stage ?? "league") as "league" | "semifinal" | "final",
     maxOvers: data.sport === "cricket" ? 5 : undefined,
   });
   const id = _r().privateCollection("matches").doc().id;
   const now = FieldValue.serverTimestamp();
-  const match: DocumentData = {
-    id,
-    ...fixture,
-    lineups: {},
-    scoreSummary: fixture.sport === "cricket" ? { innings: [] } : { [fixture.homeTeamId]: 0, [fixture.awayTeamId]: 0 },
-    revision: 0,
-    createdAt: now,
-    updatedAt: now,
-    createdBy: ACTOR.name,
-    updatedBy: ACTOR.name,
-  };
   await _r().db.runTransaction(async (transaction) => {
-    const duplicateQuery = _r().privateCollection("matches").where("sport", "==", fixture.sport).where("stage", "==", fixture.stage);
-    const existing = await transaction.get(duplicateQuery);
+    const sportQuery = _r().privateCollection("matches").where("sport", "==", fixture.sport);
+    const existing = await transaction.get(sportQuery);
     if (existing.docs.some((snapshot) => {
       const row = snapshot.data();
-      return [row.homeTeamId, row.awayTeamId].sort().join(":") === [fixture.homeTeamId, fixture.awayTeamId].sort().join(":");
+      return row.stage === fixture.stage && [row.homeTeamId, row.awayTeamId].sort().join(":") === [fixture.homeTeamId, fixture.awayTeamId].sort().join(":");
     })) throw new CommandError(409, "ALREADY_EXISTS", "This matchup already exists for the stage.");
+    const match: DocumentData = {
+      id,
+      ...fixture,
+      matchNumber: nextMatchNumber(fixture.sport, existing.docs.map((snapshot) => String(snapshot.data().matchNumber ?? ""))),
+      lineups: {},
+      scoreSummary: fixture.sport === "cricket" ? { innings: [] } : { [fixture.homeTeamId]: 0, [fixture.awayTeamId]: 0 },
+      revision: 0,
+      createdAt: now,
+      updatedAt: now,
+      createdBy: ACTOR.name,
+      updatedBy: ACTOR.name,
+    };
     transaction.create(_r().privateCollection("matches").doc(id), match);
     transaction.create(_r().publicCollection("matches").doc(id), publicMatch(match));
   });
@@ -206,7 +208,8 @@ export async function handleUpdateMatch(data: CallableData) {
     updatedBy: ACTOR.name,
   };
   await _r().privateCollection("matches").doc(id).set(update, { merge: true });
-  const { updatedBy: _updatedBy, ...projection } = update;
+  const projection = { ...update };
+  delete projection.updatedBy;
   await _r().publicCollection("matches").doc(id).set(projection, { merge: true });
   return { id };
 }
@@ -457,7 +460,7 @@ export async function handleEndMatch(data: CallableData) {
   }));
 }
 
-// --- Awards & Discipline ---
+// --- Awards ---
 
 export async function handleConfirmAward(data: CallableData) {
   const id = data.id ? asString(data.id, "Award ID") : _r().privateCollection("awards").doc().id;
@@ -471,16 +474,6 @@ export async function handleConfirmAward(data: CallableData) {
   };
   await writeMirrored("awards", id, award, false);
   await _r().privateCollection("awards").doc(id).set({ updatedBy: ACTOR.name }, { merge: true });
-  return { id };
-}
-
-export async function handleAddDisciplineAdjustment(data: CallableData) {
-  const id = _r().privateCollection("discipline").doc().id;
-  const points = Number(data.points);
-  if (!Number.isFinite(points) || points < -100 || points > 100) throw new CommandError(400, "INVALID_ARGUMENT", "Points must be between -100 and 100.");
-  const adjustment: DocumentData = { id, teamId: asString(data.teamId, "Team"), points, reason: asString(data.reason, "Reason", 240), createdAt: FieldValue.serverTimestamp() };
-  await writeMirrored("discipline", id, adjustment, false);
-  await _r().privateCollection("discipline").doc(id).set({ createdBy: ACTOR.name }, { merge: true });
   return { id };
 }
 
@@ -588,8 +581,8 @@ function cricketLeaders(matches: MatchRow[]) {
 }
 
 export async function handleRefreshProjections() {
-  const [matchSnapshots, disciplineSnapshots, awardSnapshots, tournamentSnapshot] = await Promise.all([
-    _r().privateCollection("matches").get(), _r().privateCollection("discipline").get(), _r().privateCollection("awards").get(), _r().privateRoot.get(),
+  const [matchSnapshots, awardSnapshots, tournamentSnapshot] = await Promise.all([
+    _r().privateCollection("matches").get(), _r().privateCollection("awards").get(), _r().privateRoot.get(),
   ]);
   const matches = matchSnapshots.docs.map((snapshot) => ({ id: snapshot.id, ...snapshot.data() } as MatchRow));
   const football = fieldStandings(matches, "football");
@@ -597,16 +590,12 @@ export async function handleRefreshProjections() {
   const cricket = cricketStandings(matches);
   const placementPoints = (tournamentSnapshot.data()?.placementPoints as Record<string, number[]>) ?? { football: [10, 5, 3, 1], handball: [10, 5, 3, 1], cricket: [10, 5, 3, 1] };
   const placements = awardSnapshots.docs.map((s) => s.data()).filter((a) => a.type === "sport-placement" && a.confirmed && a.teamId && a.sport && a.place);
-  const discipline = new Map<string, number>();
-  for (const snapshot of disciplineSnapshots.docs) discipline.set(snapshot.data().teamId, (discipline.get(snapshot.data().teamId) ?? 0) + Number(snapshot.data().points ?? 0));
-
   const overall = S9_TEAMS.map((team) => {
     const sportScores = Object.fromEntries(["football", "handball", "cricket"].map((sport) => {
       const place = placements.find((row) => row.teamId === team.id && row.sport === sport)?.place;
       return [sport, place ? placementPoints[sport]?.[Number(place) - 1] ?? 0 : 0];
     })) as Record<string, number>;
-    const dp = discipline.get(team.id) ?? 0;
-    return { teamId: team.id, ...sportScores, discipline: dp, total: Object.values(sportScores).reduce((s, v) => s + v, 0) + dp };
+    return { teamId: team.id, ...sportScores, total: Object.values(sportScores).reduce((s, v) => s + v, 0) };
   }).sort((a, b) => b.total - a.total || a.teamId.localeCompare(b.teamId)).map((row, index) => ({ ...row, rank: index + 1 }));
 
   const batch = _r().db.batch();

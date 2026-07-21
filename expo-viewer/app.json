@@ -1,27 +1,27 @@
 {
   "expo": {
-    "name": "Sports Fiesta S9",
+    "name": "Sports Fiesta",
     "slug": "sports-fiesta-s9-viewer",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/sports-fiesta-logo.png",
+    "icon": "./assets/images/logo.png",
     "scheme": "sportsfiestaviewer",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/images/sports-fiesta-logo.png",
+      "icon": "./assets/images/logo.png",
       "bundleIdentifier": "com.sptc.sportsfiesta.viewer"
     },
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#111210",
-        "foregroundImage": "./assets/images/sports-fiesta-logo.png"
+        "foregroundImage": "./assets/images/logo.png"
       },
       "package": "com.sptc.sportsfiesta.viewer",
       "predictiveBackGestureEnabled": false
     },
     "web": {
       "output": "static",
-      "favicon": "./assets/images/sports-fiesta-logo.png"
+      "favicon": "./assets/images/logo.png"
     },
     "plugins": [
       "expo-router",
@@ -29,10 +29,11 @@
         "expo-splash-screen",
         {
           "backgroundColor": "#111210",
-          "image": "./assets/images/sports-fiesta-logo.png",
+          "image": "./assets/images/logo.png",
           "imageWidth": 120
         }
-      ]
+      ],
+      "expo-secure-store"
     ],
     "experiments": {
       "typedRoutes": true,

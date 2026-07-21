@@ -18,7 +18,7 @@ export function SportView({ sport }: { sport: keyof typeof headings }) {
   const teamsState = usePublicCollection<PublicTeam>("teams");
   const matches = matchesState.data
     .filter((match) => match.sport === sport)
-    .sort((a, b) => new Date(a.startsAt).valueOf() - new Date(b.startsAt).valueOf());
+    .sort((a, b) => (a.matchNumber ?? a.id).localeCompare(b.matchNumber ?? b.id));
   const groups = [
     { title: "Live now", matches: matches.filter((match) => ["live", "innings-break", "super-over"].includes(match.status)) },
     { title: "Upcoming", matches: matches.filter((match) => ["scheduled", "lineup"].includes(match.status)) },

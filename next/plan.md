@@ -13,8 +13,8 @@ No application source, workspace configuration, Firebase configuration, or gener
 ## 2. Product Rules
 
 - Sports Fiesta S9 is the only tournament.
-- Seed only the four real teams and provisional rosters from `md/prompt.md`.
-- Do not seed mock fixtures, scores, events, results, player statistics, awards, or discipline entries.
+- Seed only the four real teams and finalized rosters from the approved roster specification.
+- Do not seed mock fixtures, scores, events, results, player statistics, or awards.
 - Before results exist, every standings view must show all four teams with zero values.
 - Public clients are read-only and receive published Firestore projections in real time.
 - Organizer mutations require authentication and go through callable Cloud Functions.
@@ -43,7 +43,7 @@ The public shell uses a responsive Framer Motion top navbar inspired by the supp
 - `/organizer/matches/[matchId]`: sport-specific scoring console.
 - `/organizer/teams`: edit team presentation, rosters, captains, and cricket roles.
 - `/organizer/awards`: review and confirm generated awards.
-- `/organizer/settings`: tournament metadata, venues, placement points, and discipline adjustments.
+- `/organizer/settings`: tournament metadata, venues, and placement points.
 
 The organizer area uses the existing Shadcn sidebar architecture. It is intentionally absent from public navigation. Website sessions use Firebase ID tokens exchanged for secure HTTP-only cookies when server credentials are configured.
 
@@ -52,7 +52,7 @@ Obsolete `/dashboard/*` routes redirect to the closest public route. `/dashboard
 ## 4. Expo Viewer
 
 - Expo Router tabs: Teams, Football, Handball, Cricket.
-- Teams: four zero-filled rows and a responsive stacked horizontal bar chart for football, handball, cricket, and discipline points.
+- Teams: four zero-filled rows and a responsive stacked horizontal bar chart for football, handball, and cricket.
 - Sport tabs: live matches first, upcoming second, completed last.
 - Every fixture opens a detail screen. Upcoming fixtures show schedule and published lineups; live fixtures show real-time progression; completed fixtures show the full result or scorecard.
 - Cricket detail includes every delivery, batting and bowling tables, extras, current run rate, target, required rate, and leaders.
@@ -63,7 +63,7 @@ Obsolete `/dashboard/*` routes redirect to the closest public route. `/dashboard
 - Expo Router tabs: Home, Teams, Settings.
 - Home: sport selector, match lists, fixture creation, match setup, and scoring entry points.
 - Teams: editable roster, team color/logo metadata, captains, player role, batting style, and bowling style.
-- Settings: S9 metadata, venues, five-over format, placement awards, discipline adjustments, and appearance.
+- Settings: S9 metadata, venues, five-over format, placement awards, and appearance.
 - Scoring is disabled while offline or while the local revision is stale.
 
 ## 6. Scoring Domain
@@ -95,22 +95,21 @@ Obsolete `/dashboard/*` routes redirect to the closest public route. `/dashboard
 ### Overall standings and awards
 
 - Default sport placement points: 10, 5, 3, 1; organizer-editable.
-- Overall points are confirmed football, handball, and cricket placement points plus discipline adjustments.
-- Discipline adjustments may be positive or negative and always store a reason.
+- Overall points are confirmed football, handball, and cricket placement points.
 - Orange Cap, Purple Cap, top scorer, MVP, and match awards are calculated from accepted match events and published only when appropriate.
 
 ## 7. Firebase Contract
 
-- Private source: `tournaments/sports-fiesta-s9/{teams,players,matches,discipline,awards,organizerSessions,commandReceipts}`.
+- Private source: `tournaments/sports-fiesta-s9/{teams,players,matches,awards,organizerSessions,commandReceipts}`.
 - Match events: `tournaments/sports-fiesta-s9/matches/{matchId}/events`.
-- Public projections: `publicTournaments/sports-fiesta-s9/{teams,players,matches,standings,leaderboards,awards,discipline}`.
+- Public projections: `publicTournaments/sports-fiesta-s9/{teams,players,matches,standings,leaderboards,awards}`.
 - Public reads are allowed; public writes and all direct private client writes are denied.
 - Callable commands validate organizer claims, `commandId`, and `expectedRevision`.
 - Firebase client values come only from environment variables. Server credentials and organizer PIN hashes are never exposed through public environment variables.
 
 ## 8. Test-Driven Delivery
 
-1. Add or update failing domain tests for cricket legality, strike changes, over changes, wickets, free hits, chase completion, edit/undo, field events, shootouts, standings, placement points, discipline, and awards.
+1. Add or update failing domain tests for cricket legality, strike changes, over changes, wickets, free hits, chase completion, edit/undo, field events, shootouts, standings, placement points, and awards.
 2. Implement pure reducers and selectors until those tests pass.
 3. Test Firestore rules, command idempotency, stale revision rejection, and public/private access against emulators.
 4. Build public website views and verify route, empty, loading, error, mobile, and dark/light states.

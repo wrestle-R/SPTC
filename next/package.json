@@ -3,8 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "workspaces": [
-    "packages/*",
-    "functions"
+    "packages/*"
   ],
   "scripts": {
     "dev": "next dev",
@@ -12,9 +11,7 @@
     "start": "next start",
     "lint": "eslint app components hooks lib proxy.ts",
     "test": "npm run test --workspace @sports-fiesta/domain",
-    "test:functions": "npm run test --workspace @sports-fiesta/functions",
-    "typecheck": "tsc --noEmit && npm run typecheck --workspace @sports-fiesta/domain && npm run typecheck --workspace @sports-fiesta/firebase && npm run typecheck --workspace @sports-fiesta/theme && npm run typecheck --workspace @sports-fiesta/functions",
-    "build:functions": "npm run build --workspace @sports-fiesta/functions",
+    "typecheck": "tsc --noEmit && npm run typecheck --workspace @sports-fiesta/domain && npm run typecheck --workspace @sports-fiesta/firebase && npm run typecheck --workspace @sports-fiesta/theme",
     "emulators": "firebase emulators:start"
   },
   "dependencies": {

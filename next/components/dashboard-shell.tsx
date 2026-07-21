@@ -2,9 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ExternalLink, MoreHorizontal } from "lucide-react";
 import { BrandLogo } from "@/components/brand-logo";
-import { FirebaseStatus } from "@/components/firebase-status";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -12,12 +10,10 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
-import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import {
   Sidebar,
   SidebarContent,
-  SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
   SidebarGroupLabel,
@@ -30,7 +26,6 @@ import {
   SidebarRail,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { getPageTitle, navigation } from "@/lib/navigation";
 
 export function DashboardShell({ children }: { children: React.ReactNode }) {
@@ -76,9 +71,6 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
             </SidebarGroup>
           ))}
         </SidebarContent>
-        <SidebarFooter className="p-3">
-          <FirebaseStatus />
-        </SidebarFooter>
         <SidebarRail />
       </Sidebar>
 
@@ -98,18 +90,6 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                 </BreadcrumbItem>
               </BreadcrumbList>
             </Breadcrumb>
-          </div>
-          <div className="flex items-center gap-1">
-            <Button nativeButton={false} variant="outline" size="sm" className="hidden sm:inline-flex" render={<Link href="/" />}>
-              Public site
-              <ExternalLink data-icon="inline-end" />
-            </Button>
-            <Tooltip>
-              <TooltipTrigger render={<Button variant="ghost" size="icon-sm" aria-label="More options" />}>
-                <MoreHorizontal />
-              </TooltipTrigger>
-              <TooltipContent>More options</TooltipContent>
-            </Tooltip>
           </div>
         </header>
         <div className="flex flex-1 flex-col gap-6 p-4 sm:p-6 lg:p-8">{children}</div>

@@ -25,16 +25,16 @@ export function HomeView() {
   const live = matchesState.data.find((match) => ["live", "innings-break", "super-over"].includes(match.status));
   const upcoming = matchesState.data
     .filter((match) => ["scheduled", "lineup"].includes(match.status))
-    .sort((a, b) => new Date(a.startsAt).valueOf() - new Date(b.startsAt).valueOf())
+    .sort((a, b) => (a.matchNumber ?? a.id).localeCompare(b.matchNumber ?? b.id))
     .slice(0, 2);
 
   return (
     <div className="flex flex-col gap-10">
       <section className="grid gap-6 border-b pb-10 lg:grid-cols-[1fr_0.8fr] lg:items-end">
         <div className="flex max-w-3xl flex-col gap-4">
-          <Badge variant="secondary" className="w-fit">Season 9 tournament hub</Badge>
+          <Badge variant="secondary" className="w-fit">Tournament hub</Badge>
           <h1 className="text-4xl font-semibold leading-tight text-balance sm:text-5xl">
-            Sports Fiesta S9
+            Sports Fiesta
           </h1>
           <p className="max-w-2xl text-lg leading-8 text-muted-foreground">
             Live scores, fixtures, team standings, and match progress in one clear view for the whole community.

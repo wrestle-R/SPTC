@@ -10,8 +10,9 @@ export interface PublicMatch {
   status: "scheduled" | "lineup" | "live" | "innings-break" | "super-over" | "completed";
   homeTeamId: string;
   awayTeamId: string;
-  startsAt: string;
-  venue: string;
+  matchNumber?: string;
+  startsAt?: string;
+  venue?: string;
   revision: number;
   lineups: Record<string, { starters: string[]; substitutes: string[] }>;
   scoreSummary: Record<string, number> & {
@@ -36,7 +37,6 @@ export interface OverallStandingRow {
   football: number;
   handball: number;
   cricket: number;
-  discipline: number;
   total: number;
 }
 

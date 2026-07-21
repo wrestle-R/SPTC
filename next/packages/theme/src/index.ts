@@ -18,5 +18,4 @@ export const chartColors = {
   football: "#f97316",
   handball: "#14b8a6",
   cricket: "#eab308",
-  discipline: "#64748b",
 } as const;

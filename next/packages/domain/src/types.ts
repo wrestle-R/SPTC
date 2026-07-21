@@ -179,7 +179,6 @@ export interface FieldStanding extends FieldStandingInput {
 export interface OverallStandingInput {
   teamId: TeamId;
   sportPlacements: Record<string, number | null | undefined>;
-  disciplineAdjustment?: number;
 }
 
 export interface OverallStanding extends OverallStandingInput {

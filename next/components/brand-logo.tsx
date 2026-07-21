@@ -10,12 +10,11 @@ export function BrandLogo({ compact = false, className }: BrandLogoProps) {
   return (
     <div className={cn("flex min-w-0 items-center gap-3", className)}>
       <span className="relative size-10 shrink-0 overflow-hidden rounded-lg border bg-background shadow-sm">
-        <Image src="/sports-fiesta-logo.png" alt="" fill sizes="40px" className="object-cover" priority />
+        <Image src="/logo.png" alt="" fill sizes="40px" className="object-contain" priority />
       </span>
       {!compact ? (
         <span className="min-w-0 leading-tight">
           <span className="block truncate text-sm font-semibold">Sports Fiesta</span>
-          <span className="block truncate text-xs text-muted-foreground">Season 9</span>
         </span>
       ) : null}
     </div>

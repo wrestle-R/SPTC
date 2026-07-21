@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { calculateOverallStandings, rankFieldStandings } from "../src/standings";
+import { calculateOverallStandings, rankFieldStandings, rankOverallStandings } from "../src/standings";
 
 describe("standings", () => {
   it("ranks field sports by wins, goal difference, then goals for", () => {
@@ -11,7 +11,7 @@ describe("standings", () => {
     expect(rows.map((row) => row.teamId)).toEqual(["green", "red"]);
   });
 
-  it("combines placement awards and discipline adjustments", () => {
+  it("combines sport placement awards without discipline adjustments", () => {
     const standings = calculateOverallStandings(
       ["red", "green"],
       [
@@ -19,12 +19,22 @@ describe("standings", () => {
         { teamId: "green", sport: "football", place: 2 },
       ],
       { football: [10, 5, 3, 1], cricket: [10, 5, 3, 1], handball: [10, 5, 3, 1] },
-      [{ teamId: "green", points: -2 }],
     );
 
     expect(standings).toEqual([
       expect.objectContaining({ teamId: "red", total: 10 }),
-      expect.objectContaining({ teamId: "green", total: 3 }),
+      expect.objectContaining({ teamId: "green", total: 5 }),
     ]);
+    expect(standings.every((row) => !("disciplinePoints" in row))).toBe(true);
+  });
+
+  it("ranks overall standings using sport placements only", () => {
+    const standings = rankOverallStandings([
+      { teamId: "red", sportPlacements: { football: 2, cricket: 1 } },
+      { teamId: "green", sportPlacements: { football: 1, cricket: 3 } },
+    ]);
+
+    expect(standings[0]).toMatchObject({ teamId: "red", sportPoints: 15, totalPoints: 15 });
+    expect(standings.every((row) => !("disciplineAdjustment" in row))).toBe(true);
   });
 });

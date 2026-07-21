@@ -4,24 +4,24 @@
     "slug": "sports-fiesta-s9-organizer",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/sports-fiesta-logo.png",
+    "icon": "./assets/images/logo.png",
     "scheme": "sportsfiestaorganizer",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/images/sports-fiesta-logo.png",
+      "icon": "./assets/images/logo.png",
       "bundleIdentifier": "com.sptc.sportsfiesta.organizer"
     },
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#111210",
-        "foregroundImage": "./assets/images/sports-fiesta-logo.png"
+        "foregroundImage": "./assets/images/logo.png"
       },
       "package": "com.sptc.sportsfiesta.organizer",
       "predictiveBackGestureEnabled": false
     },
     "web": {
       "output": "static",
-      "favicon": "./assets/images/sports-fiesta-logo.png"
+      "favicon": "./assets/images/logo.png"
     },
     "plugins": [
       "expo-router",
@@ -29,7 +29,7 @@
         "expo-splash-screen",
         {
           "backgroundColor": "#111210",
-          "image": "./assets/images/sports-fiesta-logo.png",
+          "image": "./assets/images/logo.png",
           "imageWidth": 120
         }
       ],

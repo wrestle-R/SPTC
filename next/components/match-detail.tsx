@@ -1,10 +1,10 @@
 "use client";
 
 import { cricketInningsMetrics, S9_TEAMS } from "@sports-fiesta/domain";
-import { ArrowLeft, CalendarDays, CircleDashed, MapPin, Radio } from "lucide-react";
+import { ArrowLeft, CircleDashed } from "lucide-react";
 import Link from "next/link";
 import { ContentSkeleton, DataError } from "@/components/data-state";
-import { Badge } from "@/components/ui/badge";
+import { MatchStatusBadge } from "@/components/match-status-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -12,13 +12,6 @@ import { usePublicCollection, usePublicDocument } from "@/lib/public-data";
 import type { PublicMatch, PublicPlayer, PublicTeam } from "@/lib/web-types";
 
 type Sport = "football" | "handball" | "cricket";
-
-function formatDate(value: string) {
-  const date = new Date(value);
-  return Number.isNaN(date.valueOf())
-    ? "Schedule pending"
-    : new Intl.DateTimeFormat("en-IN", { dateStyle: "full", timeStyle: "short" }).format(date);
-}
 
 export function MatchDetail({ sport, matchId }: { sport: Sport; matchId: string }) {
   const matchState = usePublicDocument<PublicMatch>("matches", matchId);
@@ -58,13 +51,10 @@ export function MatchDetail({ sport, matchId }: { sport: Sport; matchId: string 
         <CardHeader className="border-b bg-muted/30">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <CardDescription className="capitalize">{match.stage} {sport}</CardDescription>
+              <CardDescription className="capitalize">{match.matchNumber ?? "Match"} · {match.stage} {sport}</CardDescription>
               <CardTitle className="mt-1 text-xl sm:text-2xl">{home?.name ?? "Team"} vs {away?.name ?? "Team"}</CardTitle>
             </div>
-            <Badge variant={match.status === "live" ? "destructive" : "secondary"}>
-              {match.status === "live" ? <Radio data-icon="inline-start" /> : null}
-              {match.status.replace("-", " ")}
-            </Badge>
+            <MatchStatusBadge status={match.status} />
           </div>
         </CardHeader>
         <CardContent className="flex flex-col gap-6 pt-6">
@@ -73,10 +63,6 @@ export function MatchDetail({ sport, matchId }: { sport: Sport; matchId: string 
           ) : (
             <FieldScore match={match} homeName={home?.name ?? "Team"} awayName={away?.name ?? "Team"} playerName={playerName} teamName={teamName} />
           )}
-          <div className="flex flex-wrap gap-x-5 gap-y-2 border-t pt-4 text-sm text-muted-foreground">
-            <span className="inline-flex items-center gap-2"><CalendarDays /> {formatDate(match.startsAt)}</span>
-            <span className="inline-flex items-center gap-2"><MapPin /> {match.venue || "Venue pending"}</span>
-          </div>
           {match.resultText ? <p className="rounded-md bg-muted p-3 font-medium">{match.resultText}</p> : null}
         </CardContent>
       </Card>
@@ -138,7 +124,7 @@ function CricketScore({ match, teamName, playerName }: {
         <p className="mt-2 text-sm text-muted-foreground">{current.overs} overs · RR {metrics?.runRate.toFixed(2)}</p>
         {target ? <p className="mt-2 font-medium">Need {metrics?.runsRequired} from {metrics?.ballsRemaining} balls · RRR {metrics?.requiredRunRate === Infinity ? "-" : metrics?.requiredRunRate.toFixed(2)}</p> : null}
       </div>
-      <ScoreTable title="Batting" headers={["Batter", "R", "B", "4s", "6s", "SR"]} rows={batters.map((batter) => [
+      <ScoreTable title="Batting" headers={["Batter", "R", "B", "4s", "6s", "SR"]} dismissedRows={batters.map((batter) => Boolean(batter.dismissal))} rows={batters.map((batter) => [
         playerName(batter.playerId), batter.runs, batter.balls, batter.fours, batter.sixes,
         batter.balls ? ((batter.runs / batter.balls) * 100).toFixed(1) : "0.0",
       ])} />
@@ -161,13 +147,13 @@ function CricketScore({ match, teamName, playerName }: {
   );
 }
 
-function ScoreTable({ title, headers, rows }: { title: string; headers: string[]; rows: Array<Array<string | number>> }) {
+function ScoreTable({ title, headers, rows, dismissedRows = [] }: { title: string; headers: string[]; rows: Array<Array<string | number>>; dismissedRows?: boolean[] }) {
   return (
     <div>
       <h2 className="mb-3 text-lg font-semibold">{title}</h2>
       <Table>
         <TableHeader><TableRow>{headers.map((header) => <TableHead key={header} className={header === headers[0] ? "" : "text-right"}>{header}</TableHead>)}</TableRow></TableHeader>
-        <TableBody>{rows.map((row, index) => <TableRow key={`${row[0]}-${index}`}>{row.map((cell, cellIndex) => <TableCell key={cellIndex} className={cellIndex === 0 ? "font-medium" : "text-right tabular-nums"}>{cell}</TableCell>)}</TableRow>)}</TableBody>
+        <TableBody>{rows.map((row, index) => <TableRow key={`${row[0]}-${index}`} className={dismissedRows[index] ? "bg-destructive/5 text-muted-foreground" : undefined}>{row.map((cell, cellIndex) => <TableCell key={cellIndex} className={cellIndex === 0 ? dismissedRows[index] ? "font-medium text-destructive line-through decoration-2" : "font-medium" : "text-right tabular-nums"}>{cell}{cellIndex === 0 && dismissedRows[index] ? <span className="ml-2 text-[10px] font-bold no-underline">OUT</span> : null}</TableCell>)}</TableRow>)}</TableBody>
       </Table>
     </div>
   );

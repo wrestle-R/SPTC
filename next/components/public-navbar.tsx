@@ -12,9 +12,6 @@ import { cn } from "@/lib/utils";
 
 const links = [
   { href: "/teams", label: "Teams" },
-  { href: "/football", label: "Football" },
-  { href: "/handball", label: "Handball" },
-  { href: "/cricket", label: "Cricket" },
 ];
 
 const subscribeToHydration = () => () => undefined;
@@ -37,7 +34,7 @@ export function PublicNavbar() {
           scrolled && "rounded-full border-border/70 bg-background/85 shadow-sm backdrop-blur-xl",
         )}
       >
-        <Link href="/" aria-label="Sports Fiesta S9 home" onClick={() => setOpen(false)}>
+        <Link href="/" aria-label="Sports Fiesta home" onClick={() => setOpen(false)}>
           <BrandLogo />
         </Link>
         <nav className="absolute left-1/2 hidden -translate-x-1/2 items-center md:flex" aria-label="Tournament">

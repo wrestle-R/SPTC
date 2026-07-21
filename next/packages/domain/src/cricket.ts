@@ -116,6 +116,29 @@ function isLegalDelivery(input: CricketDeliveryInput) {
   return !["wide", "no-ball", "dead-ball", "penalty"].includes(input.extraType ?? "");
 }
 
+export interface FallOfWicket {
+  wicket: number;
+  score: number;
+  over: string;
+  playerOutId: PlayerId;
+}
+
+export function fallOfWickets(state: Pick<CricketInningsState, "events">): FallOfWicket[] {
+  let score = 0;
+  let wickets = 0;
+  return state.events.flatMap((event) => {
+    score += event.totalRuns;
+    if (!event.dismissal || event.dismissal.type === "retired-hurt") return [];
+    wickets += 1;
+    return [{
+      wicket: wickets,
+      score,
+      over: `${event.over}.${event.ball}`,
+      playerOutId: event.dismissal.playerOutId,
+    }];
+  });
+}
+
 function runsForDelivery(input: CricketDeliveryInput) {
   if (input.extraType === "dead-ball") return 0;
   if (input.extraType === "wide") return Math.max(1, input.extraRuns ?? 1);

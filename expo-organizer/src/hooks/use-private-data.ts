@@ -3,7 +3,7 @@ import { collection, doc, onSnapshot, type DocumentData } from "firebase/firesto
 import { useEffect, useState } from "react";
 import { db, privatePath } from "@/lib/firebase";
 
-const API_URL = process.env.EXPO_PUBLIC_API_URL;
+const API_URL = process.env.EXPO_PUBLIC_API_URL || "https://sptc-fiesta.vercel.app";
 
 export function usePrivateCollection<T extends DocumentData>(name: string) { const [data, setData] = useState<T[]>([]); const [loading, setLoading] = useState(true); const [error, setError] = useState<string | null>(null); useEffect(() => { const key = `private-${name}`; AsyncStorage.getItem(key).then((cached) => { if (cached) setData(JSON.parse(cached) as T[]); }).finally(() => setLoading(false)); return onSnapshot(collection(db, privatePath(name)), (snapshot) => { const rows = snapshot.docs.map((item) => ({ id: item.id, ...item.data() }) as unknown as T); setData(rows); setLoading(false); setError(null); void AsyncStorage.setItem(key, JSON.stringify(rows)); }, (cause) => { setError(cause.message); setLoading(false); }); }, [name]); return { data, loading, error }; }
 export function usePrivateDocument<T extends DocumentData>(name: string, id: string) { const [data, setData] = useState<T | null>(null); const [loading, setLoading] = useState(true); const [error, setError] = useState<string | null>(null); useEffect(() => onSnapshot(doc(db, privatePath(name, id)), (snapshot) => { setData(snapshot.exists() ? ({ id: snapshot.id, ...snapshot.data() } as unknown as T) : null); setLoading(false); setError(null); }, (cause) => { setError(cause.message); setLoading(false); }), [id, name]); return { data, loading, error }; }
@@ -19,5 +19,6 @@ export async function command<T = unknown>(name: string, data: Record<string, un
   if (!response.ok || body.error) throw new Error(body.error?.message ?? `Command failed (${response.status}).`);
   return body.result as T;
 }
-export function revision(match: MatchLike, data: Record<string, unknown> = {}) { return { ...data, matchId: match.id, expectedRevision: match.revision, commandId: crypto.randomUUID() }; }
+function commandId() { return `cmd-${Date.now()}-${Math.random().toString(36).slice(2, 12)}`; }
+export function revision(match: MatchLike, data: Record<string, unknown> = {}) { return { ...data, matchId: match.id, expectedRevision: match.revision, commandId: commandId() }; }
 type MatchLike = { id: string; revision: number };

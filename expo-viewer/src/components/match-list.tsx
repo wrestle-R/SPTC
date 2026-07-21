@@ -1,27 +1,24 @@
 import { useRouter } from "expo-router";
-import { CalendarDays, ChevronRight, MapPin } from "lucide-react-native";
+import { ChevronRight } from "lucide-react-native";
 import { Pressable, StyleSheet, Text, View } from "react-native";
-import { Card, Section, StateView } from "@/components/screen";
+import { Badge, Card, StateView } from "@/components/ui/primitives";
 import { usePublicCollection } from "@/hooks/use-public-data";
-import { colors } from "@/lib/theme";
-import type { PublicMatch, PublicTeam, Sport } from "@/lib/types";
+import { useAppTheme } from "@/lib/theme";
+import type { PublicMatch, PublicTeam } from "@/lib/types";
 
-export function MatchList({ sport }: { sport: Sport }) {
-  const matches = usePublicCollection<PublicMatch>("matches");
-  const teams = usePublicCollection<PublicTeam>("teams");
-  const filtered = matches.data.filter((match) => match.sport === sport).sort((a, b) => new Date(a.startsAt).valueOf() - new Date(b.startsAt).valueOf());
-  const groups = [{ title: "Live now", rows: filtered.filter((match) => ["live", "innings-break", "super-over"].includes(match.status)) }, { title: "Upcoming", rows: filtered.filter((match) => ["scheduled", "lineup"].includes(match.status)) }, { title: "Results", rows: filtered.filter((match) => match.status === "completed") }];
+export function MatchList({ filter, limit }: { filter?: (match: PublicMatch) => boolean; limit?: number }) {
+  const matches = usePublicCollection<PublicMatch>("matches"); const teams = usePublicCollection<PublicTeam>("teams");
   if (matches.loading || teams.loading) return <StateView loading />;
   if (matches.error || teams.error) return <StateView error={matches.error || teams.error} />;
-  if (!filtered.length) return <StateView empty={<><CalendarDays color={colors.muted} /><Text style={styles.emptyTitle}>No fixtures yet</Text><Text style={styles.muted}>Organizer-created matches will appear automatically.</Text></>} />;
-  return <View style={styles.groups}>{groups.filter((group) => group.rows.length).map((group) => <Section key={group.title} title={group.title}><View style={styles.list}>{group.rows.map((match) => <MatchItem key={match.id} match={match} teams={teams.data} />)}</View></Section>)}</View>;
+  const rows = matches.data.filter(filter ?? (() => true)).sort((a, b) => (a.matchNumber ?? a.id).localeCompare(b.matchNumber ?? b.id)).slice(0, limit);
+  if (!rows.length) return <StateView empty={<Text style={{ color: "#8b9188" }}>No matches in this section.</Text>} />;
+  return <View style={styles.list}>{rows.map((match) => <MatchItem key={match.id} match={match} teams={teams.data} />)}</View>;
 }
 
-function MatchItem({ match, teams }: { match: PublicMatch; teams: PublicTeam[] }) {
-  const router = useRouter(); const home = teams.find((team) => team.id === match.homeTeamId); const away = teams.find((team) => team.id === match.awayTeamId);
+export function MatchItem({ match, teams }: { match: PublicMatch; teams: PublicTeam[] }) {
+  const router = useRouter(); const { colors } = useAppTheme(); const home = teams.find((team) => team.id === match.homeTeamId); const away = teams.find((team) => team.id === match.awayTeamId);
   const innings = match.scoreSummary?.innings ?? [];
   const score = (teamId: string) => match.sport === "cricket" ? (() => { const row = innings.find((item) => item.battingTeamId === teamId); return row ? `${row.score}/${row.wickets}` : "-"; })() : String(match.scoreSummary?.[teamId] ?? 0);
-  return <Pressable onPress={() => router.push({ pathname: "/match/[matchId]", params: { matchId: match.id } })} accessibilityRole="button" style={({ pressed }) => [pressed && { opacity: 0.75 }]}><Card><View style={styles.top}><Text style={styles.stage}>{match.stage.toUpperCase()}</Text><Text style={[styles.status, match.status === "live" && styles.live]}>{match.status.toUpperCase()}</Text></View><View style={styles.scoreRow}><View style={styles.team}><Text style={styles.teamName} numberOfLines={2}>{home?.shortName ?? "Home"}</Text><Text style={styles.score}>{score(match.homeTeamId)}</Text></View><Text style={styles.vs}>VS</Text><View style={[styles.team, { alignItems: "flex-end" }]}><Text style={[styles.teamName, { textAlign: "right" }]} numberOfLines={2}>{away?.shortName ?? "Away"}</Text><Text style={styles.score}>{score(match.awayTeamId)}</Text></View></View><View style={styles.meta}><View style={styles.metaText}><MapPin color={colors.muted} size={16} /><Text style={styles.muted} numberOfLines={1}>{match.venue || "Venue pending"}</Text></View><ChevronRight color={colors.muted} size={20} /></View></Card></Pressable>;
+  return <Pressable onPress={() => router.push({ pathname: "/match/[matchId]", params: { matchId: match.id } })} accessibilityRole="button" style={({ pressed }) => [pressed && { opacity: 0.75 }]}><Card><View style={styles.top}><Text style={[styles.stage, { color: colors.primary }]}>{match.matchNumber ?? "MATCH"} · {match.sport.toUpperCase()}</Text><Badge status={match.status} /></View><View style={styles.scoreRow}><View style={styles.team}><Text style={[styles.teamName, { color: colors.text }]} numberOfLines={2}>{home?.name ?? "Home"}</Text><Text style={[styles.score, { color: colors.text }]}>{score(match.homeTeamId)}</Text></View><Text style={[styles.vs, { color: colors.muted }]}>VS</Text><View style={[styles.team, { alignItems: "flex-end" }]}><Text style={[styles.teamName, { color: colors.text, textAlign: "right" }]} numberOfLines={2}>{away?.name ?? "Away"}</Text><Text style={[styles.score, { color: colors.text }]}>{score(match.awayTeamId)}</Text></View></View><View style={[styles.meta, { borderTopColor: colors.border }]}><Text style={[styles.muted, { color: colors.muted }]}>{match.stage.replace("semifinal", "semi-final").toUpperCase()}</Text><ChevronRight color={colors.muted} size={20} /></View></Card></Pressable>;
 }
-
-const styles = StyleSheet.create({ groups: { gap: 24 }, list: { gap: 10 }, top: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12 }, stage: { color: colors.muted, fontSize: 11, fontWeight: "800" }, status: { color: colors.muted, fontSize: 11, fontWeight: "800" }, live: { color: colors.danger }, scoreRow: { flexDirection: "row", alignItems: "center", marginTop: 18, gap: 10 }, team: { flex: 1, gap: 6 }, teamName: { color: colors.text, fontSize: 16, lineHeight: 20, fontWeight: "700" }, score: { color: colors.text, fontSize: 30, fontWeight: "800" }, vs: { color: colors.muted, fontSize: 11, fontWeight: "800" }, meta: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", borderTopWidth: 1, borderTopColor: colors.border, marginTop: 16, paddingTop: 12 }, metaText: { flex: 1, flexDirection: "row", alignItems: "center", gap: 7 }, muted: { color: colors.muted, fontSize: 13, flexShrink: 1 }, emptyTitle: { color: colors.text, fontSize: 17, fontWeight: "700" } });
+const styles = StyleSheet.create({ list: { gap: 10 }, top: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12 }, stage: { fontSize: 11, fontWeight: "900" }, scoreRow: { flexDirection: "row", alignItems: "center", marginTop: 18, gap: 10 }, team: { flex: 1, gap: 6 }, teamName: { fontSize: 15, lineHeight: 20, fontWeight: "700" }, score: { fontSize: 30, fontWeight: "800" }, vs: { fontSize: 11, fontWeight: "800" }, meta: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", borderTopWidth: 1, marginTop: 16, paddingTop: 12 }, muted: { fontSize: 12, fontWeight: "700" } });

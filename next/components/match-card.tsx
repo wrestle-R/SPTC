@@ -1,15 +1,8 @@
-import { CalendarDays, ChevronRight, MapPin, Radio } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import Link from "next/link";
-import { Badge } from "@/components/ui/badge";
+import { MatchStatusBadge } from "@/components/match-status-badge";
 import { Card, CardContent } from "@/components/ui/card";
 import type { PublicMatch, PublicTeam } from "@/lib/web-types";
-
-function formatDate(value: string) {
-  const date = new Date(value);
-  return Number.isNaN(date.valueOf())
-    ? "Schedule pending"
-    : new Intl.DateTimeFormat("en-IN", { dateStyle: "medium", timeStyle: "short" }).format(date);
-}
 
 export function MatchCard({ match, teams, featured = false }: { match: PublicMatch; teams: PublicTeam[]; featured?: boolean }) {
   const home = teams.find((team) => team.id === match.homeTeamId);
@@ -29,12 +22,9 @@ export function MatchCard({ match, teams, featured = false }: { match: PublicMat
         <CardContent className="p-4 sm:p-5">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-2 text-xs font-medium uppercase text-muted-foreground">
-              {match.status === "live" ? <Radio className="size-4 text-destructive" /> : <CalendarDays className="size-4" />}
-              {match.stage}
+              {match.matchNumber ?? "Match"} · {match.stage}
             </div>
-            <Badge variant={match.status === "live" ? "destructive" : "secondary"}>
-              {match.status === "live" ? "Live" : match.status.replace("-", " ")}
-            </Badge>
+            <MatchStatusBadge status={match.status} />
           </div>
           <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
             <TeamScore team={home} score={isCricket ? cricketScore(homeScore) : match.scoreSummary?.[match.homeTeamId]} />
@@ -42,10 +32,7 @@ export function MatchCard({ match, teams, featured = false }: { match: PublicMat
             <TeamScore team={away} score={isCricket ? cricketScore(awayScore) : match.scoreSummary?.[match.awayTeamId]} align="right" />
           </div>
           <div className="mt-4 flex items-center justify-between gap-3 border-t pt-3 text-sm text-muted-foreground">
-            <span className="flex min-w-0 items-center gap-2">
-              <MapPin className="size-4 shrink-0" />
-              <span className="truncate">{match.status === "scheduled" ? formatDate(match.startsAt) : match.venue}</span>
-            </span>
+            <span className="truncate capitalize">{match.sport} · {match.stage}</span>
             <ChevronRight className="size-4 shrink-0" />
           </div>
         </CardContent>

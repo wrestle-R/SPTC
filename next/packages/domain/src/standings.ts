@@ -31,16 +31,10 @@ interface SportPlacement {
   place: number;
 }
 
-interface DisciplineAdjustment {
-  teamId: string;
-  points: number;
-}
-
 export function calculateOverallStandings(
   teamIds: string[],
   placements: SportPlacement[],
   pointsBySport: Record<string, readonly number[]>,
-  discipline: DisciplineAdjustment[] = [],
 ) {
   return teamIds
     .map((teamId) => {
@@ -53,15 +47,11 @@ export function calculateOverallStandings(
         }),
       );
       const sportPoints = Object.values(segments).reduce((sum, points) => sum + points, 0);
-      const disciplinePoints = discipline
-        .filter((entry) => entry.teamId === teamId)
-        .reduce((sum, entry) => sum + entry.points, 0);
       return {
         teamId,
         segments,
         sportPoints,
-        disciplinePoints,
-        total: sportPoints + disciplinePoints,
+        total: sportPoints,
       };
     })
     .sort((a, b) => b.total - a.total || b.sportPoints - a.sportPoints || a.teamId.localeCompare(b.teamId))
@@ -81,13 +71,11 @@ export function rankOverallStandings(
         ]),
       );
       const sportPoints = Object.values(segments).reduce((total, points) => total + points, 0);
-      const disciplineAdjustment = row.disciplineAdjustment ?? 0;
       return {
         ...row,
-        disciplineAdjustment,
         segments,
         sportPoints,
-        totalPoints: sportPoints + disciplineAdjustment,
+        totalPoints: sportPoints,
         rank: 0,
       };
     })

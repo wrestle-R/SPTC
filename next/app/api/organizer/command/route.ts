@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { CommandError } from "@/lib/firebase-admin";
 import {
-  handleAddDisciplineAdjustment, handleBootstrap, handleConfirmAward, handleConfirmFixtures, handleCreateMatch,
+  handleBootstrap, handleConfirmAward, handleConfirmFixtures, handleCreateMatch,
   handleEditMatchEvent, handleEndInnings, handleEndMatch, handleRecordCricketDelivery, handleRecordFieldSportEvent,
   handleRefreshProjections, handleSavePlayer, handleSaveTeam, handleSaveTournamentSettings, handleSelectCricketBowler,
   handleSelectNextBatter, handleSetLineup, handleSetPlacementPoints, handleSetToss, handleStartInnings, handleStartMatch,
@@ -42,13 +42,12 @@ async function dispatch(command: string, data: Record<string, unknown>): Promise
     case "recordCricketDelivery": return handleRecordCricketDelivery(data);
     case "selectNextBatter": return handleSelectNextBatter(data);
     case "selectCricketBowler": return handleSelectCricketBowler(data);
-    case "recordFieldSportEvent": return handleRecordFieldSportEvent(data);
+    case "recordFieldEvent": return handleRecordFieldSportEvent(data);
     case "editMatchEvent": return handleEditMatchEvent(data);
     case "undoLastEvent": return handleUndoLastEvent(data);
     case "endInnings": return handleEndInnings(data);
     case "endMatch": return handleEndMatch(data);
     case "confirmAward": return handleConfirmAward(data);
-    case "addDisciplineAdjustment": return handleAddDisciplineAdjustment(data);
     case "setPlacementPoints": return handleSetPlacementPoints(data);
     case "refreshProjections": return handleRefreshProjections();
     default: throw new CommandError(400, "INVALID_ARGUMENT", `Unknown command: ${command}`);

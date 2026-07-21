@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   cricketInningsMetrics,
   createCricketInnings,
+  fallOfWickets,
   recalculateCricketInnings,
   recordCricketDelivery,
   setCricketBowler,
@@ -111,6 +112,18 @@ describe("five-over cricket scoring", () => {
     expect(wicket.strikerId).toBeNull();
     expect(() => recordCricketDelivery(wicket, { runsOffBat: 1 })).toThrow(/next batter/i);
     expect(setNextBatter(wicket, "c").strikerId).toBe("c");
+  });
+
+  it("derives fall of wickets with the score and over at dismissal time", () => {
+    let state = recordCricketDelivery(innings(), { runsOffBat: 4 });
+    state = recordCricketDelivery(state, {
+      runsOffBat: 0,
+      dismissal: { type: "bowled", playerOutId: "a" },
+    });
+
+    expect(fallOfWickets(state)).toEqual([
+      { wicket: 1, score: 4, over: "0.2", playerOutId: "a" },
+    ]);
   });
 
   it("ends an innings after five completed overs", () => {
