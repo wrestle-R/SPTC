@@ -38,7 +38,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         <SidebarHeader className="p-3">
           <SidebarMenu>
             <SidebarMenuItem>
-              <SidebarMenuButton size="lg" render={<Link href="/organizer" />} tooltip="Sports Fiesta S9">
+              <SidebarMenuButton size="lg" render={<Link href="/organizer" />} tooltip="Sports Fiesta">
                 <BrandLogo className="group-data-[collapsible=icon]:[&>span:last-child]:hidden" />
               </SidebarMenuButton>
             </SidebarMenuItem>

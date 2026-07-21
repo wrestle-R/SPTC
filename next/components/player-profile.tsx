@@ -23,7 +23,7 @@ export function PlayerProfile({ playerId }: { playerId: string }) {
         <CardHeader>
           <div className="flex items-center gap-4">
             <span className="grid size-14 place-items-center rounded-md bg-muted"><UserRound /></span>
-            <div><CardTitle className="text-2xl">{player.data.name}</CardTitle><CardDescription>{team?.name ?? "Sports Fiesta S9"}</CardDescription></div>
+            <div><CardTitle className="text-2xl">{player.data.name}</CardTitle><CardDescription>{team?.name ?? "Sports Fiesta"}</CardDescription></div>
           </div>
         </CardHeader>
         <CardContent className="flex flex-wrap gap-2">

@@ -28,7 +28,7 @@ export function SportView({ sport }: { sport: keyof typeof headings }) {
   return (
     <div className="flex flex-col gap-8">
       <header className="max-w-2xl">
-        <p className="text-sm font-semibold text-primary">Sports Fiesta S9</p>
+        <p className="text-sm font-semibold text-primary">Sports Fiesta</p>
         <h1 className="mt-2 text-3xl font-semibold sm:text-4xl">{headings[sport].title}</h1>
         <p className="mt-3 text-base leading-7 text-muted-foreground">{headings[sport].description}</p>
       </header>

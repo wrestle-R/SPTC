@@ -63,7 +63,7 @@ export async function handleBootstrap() {
   const batch = _r().db.batch();
   const tournament: DocumentData = {
     id: "sports-fiesta-s9",
-    name: "Sports Fiesta S9",
+    name: "Sports Fiesta",
     season: "S9",
     organizer: "SPTC",
     startDate: null,

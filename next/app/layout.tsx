@@ -12,8 +12,8 @@ const outfit = Outfit({
 
 export const metadata: Metadata = {
   title: {
-    default: "Sports Fiesta S9",
-    template: "%s | Sports Fiesta S9",
+    default: "Sports Fiesta",
+    template: "%s | Sports Fiesta",
   },
   description:
     "Live scores, fixtures, standings, brackets, and tournament operations in one place.",
