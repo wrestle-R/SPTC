@@ -5,7 +5,6 @@ import { ArrowRight, CircleDot, Hand, Radio, Trophy, Users } from "lucide-react"
 import Link from "next/link";
 import { DataError, ContentSkeleton } from "@/components/data-state";
 import { MatchCard } from "@/components/match-card";
-import { TeamStandings } from "@/components/team-standings";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -112,8 +111,6 @@ export function HomeView() {
           ))}
         </div>
       </section>
-
-      <TeamStandings compact />
 
       {upcoming.length ? (
         <section className="flex flex-col gap-3" aria-labelledby="upcoming-heading">

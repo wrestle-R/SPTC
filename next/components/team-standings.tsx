@@ -4,21 +4,13 @@ import { S9_TEAMS } from "@sports-fiesta/domain";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts";
 import { ContentSkeleton, DataError } from "@/components/data-state";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ChartContainer, ChartLegend, ChartLegendContent, ChartTooltip, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { usePublicDocument } from "@/lib/public-data";
 import type { OverallStandingDocument } from "@/lib/web-types";
 import { motion } from "framer-motion";
-import { Trophy, Medal, TrendingUp } from "lucide-react";
-
-const chartConfig = {
-  football: { label: "Football", color: "var(--chart-1)" },
-  handball: { label: "Handball", color: "var(--chart-2)" },
-  cricket: { label: "Cricket", color: "var(--chart-3)" },
-} satisfies ChartConfig;
+import { Trophy, Medal } from "lucide-react";
 
 const TEAM_JERSEYS: Record<string, { front: string; back: string }> = {
   "crimson-warriors": { front: "/Jersey/red-front.png", back: "/Jersey/red-back.png" },
@@ -41,7 +33,7 @@ const TEAM_TEXT_COLORS: Record<string, string> = {
   "ivory-elites": "text-orange-600",
 };
 
-export function TeamStandings({ compact = false }: { compact?: boolean }) {
+export function TeamStandings() {
   const router = useRouter();
   const standings = usePublicDocument<OverallStandingDocument>("standings", "overall");
   const rows = S9_TEAMS.map((team, index) => {
@@ -49,7 +41,6 @@ export function TeamStandings({ compact = false }: { compact?: boolean }) {
     return {
       rank: stored?.rank ?? index + 1,
       teamId: team.id,
-      team: team.shortName,
       name: team.name,
       accentColor: team.accentColor,
       football: stored?.football ?? 0,
@@ -58,8 +49,6 @@ export function TeamStandings({ compact = false }: { compact?: boolean }) {
       total: stored?.total ?? 0,
     };
   }).sort((a, b) => b.total - a.total || a.rank - b.rank);
-
-  const topTeam = rows[0];
 
   return (
     <section className="flex flex-col gap-6" aria-labelledby="standings-heading">
@@ -115,31 +104,7 @@ export function TeamStandings({ compact = false }: { compact?: boolean }) {
             })}
           </div>
 
-          <div className={compact ? "grid gap-4 lg:grid-cols-[0.9fr_1.1fr]" : "grid gap-4 lg:grid-cols-[1fr_1.2fr]"}>
-            <Card className="shadow-none border-white/10 bg-gradient-to-br from-zinc-900 to-zinc-800 text-white overflow-hidden">
-              <CardHeader className="pb-2">
-                <CardTitle className="flex items-center gap-2 text-white">
-                  <TrendingUp className="h-5 w-5 text-emerald-400" />
-                  Points Breakdown
-                </CardTitle>
-                <CardDescription className="text-zinc-400">Placement points earned across all three sports.</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ChartContainer config={chartConfig} className="h-56 w-full aspect-auto">
-                  <BarChart data={rows} layout="vertical" margin={{ left: 8, right: 12 }} accessibilityLayer>
-                    <CartesianGrid horizontal={false} strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-                    <XAxis type="number" allowDecimals={false} stroke="rgba(255,255,255,0.3)" tick={{ fill: "rgba(255,255,255,0.5)" }} />
-                    <YAxis type="category" dataKey="team" width={68} tickLine={false} axisLine={false} stroke="rgba(255,255,255,0.3)" tick={{ fill: "rgba(255,255,255,0.7)", fontWeight: 600 }} />
-                    <ChartTooltip content={<ChartTooltipContent />} />
-                    <ChartLegend content={<ChartLegendContent />} />
-                    <Bar dataKey="football" stackId="points" fill="var(--color-football)" radius={[0, 0, 0, 0]} />
-                    <Bar dataKey="handball" stackId="points" fill="var(--color-handball)" radius={[0, 0, 0, 0]} />
-                    <Bar dataKey="cricket" stackId="points" fill="var(--color-cricket)" radius={[0, 4, 4, 0]} />
-                  </BarChart>
-                </ChartContainer>
-              </CardContent>
-            </Card>
-
+          <div>
             <Card className="shadow-none overflow-hidden">
               <CardHeader className="pb-2">
                 <CardTitle className="flex items-center gap-2">
