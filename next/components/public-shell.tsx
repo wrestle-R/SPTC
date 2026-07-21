@@ -5,7 +5,7 @@ export function PublicShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-svh flex-col">
       <PublicNavbar />
-      <main className="mx-auto w-full max-w-6xl flex-1 px-4 pb-16 pt-24 sm:px-6">{children}</main>
+      <main className="mx-auto w-full max-w-6xl flex-1 px-4 pb-12 pt-20 sm:px-6">{children}</main>
       <footer className="mt-auto border-t bg-muted/40">
         <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 px-4 py-6 sm:flex-row sm:px-6">
           <nav className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm" aria-label="Footer sports">
