@@ -13,6 +13,8 @@ export {
   savePlayer,
   saveTeam,
   saveTournamentSettings,
+  selectCricketBowler,
+  selectNextBatter,
   setLineup,
   setPlacementPoints,
   setToss,

@@ -4,6 +4,8 @@ import {
   recalculateCricketInnings,
   recordCricketDelivery as applyCricketDelivery,
   recordFieldEvent,
+  setCricketBowler as applyCricketBowler,
+  setNextBatter as applyNextBatter,
   validateFixture,
   type CricketDeliveryInput,
   type CricketInningsState,
@@ -370,6 +372,42 @@ export const recordCricketDelivery = organizerCallable((data, actor) => mutateMa
   return { match: next, event };
 }));
 
+export const selectNextBatter = organizerCallable((data, actor) => mutateMatch(data, actor, (match) => {
+  if (match.sport !== "cricket" || match.status !== "live") {
+    throw new HttpsError("failed-precondition", "The cricket match is not live.");
+  }
+  const index = match.cricket?.currentInnings;
+  const innings = [...(match.cricket?.innings ?? [])];
+  if (!Number.isInteger(index) || !innings[index]) throw new HttpsError("failed-precondition", "Start an innings first.");
+  try {
+    innings[index] = {
+      ...innings[index],
+      state: applyNextBatter(innings[index].state, asString(data.playerId, "Next batter")),
+    };
+  } catch (error) {
+    throw new HttpsError("failed-precondition", (error as Error).message);
+  }
+  return { match: { ...match, cricket: { ...match.cricket, innings } } };
+}));
+
+export const selectCricketBowler = organizerCallable((data, actor) => mutateMatch(data, actor, (match) => {
+  if (match.sport !== "cricket" || match.status !== "live") {
+    throw new HttpsError("failed-precondition", "The cricket match is not live.");
+  }
+  const index = match.cricket?.currentInnings;
+  const innings = [...(match.cricket?.innings ?? [])];
+  if (!Number.isInteger(index) || !innings[index]) throw new HttpsError("failed-precondition", "Start an innings first.");
+  try {
+    innings[index] = {
+      ...innings[index],
+      state: applyCricketBowler(innings[index].state, asString(data.playerId, "Bowler")),
+    };
+  } catch (error) {
+    throw new HttpsError("failed-precondition", (error as Error).message);
+  }
+  return { match: { ...match, cricket: { ...match.cricket, innings } } };
+}));
+
 export const recordFieldSportEvent = organizerCallable((data, actor) => mutateMatch(data, actor, (match) => {
   if (!["football", "handball"].includes(match.sport) || match.status !== "live") {
     throw new HttpsError("failed-precondition", "The field-sport match is not live.");
@@ -445,7 +483,8 @@ export const endInnings = organizerCallable((data, actor) => mutateMatch(data, a
   const innings = [...match.cricket.innings];
   const state = { ...innings[index].state, completed: true } as CricketInningsState;
   innings[index] = { ...innings[index], state };
-  return { match: { ...match, status: index % 2 === 0 ? "innings-break" : "completed", cricket: { ...match.cricket, innings } } };
+  const withInnings = { ...match, cricket: { ...match.cricket, innings } };
+  return { match: { ...withInnings, ...cricketStatus(withInnings, state) } };
 }));
 
 export const endMatch = organizerCallable((data, actor) => mutateMatch(data, actor, (match) => ({

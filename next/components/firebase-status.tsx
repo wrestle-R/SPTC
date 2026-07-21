@@ -12,9 +12,9 @@ export function FirebaseStatus() {
       <div className="min-w-0 group-data-[collapsible=icon]:hidden">
         <div className="flex items-center gap-2">
           <p className="truncate text-xs font-medium">Tournament</p>
-          <Badge variant="outline" className="h-4 px-1.5 text-[10px]">Empty</Badge>
+          <Badge variant="outline" className="h-4 px-1.5 text-[10px]">Secure</Badge>
         </div>
-        <p className="truncate text-[11px] text-muted-foreground">Not configured</p>
+        <p className="truncate text-[11px] text-muted-foreground">Firebase live data</p>
       </div>
     </div>
   );
