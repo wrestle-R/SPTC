@@ -1,0 +1,99 @@
+@import "tailwindcss";
+
+:root {
+  --background: #080b12;
+  --foreground: #f7fafc;
+  --card: #101722;
+  --card-strong: #151f2d;
+  --muted: #8ea0b8;
+  --muted-strong: #b9c5d6;
+  --border: rgba(255, 255, 255, 0.12);
+  --primary: #f0c96b;
+  --primary-foreground: #151006;
+  --green: #39d77a;
+  --red: #f05969;
+  --silver: #cbd5e1;
+  --ivory: #fff1c9;
+  --football: #64d2ff;
+  --cricket: #ffb86b;
+  --handball: #b592ff;
+  --discipline: #50e3c2;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-strong: var(--card-strong);
+  --color-muted: var(--muted);
+  --color-muted-strong: var(--muted-strong);
+  --color-border: var(--border);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-green: var(--green);
+  --color-red: var(--red);
+  --color-silver: var(--silver);
+  --color-ivory: var(--ivory);
+  --color-football: var(--football);
+  --color-cricket: var(--cricket);
+  --color-handball: var(--handball);
+  --color-discipline: var(--discipline);
+  --font-sans: var(--font-inter);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  min-height: 100vh;
+  margin: 0;
+  background:
+    radial-gradient(circle at 18% 5%, rgba(240, 201, 107, 0.2), transparent 32rem),
+    radial-gradient(circle at 82% 18%, rgba(100, 210, 255, 0.11), transparent 30rem),
+    linear-gradient(135deg, #070a10 0%, #0b111a 45%, #090d14 100%);
+  color: var(--foreground);
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  letter-spacing: 0;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button,
+a {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 3px;
+}
+
+.score-grid {
+  background-image:
+    linear-gradient(to right, rgba(255, 255, 255, 0.055) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.055) 1px, transparent 1px);
+  background-size: 44px 44px;
+}
+
+.glass {
+  background: rgba(16, 23, 34, 0.78);
+  border: 1px solid var(--border);
+  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.28);
+  backdrop-filter: blur(18px);
+}
+
+.safe-text {
+  overflow-wrap: anywhere;
+}
