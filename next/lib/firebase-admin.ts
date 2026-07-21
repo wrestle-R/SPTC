@@ -17,13 +17,13 @@ function initApp() {
   initializeApp({ projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID });
 }
 
-let _settingsApplied = false;
 function getDb() {
   initApp();
   const db = getFirestore();
-  if (!_settingsApplied) {
+  try {
     db.settings({ ignoreUndefinedProperties: true });
-    _settingsApplied = true;
+  } catch {
+    // settings already applied
   }
   return db;
 }
