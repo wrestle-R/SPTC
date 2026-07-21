@@ -166,7 +166,7 @@ export async function handleCreateMatch(data: CallableData) {
     sport: asString(data.sport, "Sport") as "football" | "handball" | "cricket",
     homeTeamId: asString(data.homeTeamId, "Home team"),
     awayTeamId: asString(data.awayTeamId, "Away team"),
-    stage: (data.stage ?? "league") as "league" | "semifinal" | "final",
+    stage: (data.stage ?? "league") as "league" | "third-place" | "final",
     maxOvers: data.sport === "cricket" ? 5 : undefined,
   });
   const id = _r().privateCollection("matches").doc().id;
@@ -248,7 +248,7 @@ async function mutateMatch(data: CallableData, mutate: (match: DocumentData) => 
     if (!snapshot.exists) throw new CommandError(404, "NOT_FOUND", "Match not found.");
     const current = snapshot.data()!;
     if (current.revision !== expectedRevision) {
-      throw new CommandError(409, "ABORTED", "The match changed on another scorer. Refresh and try again.");
+      throw new CommandError(409, "ABORTED", "Data is out of sync. Please refresh the page and try again.");
     }
     const result = mutate(current);
     const next: DocumentData = {

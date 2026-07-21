@@ -15,11 +15,11 @@ describe("fixtures", () => {
   });
 
   it("creates a scheduled fixture without date, time, or venue", () => {
-    expect(validateFixture({ sport: "football", homeTeamId: "red", awayTeamId: "green", stage: "semifinal" })).toEqual({
+    expect(validateFixture({ sport: "football", homeTeamId: "red", awayTeamId: "green", stage: "third-place" })).toEqual({
       sport: "football",
       homeTeamId: "red",
       awayTeamId: "green",
-      stage: "semifinal",
+      stage: "third-place",
       maxOvers: undefined,
       status: "scheduled",
     });

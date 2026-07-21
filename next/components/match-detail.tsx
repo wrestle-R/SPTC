@@ -136,6 +136,14 @@ function CricketScore({ match, teamName, playerName }: {
 
   const batters = Object.values(state.batters);
   const bowlers = Object.values(state.bowlers);
+
+  const battingOrder: string[] = [];
+  for (const event of state.events) {
+    if (!battingOrder.includes(event.strikerId)) battingOrder.push(event.strikerId);
+    if (!battingOrder.includes(event.nonStrikerId)) battingOrder.push(event.nonStrikerId);
+  }
+  if (state.strikerId && !battingOrder.includes(state.strikerId)) battingOrder.push(state.strikerId);
+  if (state.nonStrikerId && !battingOrder.includes(state.nonStrikerId)) battingOrder.push(state.nonStrikerId);
   const inningsLabel = (i: number) => {
     const s = entries[i]?.state;
     if (!s) return `Innings ${i + 1}`;
@@ -202,9 +210,9 @@ function CricketScore({ match, teamName, playerName }: {
           <div className="divide-y">
             {batters
               .sort((a, b) => {
-                const aDismissed = a.dismissal ? 1 : 0;
-                const bDismissed = b.dismissal ? 1 : 0;
-                return aDismissed - bDismissed;
+                const aIdx = battingOrder.indexOf(a.playerId);
+                const bIdx = battingOrder.indexOf(b.playerId);
+                return (aIdx >= 0 ? aIdx : 999) - (bIdx >= 0 ? bIdx : 999);
               })
               .map((batter) => {
                 const dismissed = Boolean(batter.dismissal);
@@ -288,13 +296,26 @@ function CricketScore({ match, teamName, playerName }: {
 
       <div>
         <h2 className="mb-3 text-lg font-semibold">Ball progression</h2>
-        <div className="flex flex-wrap gap-2">
-          {state.events.length ? state.events.map((event) => (
-            <span key={event.id} className="grid min-h-10 min-w-10 place-items-center rounded-md border px-2 text-sm font-semibold" title={event.commentary}>
-              {event.dismissal ? "W" : event.extraType === "wide" ? "Wd" : event.extraType === "no-ball" ? "Nb" : event.totalRuns}
-            </span>
-          )) : <p className="text-sm text-muted-foreground">No deliveries recorded.</p>}
-        </div>
+        {state.events.length ? (
+          <div className="flex flex-col gap-3">
+            {Object.entries(
+              state.events.reduce((acc, event) => {
+                if (!acc[event.over]) acc[event.over] = [];
+                acc[event.over].push(event);
+                return acc;
+              }, {} as Record<number, typeof state.events>)
+            ).map(([overNum, overEvents]) => (
+              <div key={overNum} className="flex flex-wrap items-center gap-2">
+                <span className="w-10 text-sm font-medium text-muted-foreground">Ov {Number(overNum) + 1}</span>
+                {overEvents.map((event) => (
+                  <span key={event.id} className="grid min-h-10 min-w-10 place-items-center rounded-md border px-2 text-sm font-semibold" title={event.commentary}>
+                    {event.dismissal ? "W" : event.extraType === "wide" ? "Wd" : event.extraType === "no-ball" ? "Nb" : event.totalRuns}
+                  </span>
+                ))}
+              </div>
+            ))}
+          </div>
+        ) : <p className="text-sm text-muted-foreground">No deliveries recorded.</p>}
       </div>
     </div>
   );

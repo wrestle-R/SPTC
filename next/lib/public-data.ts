@@ -37,7 +37,8 @@ export function usePublicCollection<T extends DocumentData>(
       setData(snapshot.docs.map((item) => ({ id: item.id, ...item.data() }) as unknown as T));
       setLoading(false);
     }, (snapshotError) => {
-      setError(snapshotError.message);
+      console.error(snapshotError);
+      setError("Failed to load data. Please check your connection or permissions.");
       setLoading(false);
     });
     return () => {
@@ -70,7 +71,8 @@ export function usePublicDocument<T extends DocumentData>(
       setError(null);
       setLoading(false);
     }, (snapshotError) => {
-      setError(snapshotError.message);
+      console.error(snapshotError);
+      setError("Failed to load data. Please check your connection or permissions.");
       setLoading(false);
     });
     return () => {

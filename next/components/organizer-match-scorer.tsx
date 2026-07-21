@@ -28,7 +28,13 @@ export function OrganizerMatchScorer({ matchId }: { matchId: string }) {
     try {
       await callOrganizerCommand(name, revisionCommand(match.id, match.revision, data));
     } catch (cause) {
-      toast.error(cause instanceof Error ? cause.message : "Score update failed.");
+      const msg = cause instanceof Error ? cause.message : "Score update failed.";
+      if (msg.includes("out of sync")) {
+        toast.loading("Syncing latest match data...");
+        window.location.reload();
+      } else {
+        toast.error(msg);
+      }
     } finally { setPending(false); }
   }
 
@@ -69,7 +75,7 @@ function CricketConsole({ match, players, teams, pending, run, teamName, playerN
   const bowlingPlayers = players.filter((player) => current.bowlingLineup.includes(player.id));
   const target = currentIndex % 2 === 1 ? (entries[currentIndex - 1]?.state.score ?? 0) + 1 : null;
   return <div className="grid gap-4 xl:grid-cols-[0.8fr_1.2fr]">
-    <Card className="shadow-none"><CardHeader><CardDescription>{teamName(current.battingTeamId)} batting</CardDescription><CardTitle className="text-4xl tabular-nums">{current.score}/{current.wickets}</CardTitle><CardDescription>{current.overs} overs{target ? ` · Target ${target}` : ""}</CardDescription></CardHeader><CardContent className="flex flex-col gap-3"><div className="grid grid-cols-2 gap-3 rounded-md bg-muted p-3 text-sm"><div><p className="text-muted-foreground">Striker</p><p className="font-medium">{playerName(current.strikerId)}</p></div><div><p className="text-muted-foreground">Bowler</p><p className="font-medium">{playerName(current.currentBowlerId)}</p></div></div><div className="flex flex-wrap gap-2">{current.events.slice(-18).map((event) => <span key={event.id} className="grid min-h-10 min-w-10 place-items-center rounded-md border px-2 text-sm font-semibold">{event.dismissal ? "W" : event.extraType === "wide" ? "Wd" : event.extraType === "no-ball" ? "Nb" : event.totalRuns}</span>)}</div></CardContent></Card>
+    <Card className="shadow-none"><CardHeader><CardDescription>{teamName(current.battingTeamId)} batting</CardDescription><CardTitle className="text-4xl tabular-nums">{current.score}/{current.wickets}</CardTitle><CardDescription>{current.overs} overs{target ? ` · Target ${target}` : ""}</CardDescription></CardHeader><CardContent className="flex flex-col gap-3"><div className="grid grid-cols-2 gap-3 rounded-md bg-muted p-3 text-sm"><div><p className="text-muted-foreground">Striker</p><p className="font-medium">{playerName(current.strikerId)}</p></div><div><p className="text-muted-foreground">Bowler</p><p className="font-medium">{playerName(current.currentBowlerId)}</p></div></div><div className="flex flex-col gap-2">{Object.entries(current.events.slice(-18).reduce((acc, event) => { if (!acc[event.over]) acc[event.over] = []; acc[event.over].push(event); return acc; }, {} as Record<number, typeof current.events>)).map(([overNum, overEvents]) => <div key={overNum} className="flex flex-wrap items-center gap-2"><span className="w-8 text-xs font-medium text-muted-foreground">Ov {Number(overNum) + 1}</span>{overEvents.map((event) => <span key={event.id} className="grid min-h-10 min-w-10 place-items-center rounded-md border px-2 text-sm font-semibold">{event.dismissal ? "W" : event.extraType === "wide" ? "Wd" : event.extraType === "no-ball" ? "Nb" : event.totalRuns}</span>)}</div>)}</div></CardContent></Card>
     <Card className="shadow-none"><CardHeader><CardTitle>Ball-by-ball scoring</CardTitle><CardDescription>Strike, totals, overs, and player figures update automatically.</CardDescription></CardHeader><CardContent>
       {!current.strikerId ? <ParticipantSelect label="Next batter" players={battingPlayers.filter((player) => player.id !== current.nonStrikerId && !current.batters[player.id]?.dismissal)} pending={pending} onSelect={(playerId) => run("selectNextBatter", { playerId })} /> : null}
       {!current.currentBowlerId ? <ParticipantSelect label="Bowler for this over" players={bowlingPlayers.filter((player) => player.id !== current.previousOverBowlerId)} pending={pending} onSelect={(playerId) => run("selectCricketBowler", { playerId })} /> : null}

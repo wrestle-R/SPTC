@@ -24,7 +24,8 @@ export function usePrivateCollection<T extends DocumentData>(collectionName: str
       setLoading(false);
       setError(null);
     }, (snapshotError) => {
-      setError(snapshotError.message);
+      console.error(snapshotError);
+      setError("Failed to load data. Please check your connection or permissions.");
       setLoading(false);
     });
     return () => { window.clearTimeout(timeout); unsubscribe(); };
@@ -49,7 +50,8 @@ export function usePrivateDocument<T extends DocumentData>(collectionName: strin
       setLoading(false);
       setError(null);
     }, (snapshotError) => {
-      setError(snapshotError.message);
+      console.error(snapshotError);
+      setError("Failed to load data. Please check your connection or permissions.");
       setLoading(false);
     });
     return () => { window.clearTimeout(timeout); unsubscribe(); };
@@ -74,7 +76,8 @@ export function usePrivateTournament<T extends DocumentData>(): LiveData<T | nul
       setLoading(false);
       setError(null);
     }, (snapshotError) => {
-      setError(snapshotError.message);
+      console.error(snapshotError);
+      setError("Failed to load data. Please check your connection or permissions.");
       setLoading(false);
     });
     return () => { window.clearTimeout(timeout); unsubscribe(); };
@@ -89,7 +92,7 @@ export async function callOrganizerCommand<T>(name: string, data: Record<string,
     body: JSON.stringify({ command: name, data }),
   });
   const body = await response.json() as { result?: T; error?: { message: string } };
-  if (!response.ok || body.error) throw new Error(body.error?.message ?? `Command failed (${response.status}).`);
+  if (!response.ok || body.error) throw new Error(body.error?.message ?? "An unexpected error occurred.");
   return body.result as T;
 }
 

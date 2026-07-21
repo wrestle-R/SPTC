@@ -20,9 +20,8 @@ export async function POST(request: Request) {
     if (error instanceof CommandError) {
       return NextResponse.json({ error: { message: error.message, status: error.code } }, { status: error.statusCode });
     }
-    const message = error instanceof Error ? error.message : "Unknown error";
-    console.error("Command error:", message, error instanceof Error ? error.stack : "");
-    return NextResponse.json({ error: { message, status: "INTERNAL" } }, { status: 500 });
+    console.error("Command error:", error instanceof Error ? error.message : "Unknown error", error instanceof Error ? error.stack : "");
+    return NextResponse.json({ error: { message: "An unexpected server error occurred.", status: "INTERNAL" } }, { status: 500 });
   }
 }
 

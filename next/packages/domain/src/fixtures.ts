@@ -5,7 +5,7 @@ export interface FixtureInput {
   sport: SportKey;
   homeTeamId: string;
   awayTeamId: string;
-  stage?: "league" | "semifinal" | "final";
+  stage?: "league" | "third-place" | "final";
   maxOvers?: number;
 }
 

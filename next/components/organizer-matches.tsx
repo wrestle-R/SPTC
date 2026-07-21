@@ -53,7 +53,7 @@ export function OrganizerMatches() {
               <SelectField label="Sport" value={sport} onChange={setSport} items={[{ value: "football", label: "Football" }, { value: "handball", label: "Handball" }, { value: "cricket", label: "Cricket" }]} />
               <SelectField label="Home team" value={home} onChange={setHome} items={teams.data.map((team) => ({ value: team.id, label: team.name }))} />
               <SelectField label="Away team" value={away} onChange={setAway} items={teams.data.filter((team) => team.id !== home).map((team) => ({ value: team.id, label: team.name }))} />
-              <SelectField label="Stage" value={stage} onChange={setStage} items={[{ value: "league", label: "League" }, { value: "semifinal", label: "Semi-final" }, { value: "final", label: "Final" }]} />
+              <SelectField label="Stage" value={stage} onChange={setStage} items={[{ value: "league", label: "League" }, { value: "third-place", label: "Third place" }, { value: "final", label: "Final" }]} />
               <Button type="submit" className="md:col-span-2 xl:col-span-3" size="lg" disabled={pending || !home || !away || home === away}>{pending ? <LoaderCircle data-icon="inline-start" className="animate-spin" /> : <CalendarPlus data-icon="inline-start" />}{pending ? "Creating" : "Create fixture"}</Button>
             </FieldGroup>
           </form>
