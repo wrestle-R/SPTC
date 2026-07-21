@@ -1,12 +1,9 @@
 import {
   Activity,
   CalendarDays,
-  ChartNoAxesColumnIncreasing,
-  GitFork,
   House,
-  KeyRound,
-  ListOrdered,
-  ScrollText,
+  Medal,
+  Settings,
   Trophy,
   Users,
 } from "lucide-react";
@@ -25,22 +22,13 @@ export type NavGroup = {
 
 export const navigation: NavGroup[] = [
   {
-    label: "Tournament",
+    label: "Organizer",
     items: [
-      { title: "Overview", href: "/dashboard", icon: House },
-      { title: "Live Scores", href: "/dashboard/live-scores", icon: Activity },
-      { title: "Fixtures", href: "/dashboard/fixtures", icon: CalendarDays },
-      { title: "Standings", href: "/dashboard/standings", icon: ListOrdered },
-      { title: "Brackets", href: "/dashboard/brackets", icon: GitFork },
-    ],
-  },
-  {
-    label: "People & Records",
-    items: [
-      { title: "Players", href: "/dashboard/players", icon: Users },
-      { title: "Leaderboards", href: "/dashboard/leaderboards", icon: Trophy },
-      { title: "Audit Trail", href: "/dashboard/audit-trail", icon: ScrollText },
-      { title: "Access", href: "/dashboard/access", icon: KeyRound },
+      { title: "Home", href: "/organizer", icon: House },
+      { title: "Matches", href: "/organizer/matches", icon: CalendarDays },
+      { title: "Teams", href: "/organizer/teams", icon: Users },
+      { title: "Awards", href: "/organizer/awards", icon: Medal },
+      { title: "Settings", href: "/organizer/settings", icon: Settings },
     ],
   },
 ];
@@ -48,13 +36,13 @@ export const navigation: NavGroup[] = [
 export function getPageTitle(pathname: string) {
   return (
     navigation.flatMap((group) => group.items).find((item) => item.href === pathname)?.title ??
-    "Dashboard"
+    "Organizer"
   );
 }
 
 export const overviewMetrics = [
-  { label: "Live matches", icon: Activity },
-  { label: "Upcoming fixtures", icon: CalendarDays },
-  { label: "Registered teams", icon: ChartNoAxesColumnIncreasing },
-  { label: "Players", icon: Users },
+  { key: "live", label: "Live matches", icon: Activity },
+  { key: "fixtures", label: "Upcoming fixtures", icon: CalendarDays },
+  { key: "teams", label: "Registered teams", icon: Trophy },
+  { key: "players", label: "Players", icon: Users },
 ] as const;

@@ -1,6 +1,4 @@
-import { getAnalytics, isSupported, type Analytics } from "firebase/analytics";
-import { getApps, initializeApp, type FirebaseApp } from "firebase/app";
-import { getFirestore } from "firebase/firestore";
+import { createFirebaseClient } from "@sports-fiesta/firebase";
 
 function requiredEnv(name: string, value: string | undefined) {
   if (!value) {
@@ -32,13 +30,4 @@ const firebaseConfig = {
   measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
 };
 
-export const app: FirebaseApp = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
-export const db = getFirestore(app);
-
-export async function getFirebaseAnalytics(): Promise<Analytics | null> {
-  if (typeof window === "undefined") {
-    return null;
-  }
-
-  return (await isSupported()) ? getAnalytics(app) : null;
-}
+export const { app, auth, db, functions, storage } = createFirebaseClient(firebaseConfig);

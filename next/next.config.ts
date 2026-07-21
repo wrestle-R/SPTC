@@ -1,5 +1,7 @@
 import type { NextConfig } from "next";
 
-const nextConfig: NextConfig = {};
+const nextConfig: NextConfig = {
+  transpilePackages: ["@sports-fiesta/domain", "@sports-fiesta/firebase", "@sports-fiesta/theme"],
+};
 
 export default nextConfig;

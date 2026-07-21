@@ -1,0 +1,6 @@
+import { PublicShell } from "@/components/public-shell";
+import { SportView } from "@/components/sport-view";
+
+export default function FootballPage() {
+  return <PublicShell><SportView sport="football" /></PublicShell>;
+}

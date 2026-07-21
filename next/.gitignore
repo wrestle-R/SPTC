@@ -2,5 +2,15 @@
 node_modules/
 out/
 dist/
+lib/
+coverage/
+.firebase/
+.expo/
+web-build/
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
 .env*
 !.env.example
+.secret.local
+.DS_Store

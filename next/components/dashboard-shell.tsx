@@ -43,7 +43,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         <SidebarHeader className="p-3">
           <SidebarMenu>
             <SidebarMenuItem>
-              <SidebarMenuButton size="lg" render={<Link href="/dashboard" />} tooltip="Sports Fiesta S9">
+              <SidebarMenuButton size="lg" render={<Link href="/organizer" />} tooltip="Sports Fiesta S9">
                 <BrandLogo className="group-data-[collapsible=icon]:[&>span:last-child]:hidden" />
               </SidebarMenuButton>
             </SidebarMenuItem>
@@ -90,7 +90,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
             <Breadcrumb>
               <BreadcrumbList>
                 <BreadcrumbItem className="hidden sm:inline-flex">
-                  <Link href="/dashboard" className="text-muted-foreground hover:text-foreground">Dashboard</Link>
+                  <Link href="/organizer" className="text-muted-foreground hover:text-foreground">Organizer</Link>
                 </BreadcrumbItem>
                 <BreadcrumbSeparator className="hidden sm:block" />
                 <BreadcrumbItem>

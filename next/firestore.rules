@@ -1,0 +1,33 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isOrganizer() {
+      return request.auth != null && request.auth.token.organizer == true;
+    }
+
+    match /publicTournaments/{tournamentId} {
+      allow read: if true;
+      allow write: if false;
+
+      match /{document=**} {
+        allow read: if true;
+        allow write: if false;
+      }
+    }
+
+    match /tournaments/{tournamentId} {
+      allow read: if isOrganizer();
+      allow write: if false;
+
+      match /{document=**} {
+        allow read: if isOrganizer();
+        allow write: if false;
+      }
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
