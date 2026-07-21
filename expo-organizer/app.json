@@ -1,36 +1,36 @@
 {
   "expo": {
-    "name": "expo-organizer",
-    "slug": "expo-organizer",
+    "name": "Sports Fiesta Organizer",
+    "slug": "sports-fiesta-s9-organizer",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
-    "scheme": "expoorganizer",
+    "icon": "./assets/images/sports-fiesta-logo.png",
+    "scheme": "sportsfiestaorganizer",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/expo.icon"
+      "icon": "./assets/images/sports-fiesta-logo.png",
+      "bundleIdentifier": "com.sptc.sportsfiesta.organizer"
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
-        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+        "backgroundColor": "#111210",
+        "foregroundImage": "./assets/images/sports-fiesta-logo.png"
       },
+      "package": "com.sptc.sportsfiesta.organizer",
       "predictiveBackGestureEnabled": false
     },
     "web": {
       "output": "static",
-      "favicon": "./assets/images/favicon.png"
+      "favicon": "./assets/images/sports-fiesta-logo.png"
     },
     "plugins": [
       "expo-router",
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#208AEF",
-          "image": "./assets/images/splash-icon.png",
-          "imageWidth": 76
+          "backgroundColor": "#111210",
+          "image": "./assets/images/sports-fiesta-logo.png",
+          "imageWidth": 120
         }
       ],
       "expo-secure-store"

@@ -15,9 +15,9 @@ export interface PublicMatch {
   venue: string;
   revision: number;
   lineups: Record<string, { starters: string[]; substitutes: string[] }>;
-  scoreSummary: Record<string, number> & { innings?: Array<{ battingTeamId: string; score: number; wickets: number; overs: string }> };
-  fieldState?: { score: Record<string, number>; shootout: Record<string, number>; events: Array<Record<string, string | number>> };
-  cricket?: { innings: Array<{ state: CricketInningsState; superOver?: boolean }>; currentInnings: number };
+  scoreSummary: Record<string, number> & { innings?: { battingTeamId: string; score: number; wickets: number; overs: string }[] };
+  fieldState?: { score: Record<string, number>; shootout: Record<string, number>; events: Record<string, string | number>[] };
+  cricket?: { innings: { state: CricketInningsState; superOver?: boolean }[]; currentInnings: number };
   winnerTeamId?: string | null;
   resultText?: string;
 }

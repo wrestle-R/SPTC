@@ -1,4 +1,4 @@
-import { Trophy } from "lucide-react";
+import Image from "next/image";
 import { cn } from "@/lib/utils";
 
 type BrandLogoProps = {
@@ -9,11 +9,8 @@ type BrandLogoProps = {
 export function BrandLogo({ compact = false, className }: BrandLogoProps) {
   return (
     <div className={cn("flex min-w-0 items-center gap-3", className)}>
-      <span className="relative grid size-10 shrink-0 place-items-center rounded-xl bg-primary text-primary-foreground shadow-sm">
-        <Trophy aria-hidden="true" />
-        <span className="absolute -bottom-1 -right-1 grid size-5 place-items-center rounded-full border-2 border-background bg-secondary text-[10px] font-bold text-secondary-foreground">
-          9
-        </span>
+      <span className="relative size-10 shrink-0 overflow-hidden rounded-lg border bg-background shadow-sm">
+        <Image src="/sports-fiesta-logo.png" alt="" fill sizes="40px" className="object-cover" priority />
       </span>
       {!compact ? (
         <span className="min-w-0 leading-tight">

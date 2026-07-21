@@ -5,7 +5,7 @@ import { Menu, Moon, Sun, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useTheme } from "next-themes";
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { BrandLogo } from "@/components/brand-logo";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -17,10 +17,13 @@ const links = [
   { href: "/cricket", label: "Cricket" },
 ];
 
+const subscribeToHydration = () => () => undefined;
+
 export function PublicNavbar() {
   const pathname = usePathname();
   const { scrollY } = useScroll();
   const { resolvedTheme, setTheme } = useTheme();
+  const mounted = useSyncExternalStore(subscribeToHydration, () => true, () => false);
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
   useMotionValueEvent(scrollY, "change", (latest) => setScrolled(latest > 24));
@@ -58,7 +61,7 @@ export function PublicNavbar() {
             aria-label="Toggle color theme"
             onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
           >
-            {resolvedTheme === "dark" ? <Sun /> : <Moon />}
+            {mounted && resolvedTheme === "dark" ? <Sun /> : <Moon />}
           </Button>
           <Button
             variant="ghost"

@@ -57,10 +57,36 @@ export const bootstrapTournament = onCall({ region: REGION }, async (request) =>
     discipline: 0,
     total: 0,
   }));
+  const emptyFieldRows = S9_TEAMS.map((team, index) => ({
+    rank: index + 1,
+    teamId: team.id,
+    played: 0,
+    wins: 0,
+    draws: 0,
+    losses: 0,
+    goalsFor: 0,
+    goalsAgainst: 0,
+    goalDifference: 0,
+    points: 0,
+  }));
+  const emptyCricketRows = S9_TEAMS.map((team, index) => ({
+    rank: index + 1,
+    teamId: team.id,
+    played: 0,
+    wins: 0,
+    ties: 0,
+    losses: 0,
+    points: 0,
+    runsFor: 0,
+    runsAgainst: 0,
+    ballsFaced: 0,
+    ballsBowled: 0,
+    netRunRate: 0,
+  }));
   batch.set(publicCollection("standings").doc("overall"), { rows: emptyRows });
-  batch.set(publicCollection("standings").doc("football"), { rows: [] });
-  batch.set(publicCollection("standings").doc("handball"), { rows: [] });
-  batch.set(publicCollection("standings").doc("cricket"), { rows: [] });
+  batch.set(publicCollection("standings").doc("football"), { rows: emptyFieldRows });
+  batch.set(publicCollection("standings").doc("handball"), { rows: emptyFieldRows });
+  batch.set(publicCollection("standings").doc("cricket"), { rows: emptyCricketRows });
   await batch.commit();
   return { bootstrapped: true, teams: S9_TEAMS.length, players: S9_PLAYERS.length };
 });
