@@ -6,6 +6,7 @@ import { Menu, Plus, Trophy, X } from "lucide-react";
 import { useState } from "react";
 import { navigation } from "@/lib/tournament-data";
 import { cn, pageTitleFromPath } from "@/lib/utils";
+import { FirebaseStatus } from "@/components/firebase-status";
 
 export function DashboardShell({ children }: { children: React.ReactNode }) {
   const [open, setOpen] = useState(false);
@@ -73,9 +74,12 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
           ))}
         </nav>
 
-        <div className="rounded-lg border border-primary/25 bg-primary/10 p-3">
-          <p className="text-sm font-black text-primary">Prototype mode</p>
-          <p className="mt-1 text-xs leading-5 text-muted-strong">Seeded data only. Organizer controls are visual previews.</p>
+        <div className="space-y-3">
+          <FirebaseStatus />
+          <div className="rounded-lg border border-primary/25 bg-primary/10 p-3">
+            <p className="text-sm font-black text-primary">Prototype mode</p>
+            <p className="mt-1 text-xs leading-5 text-muted-strong">Seeded UI data remains active until Firestore reads are added.</p>
+          </div>
         </div>
       </aside>
 

@@ -9,12 +9,14 @@
     "lint": "eslint ."
   },
   "dependencies": {
+    "firebase": "^12.16.0",
     "lucide-react": "latest",
     "next": "latest",
     "react": "latest",
     "react-dom": "latest"
   },
   "devDependencies": {
+    "@eslint/eslintrc": "latest",
     "@tailwindcss/postcss": "latest",
     "@types/node": "latest",
     "@types/react": "latest",

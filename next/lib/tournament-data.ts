@@ -11,6 +11,7 @@ import {
   Trophy,
   Users,
 } from "lucide-react";
+import type { ComponentType } from "react";
 
 export type Team = {
   id: string;
@@ -88,7 +89,7 @@ export type NavGroup = {
   items: {
     title: string;
     href: string;
-    icon: React.ComponentType<{ className?: string }>;
+    icon: ComponentType<{ className?: string }>;
     badge?: string;
   }[];
 };
