@@ -22,7 +22,7 @@ export function HomeView() {
   const matchesState = usePublicCollection<PublicMatch>("matches");
   const teamsState = usePublicCollection<PublicTeam>("teams");
   const teams = teamsState.data.length ? teamsState.data : S9_TEAMS;
-  const live = matchesState.data.find((match) => ["live", "innings-break", "super-over"].includes(match.status));
+  const liveMatches = matchesState.data.filter((match) => ["live", "innings-break", "super-over"].includes(match.status)).slice(0, 2);
   const upcoming = matchesState.data
     .filter((match) => ["scheduled", "lineup"].includes(match.status))
     .sort((a, b) => (a.matchNumber ?? a.id).localeCompare(b.matchNumber ?? b.id))
@@ -60,7 +60,7 @@ export function HomeView() {
             <CardHeader>
               <Radio />
               <CardDescription>Live now</CardDescription>
-              <CardTitle className="text-3xl">{live ? 1 : 0}</CardTitle>
+              <CardTitle className="text-3xl">{liveMatches.length}</CardTitle>
             </CardHeader>
           </Card>
         </div>
@@ -74,12 +74,14 @@ export function HomeView() {
           <div className="flex items-center justify-between gap-4">
             <div>
               <p className="text-sm font-medium text-primary">Match centre</p>
-              <h2 id="live-heading" className="text-2xl font-semibold">{live ? "Live now" : "Tournament ready"}</h2>
+              <h2 id="live-heading" className="text-2xl font-semibold">{liveMatches.length ? "Live now" : "Tournament ready"}</h2>
             </div>
-            {live ? <Badge variant="destructive">Live</Badge> : <Badge variant="outline">No live match</Badge>}
+            {liveMatches.length ? <Badge variant="destructive">{liveMatches.length} live</Badge> : <Badge variant="outline">No live match</Badge>}
           </div>
-          {live ? (
-            <MatchCard match={live} teams={teams} featured />
+          {liveMatches.length ? (
+            <div className="grid gap-3 lg:grid-cols-2">
+              {liveMatches.map((match, i) => <MatchCard key={match.id} match={match} teams={teams} featured={i === 0} />)}
+            </div>
           ) : (
             <Card className="shadow-none">
               <CardContent className="flex min-h-36 flex-col justify-center gap-2">
