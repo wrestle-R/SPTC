@@ -8,7 +8,7 @@ const redirects: Record<string, string> = {
   "/dashboard/brackets": "/football",
   "/dashboard/players": "/teams",
   "/dashboard/leaderboards": "/leaderboards",
-  "/dashboard/access": "/organizer/login",
+  "/dashboard/access": "/organizer",
 };
 
 export function proxy(request: NextRequest) {

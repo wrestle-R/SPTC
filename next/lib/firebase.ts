@@ -30,4 +30,4 @@ const firebaseConfig = {
   measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
 };
 
-export const { app, auth, db, functions, storage } = createFirebaseClient(firebaseConfig);
+export const { app, db, functions, storage } = createFirebaseClient(firebaseConfig);

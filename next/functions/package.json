@@ -5,17 +5,17 @@
   "main": "lib/index.js",
   "engines": { "node": "20" },
   "scripts": {
-    "build": "tsup src/index.ts --format cjs --platform node --target node20 --out-dir lib --sourcemap --clean",
+    "build": "tsup src/index.ts --format cjs --platform node --target node20 --out-dir lib --sourcemap --clean --noExternal @sports-fiesta/domain",
     "typecheck": "tsc -p tsconfig.json",
     "test": "vitest run",
     "pin:hash": "node scripts/hash-pin.mjs"
   },
   "dependencies": {
-    "@sports-fiesta/domain": "*",
     "firebase-admin": "^13.5.0",
     "firebase-functions": "^6.4.0"
   },
   "devDependencies": {
+    "@sports-fiesta/domain": "*",
     "tsup": "^8.5.0",
     "typescript": "^5.9.3",
     "vitest": "^3.2.4",

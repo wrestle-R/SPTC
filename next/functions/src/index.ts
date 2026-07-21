@@ -1,4 +1,3 @@
-export { organizerLogin } from "./auth.js";
 export { bootstrapTournament } from "./bootstrap.js";
 export {
   addDisciplineAdjustment,

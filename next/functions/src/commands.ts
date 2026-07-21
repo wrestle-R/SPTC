@@ -16,7 +16,6 @@ import {
 } from "@sports-fiesta/domain";
 import { FieldValue, type DocumentData, type Transaction } from "firebase-admin/firestore";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
-import { requireOrganizer } from "./auth.js";
 import { REGION } from "./constants.js";
 import { db, privateCollection, privateRoot, publicCollection, publicRoot } from "./firebase.js";
 
@@ -36,8 +35,10 @@ function asStringArray(value: unknown, label: string) {
   return [...new Set(value as string[])];
 }
 
+const NOOP_ACTOR: Actor = { uid: "organizer", name: "Organizer" };
+
 function organizerCallable(handler: (data: CallableData, actor: Actor) => Promise<unknown>) {
-  return onCall({ region: REGION }, async (request) => handler(request.data ?? {}, requireOrganizer(request)));
+  return onCall({ region: REGION }, async (request) => handler(request.data ?? {}, NOOP_ACTOR));
 }
 
 function publicMatch(match: DocumentData) {
