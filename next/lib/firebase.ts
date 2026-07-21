@@ -2,14 +2,34 @@ import { getAnalytics, isSupported, type Analytics } from "firebase/analytics";
 import { getApps, initializeApp, type FirebaseApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
 
+function requiredEnv(name: string, value: string | undefined) {
+  if (!value) {
+    throw new Error(`Missing required environment variable: ${name}`);
+  }
+
+  return value;
+}
+
 const firebaseConfig = {
-  apiKey: "AIzaSyBgutHYDEpkmEKY8tBEKgP1lzJ8ul4P1O4",
-  authDomain: "sptc-2cb8a.firebaseapp.com",
-  projectId: "sptc-2cb8a",
-  storageBucket: "sptc-2cb8a.firebasestorage.app",
-  messagingSenderId: "22202265022",
-  appId: "1:22202265022:web:f43d6846fc60c12aed9def",
-  measurementId: "G-RN0KTQDNTE",
+  apiKey: requiredEnv("NEXT_PUBLIC_FIREBASE_API_KEY", process.env.NEXT_PUBLIC_FIREBASE_API_KEY),
+  authDomain: requiredEnv(
+    "NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN",
+    process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+  ),
+  projectId: requiredEnv(
+    "NEXT_PUBLIC_FIREBASE_PROJECT_ID",
+    process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+  ),
+  storageBucket: requiredEnv(
+    "NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET",
+    process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+  ),
+  messagingSenderId: requiredEnv(
+    "NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID",
+    process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+  ),
+  appId: requiredEnv("NEXT_PUBLIC_FIREBASE_APP_ID", process.env.NEXT_PUBLIC_FIREBASE_APP_ID),
+  measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
 };
 
 export const app: FirebaseApp = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
