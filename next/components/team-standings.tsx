@@ -96,7 +96,6 @@ export function TeamStandings() {
                         </div>
                       </div>
                       <p className="mt-2 text-sm font-bold truncate">{row.name}</p>
-                      <p className="text-xs text-muted-foreground">F {row.football} · H {row.handball} · C {row.cricket}</p>
                     </div>
                   </Link>
                 </motion.div>
@@ -109,7 +108,7 @@ export function TeamStandings() {
               <CardHeader className="pb-2">
                 <CardTitle className="flex items-center gap-2">
                   <Medal className="h-5 w-5 text-primary" />
-                  Full Standings
+                  Team of the year ranking
                 </CardTitle>
                 <CardDescription>Click a row to view team details.</CardDescription>
               </CardHeader>
