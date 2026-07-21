@@ -1,4 +1,6 @@
-import { createFirebaseClient } from "@sports-fiesta/firebase";
+import { getApp, getApps, initializeApp } from "firebase/app";
+import { getFirestore } from "firebase/firestore";
+import { type FirebaseOptions } from "firebase/app";
 
 function requiredEnv(name: string, value: string | undefined) {
   if (!value) {
@@ -8,7 +10,7 @@ function requiredEnv(name: string, value: string | undefined) {
   return value;
 }
 
-const firebaseConfig = {
+const firebaseConfig: FirebaseOptions = {
   apiKey: requiredEnv("NEXT_PUBLIC_FIREBASE_API_KEY", process.env.NEXT_PUBLIC_FIREBASE_API_KEY),
   authDomain: requiredEnv(
     "NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN",
@@ -30,4 +32,5 @@ const firebaseConfig = {
   measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
 };
 
-export const { app, db, functions, storage } = createFirebaseClient(firebaseConfig);
+const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
+export const db = getFirestore(app);

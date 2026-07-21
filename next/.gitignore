@@ -2,7 +2,6 @@
 node_modules/
 out/
 dist/
-lib/
 coverage/
 .firebase/
 .expo/
