@@ -70,7 +70,12 @@ export function MatchDetail({ sport, matchId }: { sport: Sport; matchId: string 
         </CardHeader>
         <CardContent className="flex flex-col gap-6 pt-6">
           {sport === "cricket" ? (
-            <CricketScore match={match} teamName={teamName} playerName={playerName} />
+            <CricketScore
+              key={`${match.id}-${match.cricket?.currentInnings ?? 0}-${match.cricket?.innings.length ?? 0}`}
+              match={match}
+              teamName={teamName}
+              playerName={playerName}
+            />
           ) : (
             <FieldScore match={match} homeName={home?.name ?? "Team"} awayName={away?.name ?? "Team"} playerName={playerName} playerJersey={playerJersey} teamName={teamName} sport={sport} />
           )}
@@ -226,8 +231,9 @@ function CricketScore({ match, teamName, playerName }: {
   playerName: (id?: string | null) => string;
 }) {
   const entries = match.cricket?.innings ?? [];
-  const [activeInnings, setActiveInnings] = useState(entries.length > 1 ? 1 : 0);
-  const safeIndex = activeInnings < entries.length ? activeInnings : entries.length - 1;
+  const currentInningsIndex = entries[match.cricket?.currentInnings ?? -1] ? match.cricket?.currentInnings ?? 0 : Math.max(0, entries.length - 1);
+  const [activeInnings, setActiveInnings] = useState(currentInningsIndex);
+  const safeIndex = entries[activeInnings] ? activeInnings : currentInningsIndex;
   const state = entries[safeIndex]?.state;
   const target = safeIndex % 2 === 1 ? (entries[safeIndex - 1]?.state.score ?? 0) + 1 : null;
   const metrics = state ? cricketInningsMetrics(state, target) : null;
@@ -245,10 +251,15 @@ function CricketScore({ match, teamName, playerName }: {
   }
   if (state.strikerId && !battingOrder.includes(state.strikerId)) battingOrder.push(state.strikerId);
   if (state.nonStrikerId && !battingOrder.includes(state.nonStrikerId)) battingOrder.push(state.nonStrikerId);
+  const canSwitchInnings = entries.length > 1 && Boolean(entries[0]?.state.completed);
   const inningsLabel = (i: number) => {
-    const s = entries[i]?.state;
-    if (!s) return `Innings ${i + 1}`;
-    return `${teamName(s.battingTeamId)} ${i % 2 === 1 ? "2nd" : "1st"}`;
+    const entry = entries[i];
+    const s = entry?.state;
+    if (!s) return { title: `Innings ${i + 1}`, subtitle: "" };
+    if (entry?.superOver) return { title: "Super Over", subtitle: teamName(s.battingTeamId) };
+    if (i === 0) return { title: "1st Innings", subtitle: teamName(s.battingTeamId) };
+    if (i === 1) return { title: "2nd Innings", subtitle: teamName(s.battingTeamId) };
+    return { title: `Innings ${i + 1}`, subtitle: teamName(s.battingTeamId) };
   };
   const extrasTotal = state.extras.wides + state.extras.noBalls + state.extras.byes + state.extras.legByes + state.extras.penalty;
   const extrasParts: string[] = [];
@@ -263,22 +274,25 @@ function CricketScore({ match, teamName, playerName }: {
 
   return (
     <div className="flex flex-col gap-6">
-      {entries.length > 1 ? (
-        <div className="flex overflow-hidden rounded-md border">
+      {canSwitchInnings ? (
+        <div className="flex overflow-hidden rounded-lg border bg-muted/30 p-1">
           {entries.map((_, i) => {
             const active = i === safeIndex;
+            const label = inningsLabel(i);
             return (
               <button
                 key={i}
                 type="button"
                 onClick={() => setActiveInnings(i)}
-                className={`flex-1 px-4 py-2.5 text-center text-sm font-semibold transition-colors ${
+                aria-pressed={active}
+                className={`flex flex-1 flex-col items-center justify-center rounded-md px-3 py-2.5 text-center transition-all ${
                   active
-                    ? "bg-card text-card-foreground shadow-sm"
-                    : "bg-muted/50 text-muted-foreground hover:bg-muted"
+                    ? "bg-background text-foreground shadow-sm ring-1 ring-border"
+                    : "text-muted-foreground hover:bg-background/70 hover:text-foreground"
                 }`}
               >
-                {inningsLabel(i)}
+                <span className="text-sm font-semibold">{label.title}</span>
+                <span className="text-xs text-muted-foreground">{label.subtitle}</span>
               </button>
             );
           })}
