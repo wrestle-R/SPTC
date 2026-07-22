@@ -3,7 +3,9 @@
 import { cricketChaseText, cricketInningsMetrics, fallOfWickets, S9_PLAYERS, S9_TEAMS, type CricketDelivery } from "@sports-fiesta/domain";
 import { ArrowLeft, CircleDashed } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import confetti from "canvas-confetti";
+import { motion } from "framer-motion";
 import { ContentSkeleton, DataError } from "@/components/data-state";
 import { MatchStatusBadge } from "@/components/match-status-badge";
 import { Button } from "@/components/ui/button";
@@ -354,7 +356,11 @@ function CricketScore({ match, teamName, playerName }: {
   if (!state) return <p className="text-center text-muted-foreground">The scorecard will appear when the innings starts.</p>;
 
   const batters = Object.values(state.batters);
-  const bowlers = Object.values(state.bowlers);
+  const bowlers = Object.values(state.bowlers).sort((a, b) => {
+    const econA = a.legalBalls ? (a.runs / a.legalBalls) * 6 : 0;
+    const econB = b.legalBalls ? (b.runs / b.legalBalls) * 6 : 0;
+    return b.wickets - a.wickets || econA - econB;
+  });
 
   const battingOrder: string[] = [];
   for (const event of state.events) {

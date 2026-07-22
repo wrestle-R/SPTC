@@ -97,6 +97,25 @@ describe("five-over cricket scoring", () => {
     expect(setNextBatter(wicket, "c").strikerId).toBe("c");
   });
 
+  it("puts the surviving non-striker on strike after a wicket on the last ball of the over", () => {
+    let state = innings();
+    for (let ball = 0; ball < 5; ball += 1) {
+      state = recordCricketDelivery(state, { runsOffBat: 0 });
+    }
+    state = recordCricketDelivery(state, {
+      runsOffBat: 0,
+      dismissal: { type: "bowled", playerOutId: state.strikerId },
+    });
+
+    expect(state.legalBalls).toBe(6);
+    expect(state.strikerId).toBeNull();
+    expect(state.nonStrikerId).toBe("b");
+
+    const next = setNextBatter(state, "c");
+    expect(next.strikerId).toBe("b");
+    expect(next.nonStrikerId).toBe("c");
+  });
+
   it("records a no-ball run-out without counting a ball", () => {
     const next = recordCricketDelivery(innings(), {
       runsOffBat: 1,
@@ -200,6 +219,29 @@ describe("five-over cricket scoring", () => {
       nextStrikerId: "d",
       replacementBatterId: "c",
     })).toThrow(/next striker/i);
+  });
+
+  it("auto-completes the innings when the chasing team passes the target", () => {
+    const second = createCricketInnings({
+      battingTeamId: "green",
+      bowlingTeamId: "red",
+      battingLineup: battingOrder,
+      strikerId: "a",
+      nonStrikerId: "b",
+      bowlerId: "g2",
+      maxOvers: 5,
+      targetScore: 31,
+    });
+
+    let state = recordCricketDelivery(second, { runsOffBat: 4 });
+    expect(state.completed).toBe(false);
+
+    state = recordCricketDelivery(state, { runsOffBat: 6 });
+    expect(state.completed).toBe(false);
+
+    state = recordCricketDelivery(state, { runsOffBat: 22 });
+    expect(state.completed).toBe(true);
+    expect(state.score).toBe(32);
   });
 
   it("derives fall of wickets with the score and over at dismissal time", () => {

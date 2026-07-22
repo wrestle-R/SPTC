@@ -16,6 +16,7 @@ export interface CreateInningsInput {
   nonStrikerId: PlayerId;
   bowlerId: PlayerId;
   maxOvers?: number;
+  targetScore?: number | null;
 }
 
 const EMPTY_EXTRAS = {
@@ -80,6 +81,7 @@ export function createCricketInnings(input: CreateInningsInput): CricketInningsS
     battingLineup: [...battingLineup],
     bowlingLineup: [...bowlingLineup],
     maxOvers: input.maxOvers ?? 5,
+    targetScore: input.targetScore ?? null,
     score: 0,
     wickets: 0,
     legalBalls: 0,
@@ -322,7 +324,10 @@ export function recordCricketDelivery(
     previousOverBowlerId = bowlerId;
   }
 
-  const completed = legalBalls >= state.maxOvers * 6 || wickets >= state.battingLineup.length - 1;
+  const oversExhausted = legalBalls >= state.maxOvers * 6;
+  const allOut = wickets >= state.battingLineup.length - 1;
+  const targetChased = state.targetScore != null && state.score + totalRuns >= state.targetScore;
+  const completed = oversExhausted || allOut || targetChased;
   return {
     ...state,
     score: state.score + totalRuns,
@@ -368,6 +373,18 @@ export function setNextBatter(state: CricketInningsState, playerId: PlayerId) {
   assertRosterSnapshotMember(state.battingLineup, playerId, "Batter");
   if (playerId === state.nonStrikerId || state.batters[playerId]?.dismissal) {
     throw new Error("That batter is not available.");
+  }
+  const overEnded = state.legalBalls > 0 && state.legalBalls % 6 === 0;
+  if (overEnded && state.nonStrikerId) {
+    return {
+      ...state,
+      strikerId: state.nonStrikerId,
+      nonStrikerId: playerId,
+      batters: {
+        ...state.batters,
+        [playerId]: state.batters[playerId] ?? emptyBatter(playerId),
+      },
+    };
   }
   return {
     ...state,

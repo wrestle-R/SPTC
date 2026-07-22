@@ -511,6 +511,8 @@ export async function handleStartInnings(data: CallableData) {
     await assertRosterPlayer(match, battingTeamId, asString(data.strikerId, "Striker"), "Striker");
     await assertRosterPlayer(match, battingTeamId, asString(data.nonStrikerId, "Non-striker"), "Non-striker");
     await assertRosterPlayer(match, bowlingTeamId, asString(data.bowlerId, "Bowler"), "Bowler");
+    const firstInnings = match.cricket?.innings?.[0]?.state;
+    const targetScore = firstInnings?.completed ? firstInnings.score + 1 : undefined;
     const initial = {
       battingTeamId,
       bowlingTeamId,
@@ -520,6 +522,7 @@ export async function handleStartInnings(data: CallableData) {
       nonStrikerId: asString(data.nonStrikerId, "Non-striker"),
       bowlerId: asString(data.bowlerId, "Bowler"),
       maxOvers: rules.cricket.maxOvers ?? 5,
+      targetScore,
     };
     let state: CricketInningsState;
     try { state = createCricketInnings(initial); } catch (error) { throw new CommandError(400, "INVALID_ARGUMENT", (error as Error).message); }

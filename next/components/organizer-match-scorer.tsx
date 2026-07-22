@@ -197,7 +197,11 @@ function OrganizerCricketScorecard({ entries, currentIndex, teamName, playerName
   const metrics = cricketInningsMetrics(state, target);
   const chaseText = cricketChaseText(state, target);
   const batters = Object.values(state.batters);
-  const bowlers = Object.values(state.bowlers);
+  const bowlers = Object.values(state.bowlers).sort((a, b) => {
+    const econA = a.legalBalls ? (a.runs / a.legalBalls) * 6 : 0;
+    const econB = b.legalBalls ? (b.runs / b.legalBalls) * 6 : 0;
+    return b.wickets - a.wickets || econA - econB;
+  });
   const battingOrder: string[] = [];
   for (const event of state.events) {
     if (!battingOrder.includes(event.strikerId)) battingOrder.push(event.strikerId);
