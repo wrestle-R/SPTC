@@ -33,7 +33,9 @@ export function OrganizerMatches() {
         sport, homeTeamId: home, awayTeamId: away, stage,
       });
       toast.success("Fixture created.");
-      event.currentTarget.reset();
+      setHome("");
+      setAway("");
+      setStage("league");
     } catch (cause) {
       toast.error(cause instanceof Error ? cause.message : "Fixture creation failed.");
     } finally {

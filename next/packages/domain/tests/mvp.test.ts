@@ -17,13 +17,17 @@ describe("MVP scoring", () => {
     expect(result.total).toBe(60);
   });
 
-  it("ranks field-sport scorers above lower-impact players", () => {
-    const [leader] = rankFieldMvpCandidates([
+  it("ranks field-sport MOTM by goals only", () => {
+    const [leader, second] = rankFieldMvpCandidates([
       { playerId: "p1", teamId: "red", goals: 2, winner: true, goalsConceded: 1 },
       { playerId: "p2", teamId: "red", goals: 0, winner: true, goalsConceded: 0 },
     ]);
 
     expect(leader.playerId).toBe("p1");
+    expect(leader.total).toBe(70);
+    expect(leader.reason).toBe("2 goals");
+    expect(second.total).toBe(0);
+    expect(second.reason).toBe("No goals scored");
   });
 
   it("ranks cricket all-round impact above one-dimensional efforts", () => {

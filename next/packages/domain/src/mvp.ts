@@ -95,18 +95,11 @@ export function calculateMvpScore(input: MvpInput) {
 }
 
 export function calculateFieldMvpScore(input: FieldMvpCandidate): MvpSuggestion {
-  const attack = input.goals * 35 + (input.assists ?? 0) * 12;
-  const discipline = (input.yellowCards ?? 0) * -5 + (input.redCards ?? 0) * -18;
-  const defense = input.goalsConceded === 0 ? 12 : input.goalsConceded === 1 ? 5 : 0;
-  const impact = input.winner ? 10 : 0;
-  const total = attack + discipline + defense + impact;
-  const reason = [
-    input.goals ? `${input.goals} goal${input.goals === 1 ? "" : "s"}` : null,
-    input.assists ? `${input.assists} assist${input.assists === 1 ? "" : "s"}` : null,
-    input.winner ? "winner impact" : null,
-    defense ? "defensive credit" : null,
-  ].filter(Boolean).join(", ") || "team impact";
-  return { playerId: input.playerId, teamId: input.teamId, total, impact, reason };
+  const total = input.goals * 35;
+  const reason = input.goals
+    ? `${input.goals} goal${input.goals === 1 ? "" : "s"}`
+    : "No goals scored";
+  return { playerId: input.playerId, teamId: input.teamId, total, impact: 0, reason };
 }
 
 export function rankFieldMvpCandidates(candidates: FieldMvpCandidate[]) {
