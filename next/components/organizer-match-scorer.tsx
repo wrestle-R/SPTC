@@ -1,6 +1,6 @@
 "use client";
 
-import { cricketChaseText, cricketInningsMetrics, fallOfWickets, getShootoutStatus, type BatterInnings, type CricketDelivery, type CricketExtraType, type DismissalType, type FieldEventType, type FieldMatchEvent, type Player, type Team } from "@sports-fiesta/domain";
+import { cricketChaseText, cricketInningsMetrics, fallOfWickets, getShootoutStatus, type BatterInnings, type CricketDelivery, type CricketExtraType, type DismissalType, type FieldEventType, type FieldMatchEvent, type Player, type Team, type ThrowballPointType } from "@sports-fiesta/domain";
 import { ArrowLeft, LoaderCircle, RotateCcw, Square, Trophy, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -30,7 +30,7 @@ export function OrganizerMatchScorer({ matchId }: { matchId: string }) {
     
     const previousMatch = { ...match };
     
-    if (name === "recordFieldEvent") {
+    if (name === "recordFieldEvent" && (match.sport === "football" || match.sport === "handball")) {
       const eventData = (data.event ?? {}) as {
         type?: string;
         teamId?: string;
@@ -59,7 +59,7 @@ export function OrganizerMatchScorer({ matchId }: { matchId: string }) {
           }
         };
       });
-    } else if (name === "undoLastEvent" && match.sport !== "cricket") {
+    } else if (name === "undoLastEvent" && (match.sport === "football" || match.sport === "handball")) {
       matchState.mutate((prev) => {
         if (!prev || !prev.fieldState?.events?.length) return prev;
         const fieldState = prev.fieldState;
@@ -118,7 +118,8 @@ export function OrganizerMatchScorer({ matchId }: { matchId: string }) {
     setPending(true);
     try {
       await callOrganizerCommand("endMatch", revisionCommand(match.id, match.revision, { manOfTheMatchPlayerId }));
-      router.push("/organizer/matches");
+      router.replace("/organizer/matches");
+      router.refresh();
     } catch (cause) {
       const msg = cause instanceof Error ? cause.message : "Match completion failed.";
       try {
@@ -147,7 +148,7 @@ export function OrganizerMatchScorer({ matchId }: { matchId: string }) {
 
     {match.status === "scheduled" && match.sport !== "cricket" ? <Card className="shadow-none"><CardHeader><CardTitle>Start match</CardTitle><CardDescription>Start scoring when the match is ready.</CardDescription></CardHeader><CardContent><Button size="lg" onClick={() => run("startMatch")} disabled={pending}>{pending ? <LoaderCircle data-icon="inline-start" className="animate-spin" /> : null}Start match</Button></CardContent></Card> : null}
 
-    {match.sport === "cricket" ? <CricketConsole key={`${match.id}-${match.status}-${match.revision}`} match={match} players={players.data} teams={teams.data} pending={pending} run={run} completeMatch={completeMatch} confirmedPlayers={confirmedPlayers} teamName={teamName} playerName={playerName} /> : <FieldConsole match={match} players={players.data} teams={teams.data} pending={pending} run={run} completeMatch={completeMatch} confirmedPlayers={confirmedPlayers} teamName={teamName} playerName={playerName} />}
+    {match.sport === "cricket" ? <CricketConsole key={`${match.id}-${match.status}-${match.revision}`} match={match} players={players.data} teams={teams.data} pending={pending} run={run} completeMatch={completeMatch} confirmedPlayers={confirmedPlayers} teamName={teamName} playerName={playerName} /> : match.sport === "throwball" ? <ThrowballConsole match={match} players={players.data} teams={teams.data} pending={pending} run={run} completeMatch={completeMatch} confirmedPlayers={confirmedPlayers} teamName={teamName} playerName={playerName} /> : <FieldConsole match={match} players={players.data} teams={teams.data} pending={pending} run={run} completeMatch={completeMatch} confirmedPlayers={confirmedPlayers} teamName={teamName} playerName={playerName} />}
   </div>;
 }
 
@@ -423,6 +424,183 @@ function DeliveryControls({ current, pending, run, battingPlayers, bowlingPlayer
 }
 
 function ParticipantSelect({ label, players, pending, onSelect }: { label: string; players: Player[]; pending: boolean; onSelect: (id: string) => void }) { const [value, setValue] = useState(""); return <div className="mb-5 rounded-md border p-4"><FieldGroup><SimpleSelect label={label} value={value} setValue={setValue} items={players.map((player) => ({ value: player.id, label: playerLabel(player) }))} /><Button disabled={pending || !value} onClick={() => onSelect(value)}>Confirm {label.toLowerCase()}</Button></FieldGroup></div>; }
+
+function ThrowballConsole({ match, players, teams, pending, run, completeMatch, confirmedPlayers, teamName, playerName }: { match: PublicMatch; players: Player[]; teams: Team[]; pending: boolean; run: RunCommand; completeMatch: (playerId?: string) => void; confirmedPlayers: Player[]; teamName: (id: string) => string; playerName: (id?: string | null) => string }) {
+  const state = match.throwball;
+  const [pointType, setPointType] = useState<ThrowballPointType>("successful-attack");
+  const [teamId, setTeamId] = useState(match.homeTeamId);
+  const [attackingPlayerId, setAttackingPlayerId] = useState("");
+  const [opponentPlayerId, setOpponentPlayerId] = useState("");
+  const [droppedByPlayerId, setDroppedByPlayerId] = useState("");
+  if (match.status === "scheduled") return null;
+  const currentSet = state?.sets[state.currentSet];
+  const homeSetsWon = state?.sets.filter((set) => set.winnerTeamId === match.homeTeamId).length ?? 0;
+  const awaySetsWon = state?.sets.filter((set) => set.winnerTeamId === match.awayTeamId).length ?? 0;
+  const homePlayers = players.filter((player) => player.teamId === match.homeTeamId);
+  const awayPlayers = players.filter((player) => player.teamId === match.awayTeamId);
+  const scoringTeamPlayers = teamId === match.homeTeamId ? homePlayers : awayPlayers;
+  const opponentPlayers = teamId === match.homeTeamId ? awayPlayers : homePlayers;
+  const statsRows = Object.entries(state?.playerStats ?? {}).sort(([, a], [, b]) => b.playerScore - a.playerScore || a.playerId.localeCompare(b.playerId));
+  const canComplete = Math.max(homeSetsWon, awaySetsWon) >= 2;
+
+  const resetSelections = () => {
+    setAttackingPlayerId("");
+    setOpponentPlayerId("");
+    setDroppedByPlayerId("");
+  };
+
+  function recordPoint() {
+    if (pointType === "successful-attack" && !attackingPlayerId) {
+      toast.error("Choose the attacking player.");
+      return;
+    }
+    if (pointType === "opponent-error" && !opponentPlayerId) {
+      toast.error("Choose the opponent who made the error.");
+      return;
+    }
+    void run("recordThrowballRally", {
+      rally: {
+        type: pointType,
+        teamId,
+        attackingPlayerId: pointType === "successful-attack" ? attackingPlayerId : undefined,
+        opponentPlayerId: pointType === "opponent-error" ? opponentPlayerId : undefined,
+        droppedByPlayerId: pointType === "successful-attack" && droppedByPlayerId ? droppedByPlayerId : undefined,
+      },
+    });
+    resetSelections();
+  }
+
+  return (
+    <div className="grid gap-3 xl:grid-cols-[1.05fr_0.95fr] sm:gap-4">
+      <Card className="shadow-none max-sm:border-0 max-sm:bg-transparent">
+        <CardHeader><CardTitle>Live score</CardTitle><CardDescription>Set score, rally log, and player impact update together.</CardDescription></CardHeader>
+        <CardContent className="flex flex-col gap-4 max-sm:px-0 sm:gap-5">
+          <div className="relative overflow-hidden rounded-2xl border bg-gradient-to-b from-muted/50 to-muted/10 p-6">
+            <div className="flex items-center justify-between gap-3 text-center">
+              <div className="flex flex-1 flex-col items-center gap-2">
+                <p className="line-clamp-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">{teamName(match.homeTeamId)}</p>
+                <p className="text-5xl font-black tracking-tighter">{currentSet?.homeScore ?? 0}</p>
+                <p className="text-sm font-semibold text-emerald-500">Sets: {homeSetsWon}</p>
+              </div>
+              <div className="flex flex-col items-center gap-2">
+                <span className="rounded-full bg-background px-3 py-1 text-[10px] font-bold tracking-widest text-muted-foreground shadow-sm">SET {state ? state.currentSet + 1 : 1}</span>
+                <span className="text-xs text-muted-foreground">Best of 3</span>
+              </div>
+              <div className="flex flex-1 flex-col items-center gap-2">
+                <p className="line-clamp-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">{teamName(match.awayTeamId)}</p>
+                <p className="text-5xl font-black tracking-tighter">{currentSet?.awayScore ?? 0}</p>
+                <p className="text-sm font-semibold text-emerald-500">Sets: {awaySetsWon}</p>
+              </div>
+            </div>
+          </div>
+
+          {state?.sets.length ? (
+            <div className="flex flex-wrap gap-2">
+              {state.sets.map((set, index) => (
+                <Badge key={`${match.id}-throwball-set-${index}`} variant={index === state.currentSet && !set.completed ? "default" : "outline"}>
+                  Set {index + 1}: {set.homeScore}-{set.awayScore}
+                </Badge>
+              ))}
+            </div>
+          ) : null}
+
+          <div>
+            <h2 className="mb-2 text-lg font-semibold sm:mb-3">Rally log</h2>
+            {state?.events.length ? (
+              <div className="flex flex-col gap-2 sm:gap-3">
+                {[...state.events].reverse().map((rally, index) => (
+                  <div key={rally.id ?? index} className="flex items-center justify-between gap-3 rounded-xl border bg-card p-3 text-sm shadow-sm">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <div className={`flex size-10 shrink-0 items-center justify-center rounded-full border text-base ${
+                        rally.type === "successful-attack"
+                          ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-500"
+                          : "border-destructive/20 bg-destructive/10 text-destructive"
+                      }`}>
+                        {rally.type === "successful-attack" ? "✓" : "✗"}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-semibold">{rally.type === "successful-attack" ? "Successful attack" : "Opponent error"}</p>
+                        <p className="break-words text-xs text-muted-foreground">
+                          {rally.type === "successful-attack"
+                            ? `${playerName(rally.attackingPlayerId)}${rally.droppedByPlayerId ? ` · drop ${playerName(rally.droppedByPlayerId)}` : ""}`
+                            : playerName(rally.opponentPlayerId)}
+                        </p>
+                      </div>
+                    </div>
+                    <span className="max-w-24 shrink-0 truncate text-right text-xs text-muted-foreground">{teamName(rally.teamId)}</span>
+                  </div>
+                ))}
+              </div>
+            ) : <p className="text-sm text-muted-foreground">No rallies recorded yet.</p>}
+          </div>
+
+          {statsRows.length ? (
+            <div className="rounded-lg border max-sm:border-0 max-sm:bg-transparent">
+              <div className="grid grid-cols-[minmax(0,1fr)_2rem_2rem_2.5rem_2.75rem] gap-1 bg-muted/30 px-3 py-2 text-xs font-semibold text-muted-foreground max-sm:bg-transparent max-sm:px-0">
+                <span>Player</span>
+                <span className="text-right">Att</span>
+                <span className="text-right">Err</span>
+                <span className="text-right">Drop</span>
+                <span className="text-right">Score</span>
+              </div>
+              <div className="divide-y px-3 max-sm:divide-y-0 max-sm:space-y-0.5 max-sm:px-0">
+                {statsRows.map(([playerId, stats]) => (
+                  <div key={playerId} className="grid grid-cols-[minmax(0,1fr)_2rem_2rem_2.5rem_2.75rem] gap-1 py-2 text-sm">
+                    <p className="break-words font-medium text-card-foreground">{playerName(playerId)}</p>
+                    <p className="text-right tabular-nums text-emerald-500">{stats.successfulAttacks}</p>
+                    <p className="text-right tabular-nums text-muted-foreground">{stats.ballsThrownOut}</p>
+                    <p className="text-right tabular-nums text-muted-foreground">{stats.droppedCatches}</p>
+                    <p className={`text-right font-semibold tabular-nums ${stats.playerScore > 0 ? "text-emerald-500" : stats.playerScore < 0 ? "text-destructive" : ""}`}>{stats.playerScore > 0 ? "+" : ""}{stats.playerScore}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
+        </CardContent>
+      </Card>
+      <Card className="shadow-none max-sm:border-0 max-sm:bg-transparent">
+        <CardHeader><CardTitle>Record point</CardTitle><CardDescription>Track attacks and opponent errors from the same score panel.</CardDescription></CardHeader>
+        <CardContent className="max-sm:px-0">
+          <FieldGroup>
+            <div>
+              <p className="mb-2 text-sm font-medium">Point type</p>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => { setPointType("successful-attack"); resetSelections(); }}
+                  className={`rounded-md border px-4 py-2 text-sm font-medium transition-colors ${pointType === "successful-attack" ? "border-primary bg-primary/10 text-primary" : "bg-background hover:bg-muted"}`}
+                >
+                  Successful attack
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setPointType("opponent-error"); resetSelections(); }}
+                  className={`rounded-md border px-4 py-2 text-sm font-medium transition-colors ${pointType === "opponent-error" ? "border-destructive bg-destructive/10 text-destructive" : "bg-background hover:bg-muted"}`}
+                >
+                  Opponent error
+                </button>
+              </div>
+            </div>
+            <SimpleSelect label="Scoring team" value={teamId} setValue={(value) => { setTeamId(value); resetSelections(); }} items={teams.filter((team) => [match.homeTeamId, match.awayTeamId].includes(team.id)).map((team) => ({ value: team.id, label: team.name }))} />
+            {pointType === "successful-attack" ? (
+              <>
+                <SimpleSelect label="Attacking player" value={attackingPlayerId} setValue={setAttackingPlayerId} items={scoringTeamPlayers.map((player) => ({ value: player.id, label: playerLabel(player) }))} />
+                <SimpleSelect label="Dropped by" value={droppedByPlayerId} setValue={setDroppedByPlayerId} items={[{ value: "", label: "None / not tracked" }, ...opponentPlayers.map((player) => ({ value: player.id, label: playerLabel(player) }))]} />
+              </>
+            ) : (
+              <SimpleSelect label="Opponent player" value={opponentPlayerId} setValue={setOpponentPlayerId} items={opponentPlayers.map((player) => ({ value: player.id, label: playerLabel(player) }))} />
+            )}
+            <Button size="lg" disabled={pending} onClick={recordPoint}>Record point</Button>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" onClick={() => run("undoLastEvent")} disabled={pending || !(state?.events.length)}><RotateCcw data-icon="inline-start" /> Undo</Button>
+            </div>
+            {canComplete ? <MotmPicker players={confirmedPlayers} pending={pending} onComplete={completeMatch} /> : null}
+          </FieldGroup>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
 
 function FieldConsole({ match, players, teams, pending, run, completeMatch, confirmedPlayers, teamName, playerName }: { match: PublicMatch; players: Player[]; teams: Team[]; pending: boolean; run: RunCommand; completeMatch: (playerId?: string) => void; confirmedPlayers: Player[]; teamName: (id: string) => string; playerName: (id?: string | null) => string }) {
   const [teamId, setTeamId] = useState(match.homeTeamId);

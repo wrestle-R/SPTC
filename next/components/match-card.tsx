@@ -9,6 +9,7 @@ export function MatchCard({ match, teams, players = S9_PLAYERS, featured = false
   const home = teams.find((team) => team.id === match.homeTeamId);
   const away = teams.find((team) => team.id === match.awayTeamId);
   const isCricket = match.sport === "cricket";
+  const isThrowball = match.sport === "throwball";
   const homeScore = isCricket
     ? match.scoreSummary?.innings?.find((innings) => innings.battingTeamId === match.homeTeamId)
     : null;
@@ -30,9 +31,9 @@ export function MatchCard({ match, teams, players = S9_PLAYERS, featured = false
             <MatchStatusBadge status={match.status} />
           </div>
           <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
-            <TeamScore team={home} score={isCricket ? cricketScore(homeScore) : match.scoreSummary?.[match.homeTeamId]} />
+            <TeamScore team={home} score={isCricket ? cricketScore(homeScore) : isThrowball ? throwballScore(match, match.homeTeamId) : match.scoreSummary?.[match.homeTeamId]} />
             <span className="text-xs font-semibold text-muted-foreground">VS</span>
-            <TeamScore team={away} score={isCricket ? cricketScore(awayScore) : match.scoreSummary?.[match.awayTeamId]} align="right" />
+            <TeamScore team={away} score={isCricket ? cricketScore(awayScore) : isThrowball ? throwballScore(match, match.awayTeamId) : match.scoreSummary?.[match.awayTeamId]} align="right" />
           </div>
           {resultText ? (
             <p className="mt-4 rounded-md bg-muted px-3 py-2 text-sm font-medium text-card-foreground">{resultText}</p>
@@ -54,6 +55,12 @@ export function MatchCard({ match, teams, players = S9_PLAYERS, featured = false
 
 function cricketScore(innings?: { score: number; wickets: number; overs: string } | null) {
   return innings ? `${innings.score}/${innings.wickets} (${innings.overs})` : undefined;
+}
+
+function throwballScore(match: PublicMatch, teamId: string) {
+  const setsWon = Number(match.scoreSummary?.[teamId] ?? 0);
+  const current = Number(match.scoreSummary?.[`${teamId}-current`] ?? 0);
+  return `${setsWon} (${current})`;
 }
 
 function displayAccentColor(color?: string | null) {

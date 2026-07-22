@@ -5,4 +5,5 @@ export * from "./mvp";
 export * from "./seed";
 export * from "./sport-rules";
 export * from "./standings";
+export * from "./throwball";
 export * from "./types";

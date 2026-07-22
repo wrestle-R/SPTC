@@ -12,6 +12,7 @@ export function PublicShell({ children }: { children: React.ReactNode }) {
             <Link href="/football" className="font-medium text-muted-foreground transition-colors hover:text-foreground">Football</Link>
             <Link href="/handball" className="font-medium text-muted-foreground transition-colors hover:text-foreground">Handball</Link>
             <Link href="/cricket" className="font-medium text-muted-foreground transition-colors hover:text-foreground">Cricket</Link>
+            <Link href="/throwball" className="font-medium text-muted-foreground transition-colors hover:text-foreground">Throwball</Link>
             <span className="hidden text-muted-foreground/30 sm:inline">|</span>
             <Link href="/teams" className="font-medium text-muted-foreground transition-colors hover:text-foreground">Standings</Link>
             <Link href="/leaderboards" className="font-medium text-muted-foreground transition-colors hover:text-foreground">Leaders</Link>

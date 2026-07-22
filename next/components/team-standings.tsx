@@ -46,6 +46,7 @@ export function TeamStandings() {
       football: stored?.football ?? 0,
       handball: stored?.handball ?? 0,
       cricket: stored?.cricket ?? 0,
+      throwball: stored?.throwball ?? 0,
       total: stored?.total ?? 0,
     };
   }).sort((a, b) => b.total - a.total || a.rank - b.rank);
@@ -121,6 +122,7 @@ export function TeamStandings() {
                       <TableHead className="text-right font-bold">Football</TableHead>
                       <TableHead className="text-right font-bold">Handball</TableHead>
                       <TableHead className="text-right font-bold">Cricket</TableHead>
+                      <TableHead className="text-right font-bold">Throwball</TableHead>
                       <TableHead className="pr-6 text-right font-bold">Total</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -143,6 +145,7 @@ export function TeamStandings() {
                         <TableCell className="text-right tabular-nums text-sm">{row.football}</TableCell>
                         <TableCell className="text-right tabular-nums text-sm">{row.handball}</TableCell>
                         <TableCell className="text-right tabular-nums text-sm">{row.cricket}</TableCell>
+                        <TableCell className="text-right tabular-nums text-sm">{row.throwball}</TableCell>
                         <TableCell className="pr-6 text-right font-black tabular-nums text-base">{row.total}</TableCell>
                       </TableRow>
                     ))}

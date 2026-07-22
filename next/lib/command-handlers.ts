@@ -2,20 +2,27 @@ import {
   cricketResultText,
   createCricketInnings,
   createFieldMatch,
+  createThrowballMatch,
   DEFAULT_SPORT_RULES,
+  getMatchWinner,
   nextMatchNumber,
   normalizeSportRules,
   rankCricketMvpCandidates,
   rankFieldMvpCandidates,
+  rankThrowballMvpCandidates,
+  rankThrowballStandings,
   recalculateCricketInnings,
+  recalculateThrowballMatch,
   recordCricketDelivery as applyCricketDelivery,
   recordFieldEvent,
+  recordThrowballRally,
   rankFieldStandings,
   S9_PLAYERS,
   S9_SPORTS,
   S9_TEAMS,
   setCricketBowler as applyCricketBowler,
   setNextBatter as applyNextBatter,
+  throwballResultText,
   validateFixture,
   type CricketDeliveryInput,
   type CricketInningsState,
@@ -24,6 +31,9 @@ import {
   type FieldMatchState,
   type Player,
   type SportRules,
+  type ThrowballMatchState,
+  type ThrowballRallyInput,
+  type ThrowballStandingInput,
 } from "@sports-fiesta/domain";
 import {
   CommandError,
@@ -40,7 +50,7 @@ import {
 type CallableData = Record<string, unknown>;
 type MatchDocument = JsonDocument & {
   id: string;
-  sport: "football" | "handball" | "cricket";
+  sport: "football" | "handball" | "cricket" | "throwball";
   stage: string;
   status: "scheduled" | "live" | "innings-break" | "super-over" | "completed";
   homeTeamId: string;
@@ -52,6 +62,7 @@ type MatchDocument = JsonDocument & {
   scoreSummary?: Record<string, unknown>;
   fieldState?: FieldMatchState;
   cricket?: { innings: Array<{ initial: unknown; state: CricketInningsState; superOver?: boolean }>; currentInnings: number };
+  throwball?: ThrowballMatchState;
   winnerTeamId?: string | null;
   resultText?: string | null;
   manOfTheMatchPlayerId?: string | null;
@@ -160,6 +171,18 @@ function inningsSummary(innings: NonNullable<MatchDocument["cricket"]>["innings"
   };
 }
 
+function throwballScoreSummary(match: Pick<MatchDocument, "homeTeamId" | "awayTeamId">, state: ThrowballMatchState) {
+  const homeSetsWon = state.sets.filter((set) => set.winnerTeamId === match.homeTeamId).length;
+  const awaySetsWon = state.sets.filter((set) => set.winnerTeamId === match.awayTeamId).length;
+  const currentSet = state.sets[state.currentSet];
+  return {
+    [match.homeTeamId]: homeSetsWon,
+    [match.awayTeamId]: awaySetsWon,
+    [`${match.homeTeamId}-current`]: currentSet?.homeScore ?? 0,
+    [`${match.awayTeamId}-current`]: currentSet?.awayScore ?? 0,
+  };
+}
+
 function cricketStatus(match: MatchDocument, state: CricketInningsState): CricketStatusPatch {
   if (!state.completed) return {};
   const innings = match.cricket?.innings ?? [];
@@ -229,6 +252,21 @@ async function suggestManOfTheMatch(match: MatchDocument) {
       }
     }
     return rankCricketMvpCandidates([...rows.values()]).slice(0, 5);
+  }
+  if (match.sport === "throwball") {
+    const candidates = roster.map((player) => {
+      const stats = match.throwball?.playerStats[player.id];
+      return {
+        playerId: player.id,
+        teamId: player.teamId,
+        successfulAttacks: stats?.successfulAttacks ?? 0,
+        ballsThrownOut: stats?.ballsThrownOut ?? 0,
+        droppedCatches: stats?.droppedCatches ?? 0,
+        playerScore: stats?.playerScore ?? 0,
+        winner: match.winnerTeamId === player.teamId,
+      };
+    });
+    return rankThrowballMvpCandidates(candidates).slice(0, 5);
   }
 
   const score = match.fieldState?.score ?? {};
@@ -336,7 +374,7 @@ export async function handleSavePlayer(data: CallableData) {
 
 export async function handleCreateMatch(data: CallableData) {
   const fixture = validateFixture({
-    sport: asString(data.sport, "Sport") as "football" | "handball" | "cricket",
+    sport: asString(data.sport, "Sport") as "football" | "handball" | "cricket" | "throwball",
     homeTeamId: asString(data.homeTeamId, "Home team"),
     awayTeamId: asString(data.awayTeamId, "Away team"),
     stage: (data.stage ?? "league") as "league" | "third-place" | "final",
@@ -409,6 +447,10 @@ export async function handleStartMatch(data: CallableData) {
   return mutateMatch(data, (match) => {
     if (match.status !== "scheduled") throw new CommandError(400, "FAILED_PRECONDITION", "This match cannot be started.");
     if (match.sport === "cricket") return { match: { ...match, status: "innings-break" } };
+    if (match.sport === "throwball") {
+      const throwball = createThrowballMatch(match.homeTeamId, match.awayTeamId);
+      return { match: { ...match, status: "live", throwball, scoreSummary: throwballScoreSummary(match, throwball) } };
+    }
     const fieldState = createFieldMatch(match.homeTeamId, match.awayTeamId);
     return { match: { ...match, status: "live", fieldState, scoreSummary: fieldState.score } };
   });
@@ -492,6 +534,44 @@ export async function handleRecordFieldSportEvent(data: CallableData) {
   });
 }
 
+export async function handleRecordThrowballRally(data: CallableData) {
+  return mutateMatch(data, async (match) => {
+    if (match.sport !== "throwball" || match.status !== "live") {
+      throw new CommandError(400, "FAILED_PRECONDITION", "The throwball match is not live.");
+    }
+    const rally = data.rally as ThrowballRallyInput | undefined;
+    if (!rally || typeof rally !== "object") {
+      throw new CommandError(400, "INVALID_ARGUMENT", "Rally is required.");
+    }
+    assertMatchTeam(match, rally.teamId);
+    const opponentTeamId = rally.teamId === match.homeTeamId ? match.awayTeamId : match.homeTeamId;
+    if (rally.type === "successful-attack") {
+      await assertRosterPlayer(match, rally.teamId, rally.attackingPlayerId, "Attacking player");
+      if (rally.droppedByPlayerId) {
+        await assertRosterPlayer(match, opponentTeamId, rally.droppedByPlayerId, "Dropped-by player");
+      }
+    } else if (rally.type === "opponent-error") {
+      await assertRosterPlayer(match, opponentTeamId, rally.opponentPlayerId, "Opponent player");
+    }
+    let throwball: ThrowballMatchState;
+    try {
+      throwball = recordThrowballRally(
+        match.throwball ?? createThrowballMatch(match.homeTeamId, match.awayTeamId),
+        rally,
+      );
+    } catch (error) {
+      throw new CommandError(400, "INVALID_ARGUMENT", (error as Error).message);
+    }
+    return {
+      match: {
+        ...match,
+        throwball,
+        scoreSummary: throwballScoreSummary(match, throwball),
+      },
+    };
+  });
+}
+
 function replayField(match: MatchDocument, events: FieldMatchEventInput[]) {
   return events.reduce((state, event) => recordFieldEvent(state, event), createFieldMatch(match.homeTeamId, match.awayTeamId));
 }
@@ -507,6 +587,22 @@ export async function handleEditMatchEvent(data: CallableData) {
       events[eventIndex] = { ...events[eventIndex], ...(data.event as CricketDeliveryInput), id: eventId };
       innings[index] = { ...entry, state: recalculateCricketInnings(entry.initial as CreateInningsInput, events) };
       return { match: cricketMatch(match, innings, index) };
+    }
+    if (match.sport === "throwball") {
+      const events = [...(match.throwball?.events ?? [])];
+      const eventIndex = events.findIndex((event) => event.id === eventId);
+      if (eventIndex < 0) throw new CommandError(404, "NOT_FOUND", "Event not found.");
+      events[eventIndex] = { ...events[eventIndex], ...(data.event as Partial<ThrowballRallyInput>), id: eventId };
+      let throwball: ThrowballMatchState;
+      try {
+        throwball = recalculateThrowballMatch(
+          [match.homeTeamId, match.awayTeamId],
+          events,
+        );
+      } catch (error) {
+        throw new CommandError(400, "INVALID_ARGUMENT", (error as Error).message);
+      }
+      return { match: { ...match, throwball, scoreSummary: throwballScoreSummary(match, throwball) } };
     }
     const events = [...(match.fieldState?.events ?? [])];
     const eventIndex = events.findIndex((event) => event.id === eventId);
@@ -524,6 +620,23 @@ export async function handleUndoLastEvent(data: CallableData) {
       if (!entry?.state.events.length) throw new CommandError(400, "FAILED_PRECONDITION", "There is no delivery to undo.");
       innings[index] = { ...entry, state: recalculateCricketInnings(entry.initial as CreateInningsInput, entry.state.events.slice(0, -1)) };
       return { match: cricketMatch(match, innings, index, { status: "live", winnerTeamId: null, resultText: null }) };
+    }
+    if (match.sport === "throwball") {
+      const events = match.throwball?.events ?? [];
+      if (!events.length) throw new CommandError(400, "FAILED_PRECONDITION", "There is no rally to undo.");
+      const throwball = recalculateThrowballMatch(
+        [match.homeTeamId, match.awayTeamId],
+        events.slice(0, -1),
+      );
+      return {
+        match: {
+          ...match,
+          throwball,
+          winnerTeamId: null,
+          resultText: null,
+          scoreSummary: throwballScoreSummary(match, throwball),
+        },
+      };
     }
     const events = match.fieldState?.events ?? [];
     if (!events.length) throw new CommandError(400, "FAILED_PRECONDITION", "There is no event to undo.");
@@ -561,6 +674,15 @@ export async function handleEndMatch(data: CallableData) {
           throw new CommandError(400, "FAILED_PRECONDITION", "Penalty shootout required — knockout match cannot end in a draw.");
         }
       }
+    } else if (match.sport === "throwball") {
+      if (!match.throwball) throw new CommandError(400, "FAILED_PRECONDITION", "Throwball match has no state.");
+      const winnerTeamId = getMatchWinner(match.throwball);
+      if (!winnerTeamId) throw new CommandError(400, "FAILED_PRECONDITION", "Throwball match has no winner yet.");
+      completed = {
+        ...completed,
+        winnerTeamId,
+        resultText: throwballResultText(match.throwball, teamName),
+      };
     } else if (match.sport === "cricket" && !match.resultText) throw new CommandError(400, "FAILED_PRECONDITION", "Cricket result is not ready yet.");
     const suggestions = await suggestManOfTheMatch(completed);
     const manOfTheMatchPlayerId = data.manOfTheMatchPlayerId ? asString(data.manOfTheMatchPlayerId, "Man of the match") : "";
@@ -670,6 +792,48 @@ function cricketStandings(matches: MatchRow[]) {
   return rows.sort((a, b) => b.points - a.points || b.netRunRate - a.netRunRate || b.wins - a.wins || a.teamId.localeCompare(b.teamId)).map((row, index) => ({ ...row, rank: index + 1 }));
 }
 
+function throwballStandings(matches: MatchRow[]) {
+  const rows = S9_TEAMS.map<ThrowballStandingInput>((team) => ({
+    teamId: team.id,
+    played: 0,
+    wins: 0,
+    losses: 0,
+    setsFor: 0,
+    setsAgainst: 0,
+    pointsFor: 0,
+    pointsAgainst: 0,
+  }));
+  const byTeam = new Map(rows.map((row) => [row.teamId, row]));
+  for (const match of matches.filter((row) => row.sport === "throwball" && row.status === "completed" && row.resultText && row.stage === "league")) {
+    const state = match.throwball;
+    if (!state) continue;
+    const home = byTeam.get(match.homeTeamId)!;
+    const away = byTeam.get(match.awayTeamId)!;
+    const homeSets = state.sets.filter((set) => set.winnerTeamId === match.homeTeamId).length;
+    const awaySets = state.sets.filter((set) => set.winnerTeamId === match.awayTeamId).length;
+    home.played += 1;
+    away.played += 1;
+    home.setsFor += homeSets;
+    home.setsAgainst += awaySets;
+    away.setsFor += awaySets;
+    away.setsAgainst += homeSets;
+    for (const set of state.sets.filter((entry) => entry.completed)) {
+      home.pointsFor += set.homeScore;
+      home.pointsAgainst += set.awayScore;
+      away.pointsFor += set.awayScore;
+      away.pointsAgainst += set.homeScore;
+    }
+    if (match.winnerTeamId === match.homeTeamId) {
+      home.wins += 1;
+      away.losses += 1;
+    } else if (match.winnerTeamId === match.awayTeamId) {
+      away.wins += 1;
+      home.losses += 1;
+    }
+  }
+  return rankThrowballStandings(rows);
+}
+
 function fieldLeaders(matches: MatchRow[], sport: "football" | "handball") {
   const scorers = new Map<string, { playerId: string; teamId: string; goals: number }>();
   for (const match of matches.filter((row) => row.sport === sport)) {
@@ -710,6 +874,39 @@ function cricketLeaders(matches: MatchRow[]) {
   };
 }
 
+function throwballLeaders(matches: MatchRow[]) {
+  const players = new Map<string, {
+    playerId: string;
+    teamId: string;
+    successfulAttacks: number;
+    ballsThrownOut: number;
+    droppedCatches: number;
+    playerScore: number;
+  }>();
+  for (const match of matches.filter((row) => row.sport === "throwball")) {
+    for (const stats of Object.values(match.throwball?.playerStats ?? {})) {
+      const row = players.get(stats.playerId) ?? {
+        playerId: stats.playerId,
+        teamId: S9_PLAYERS.find((player) => player.id === stats.playerId)?.teamId ?? "",
+        successfulAttacks: 0,
+        ballsThrownOut: 0,
+        droppedCatches: 0,
+        playerScore: 0,
+      };
+      row.successfulAttacks += stats.successfulAttacks;
+      row.ballsThrownOut += stats.ballsThrownOut;
+      row.droppedCatches += stats.droppedCatches;
+      row.playerScore += stats.playerScore;
+      players.set(stats.playerId, row);
+    }
+  }
+  const values = [...players.values()];
+  return {
+    bestPlayers: [...values].sort((a, b) => b.playerScore - a.playerScore || a.playerId.localeCompare(b.playerId)),
+    mostAttacks: [...values].sort((a, b) => b.successfulAttacks - a.successfulAttacks || a.playerId.localeCompare(b.playerId)),
+  };
+}
+
 export async function handleRefreshProjections() {
   const [matches, awards, tournament] = await Promise.all([
     listDocuments<MatchRow>("matches"),
@@ -719,10 +916,11 @@ export async function handleRefreshProjections() {
   const football = fieldStandings(matches, "football");
   const handball = fieldStandings(matches, "handball");
   const cricket = cricketStandings(matches);
-  const placementPoints = (tournament?.placementPoints as Record<string, number[]>) ?? { football: [10, 5, 3, 1], handball: [10, 5, 3, 1], cricket: [10, 5, 3, 1] };
+  const throwball = throwballStandings(matches);
+  const placementPoints = (tournament?.placementPoints as Record<string, number[]>) ?? { football: [10, 5, 3, 1], handball: [10, 5, 3, 1], cricket: [10, 5, 3, 1], throwball: [10, 5, 3, 1] };
   const placements = awards.filter((award) => award.type === "sport-placement" && award.confirmed && award.teamId && award.sport && award.place);
   const overall = S9_TEAMS.map((team) => {
-    const sportScores = Object.fromEntries(["football", "handball", "cricket"].map((sport) => {
+    const sportScores = Object.fromEntries(["football", "handball", "cricket", "throwball"].map((sport) => {
       const place = placements.find((row) => row.teamId === team.id && row.sport === sport)?.place;
       return [sport, place ? placementPoints[sport]?.[Number(place) - 1] ?? 0 : 0];
     })) as Record<string, number>;
@@ -733,10 +931,12 @@ export async function handleRefreshProjections() {
     upsertDocument("standings", "football", { id: "football", rows: football }),
     upsertDocument("standings", "handball", { id: "handball", rows: handball }),
     upsertDocument("standings", "cricket", { id: "cricket", rows: cricket }),
+    upsertDocument("standings", "throwball", { id: "throwball", rows: throwball }),
     upsertDocument("standings", "overall", { id: "overall", rows: overall }),
     upsertDocument("leaderboards", "football", { id: "football", topScorers: fieldLeaders(matches, "football") }),
     upsertDocument("leaderboards", "handball", { id: "handball", topScorers: fieldLeaders(matches, "handball") }),
     upsertDocument("leaderboards", "cricket", { id: "cricket", ...cricketLeaders(matches) }),
+    upsertDocument("leaderboards", "throwball", { id: "throwball", ...throwballLeaders(matches) }),
   ]);
 
   for (const sport of ["football", "handball"] as const) {
@@ -746,6 +946,7 @@ export async function handleRefreshProjections() {
     await upsertDocument("brackets", sport, { id: sport, finalists: needsDecider ? [rows[0]?.teamId].filter(Boolean) : rows.slice(0, 2).map((row) => row.teamId), decider: needsDecider ? [second.teamId, third.teamId] : null });
   }
   await upsertDocument("brackets", "cricket", { id: "cricket", finalists: cricket.slice(0, 2).map((row) => row.teamId) });
+  await upsertDocument("brackets", "throwball", { id: "throwball", finalists: throwball.slice(0, 2).map((row) => row.teamId) });
   return { ok: true };
 }
 
@@ -762,7 +963,7 @@ export async function seedBaseTournamentData() {
       venues: [],
       cricketOvers: 5,
       sportRules: DEFAULT_SPORT_RULES,
-      placementPoints: { football: [10, 5, 3, 1], handball: [10, 5, 3, 1], cricket: [10, 5, 3, 1] },
+      placementPoints: { football: [10, 5, 3, 1], handball: [10, 5, 3, 1], cricket: [10, 5, 3, 1], throwball: [10, 5, 3, 1] },
       createdAt: timestamp,
       updatedAt: timestamp,
     }),
@@ -776,13 +977,16 @@ export async function seedBaseTournamentData() {
     upsertDocument("standings", "football", { id: "football", rows: fieldStandings([], "football") }),
     upsertDocument("standings", "handball", { id: "handball", rows: fieldStandings([], "handball") }),
     upsertDocument("standings", "cricket", { id: "cricket", rows: cricketStandings([]) }),
-    upsertDocument("standings", "overall", { id: "overall", rows: S9_TEAMS.map((team, index) => ({ rank: index + 1, teamId: team.id, football: 0, handball: 0, cricket: 0, total: 0 })) }),
+    upsertDocument("standings", "throwball", { id: "throwball", rows: throwballStandings([]) }),
+    upsertDocument("standings", "overall", { id: "overall", rows: S9_TEAMS.map((team, index) => ({ rank: index + 1, teamId: team.id, football: 0, handball: 0, cricket: 0, throwball: 0, total: 0 })) }),
     upsertDocument("leaderboards", "football", { id: "football", topScorers: [] }),
     upsertDocument("leaderboards", "handball", { id: "handball", topScorers: [] }),
     upsertDocument("leaderboards", "cricket", { id: "cricket", orangeCap: [], purpleCap: [], mostCatches: [] }),
+    upsertDocument("leaderboards", "throwball", { id: "throwball", bestPlayers: [], mostAttacks: [] }),
     upsertDocument("brackets", "football", { id: "football", finalists: [], decider: null }),
     upsertDocument("brackets", "handball", { id: "handball", finalists: [], decider: null }),
     upsertDocument("brackets", "cricket", { id: "cricket", finalists: [] }),
+    upsertDocument("brackets", "throwball", { id: "throwball", finalists: [] }),
   ]);
   return { ok: true, teams: S9_TEAMS.length, players: S9_PLAYERS.length, matches: 0 };
 }

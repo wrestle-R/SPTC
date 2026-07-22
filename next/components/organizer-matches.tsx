@@ -60,7 +60,7 @@ export function OrganizerMatches() {
         <CardContent>
           <form onSubmit={create}>
             <FieldGroup className="grid md:grid-cols-2 xl:grid-cols-3">
-              <SelectField label="Sport" value={sport} onChange={setSport} items={[{ value: "football", label: "Football" }, { value: "handball", label: "Handball" }, { value: "cricket", label: "Cricket" }]} />
+              <SelectField label="Sport" value={sport} onChange={setSport} items={[{ value: "football", label: "Football" }, { value: "handball", label: "Handball" }, { value: "cricket", label: "Cricket" }, { value: "throwball", label: "Throwball" }]} />
               <SelectField label="Home team" value={home} onChange={setHome} items={teams.data.map((team) => ({ value: team.id, label: team.name }))} />
               <SelectField label="Away team" value={away} onChange={setAway} items={teams.data.filter((team) => team.id !== home).map((team) => ({ value: team.id, label: team.name }))} />
               <SelectField label="Stage" value={stage} onChange={setStage} items={[{ value: "league", label: "League" }, { value: "third-place", label: "Third place" }, { value: "final", label: "Final" }]} />

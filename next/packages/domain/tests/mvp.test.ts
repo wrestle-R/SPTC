@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { calculateMvpScore, rankCricketMvpCandidates, rankFieldMvpCandidates } from "../src/mvp";
+import { calculateMvpScore, rankCricketMvpCandidates, rankFieldMvpCandidates, rankThrowballMvpCandidates } from "../src/mvp";
 
 describe("MVP scoring", () => {
   it("uses the published fielding weights and winner impact bonus", () => {
@@ -37,5 +37,15 @@ describe("MVP scoring", () => {
     ]);
 
     expect(leader.playerId).toBe("p2");
+  });
+
+  it("ranks throwball players by player score with winner impact", () => {
+    const [leader] = rankThrowballMvpCandidates([
+      { playerId: "p1", teamId: "red", successfulAttacks: 3, ballsThrownOut: 1, droppedCatches: 0, playerScore: 5, winner: false },
+      { playerId: "p2", teamId: "green", successfulAttacks: 2, ballsThrownOut: 0, droppedCatches: 0, playerScore: 4, winner: true },
+    ]);
+
+    expect(leader.playerId).toBe("p2");
+    expect(leader.total).toBe(9);
   });
 });

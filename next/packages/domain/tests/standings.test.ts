@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { calculateOverallStandings, rankFieldStandings, rankOverallStandings } from "../src/standings";
+import { calculateOverallStandings, rankFieldStandings, rankOverallStandings, rankThrowballStandings } from "../src/standings";
 
 describe("standings", () => {
   it("ranks field sports by wins, goal difference, then goals for", () => {
@@ -36,5 +36,15 @@ describe("standings", () => {
 
     expect(standings[0]).toMatchObject({ teamId: "red", sportPoints: 15, totalPoints: 15 });
     expect(standings.every((row) => !("disciplineAdjustment" in row))).toBe(true);
+  });
+
+  it("ranks throwball standings by wins, then set and point difference", () => {
+    const standings = rankThrowballStandings([
+      { teamId: "red", played: 2, wins: 1, losses: 1, setsFor: 3, setsAgainst: 2, pointsFor: 33, pointsAgainst: 30 },
+      { teamId: "green", played: 2, wins: 1, losses: 1, setsFor: 3, setsAgainst: 2, pointsFor: 35, pointsAgainst: 31 },
+    ]);
+
+    expect(standings[0].teamId).toBe("green");
+    expect(standings[0].points).toBe(3);
   });
 });

@@ -3,6 +3,7 @@
 import { S9_TEAMS } from "@sports-fiesta/domain";
 import { ArrowRight, ArrowUpRight, CheckCircle2, Clock, Radio, Users } from "lucide-react";
 import { TbPlayFootball, TbPlayHandball, TbCricket } from "react-icons/tb";
+import { MdSportsVolleyball } from "react-icons/md";
 import Link from "next/link";
 import { DataError, ContentSkeleton } from "@/components/data-state";
 import { MatchCard } from "@/components/match-card";
@@ -16,6 +17,7 @@ const sportLinks = [
   { href: "/football", label: "Football", icon: TbPlayFootball, color: "text-orange-400", bg: "bg-orange-500/15", glow: "from-orange-500/15", line: "stroke-orange-400/25" },
   { href: "/handball", label: "Handball", icon: TbPlayHandball, color: "text-teal-400", bg: "bg-teal-500/15", glow: "from-teal-500/15", line: "stroke-teal-400/25" },
   { href: "/cricket", label: "Cricket", icon: TbCricket, color: "text-amber-400", bg: "bg-amber-500/15", glow: "from-amber-500/15", line: "stroke-amber-400/25" },
+  { href: "/throwball", label: "Throwball", icon: MdSportsVolleyball, color: "text-rose-400", bg: "bg-rose-500/15", glow: "from-rose-500/15", line: "stroke-rose-400/25" },
 ] as const;
 
 export function HomeView() {
@@ -78,7 +80,7 @@ export function HomeView() {
 
       <section className="flex flex-col gap-3" aria-label="Events">
         <p className="text-sm font-semibold uppercase tracking-wider text-primary">Events</p>
-        <div className="grid gap-3 sm:grid-cols-3">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {sportLinks.map(({ href, label, icon: Icon, color, bg, glow, line }) => (
             <Link key={href} href={href} className="group rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
               <Card className="relative min-h-24 overflow-hidden border-white/10 bg-card/80 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-primary/35 hover:shadow-lg">

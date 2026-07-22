@@ -1,11 +1,11 @@
-import type { CricketInningsState, FieldMatchState, Player, Team } from "@sports-fiesta/domain";
+import type { CricketInningsState, FieldMatchState, Player, Team, ThrowballMatchState } from "@sports-fiesta/domain";
 
 export type PublicTeam = Team;
 export type PublicPlayer = Player;
 
 export interface PublicMatch {
   id: string;
-  sport: "football" | "handball" | "cricket";
+  sport: "football" | "handball" | "cricket" | "throwball";
   stage: "league" | "third-place" | "final";
   status: "scheduled" | "live" | "innings-break" | "super-over" | "completed";
   homeTeamId: string;
@@ -22,6 +22,7 @@ export interface PublicMatch {
     innings: Array<{ state: CricketInningsState; superOver?: boolean }>;
     currentInnings: number;
   };
+  throwball?: ThrowballMatchState;
   winnerTeamId?: string | null;
   resultText?: string;
   manOfTheMatchPlayerId?: string | null;
@@ -35,6 +36,7 @@ export interface OverallStandingRow {
   football: number;
   handball: number;
   cricket: number;
+  throwball: number;
   total: number;
 }
 
@@ -67,7 +69,42 @@ export interface CricketStandingRow {
   netRunRate: number;
 }
 
+export interface ThrowballStandingRow {
+  rank: number;
+  teamId: string;
+  played: number;
+  wins: number;
+  losses: number;
+  setsFor: number;
+  setsAgainst: number;
+  setDifference: number;
+  pointsFor: number;
+  pointsAgainst: number;
+  pointDifference: number;
+  points: number;
+}
+
+export interface ThrowballLeaders {
+  id: string;
+  bestPlayers: Array<{
+    playerId: string;
+    teamId: string;
+    successfulAttacks: number;
+    ballsThrownOut: number;
+    droppedCatches: number;
+    playerScore: number;
+  }>;
+  mostAttacks: Array<{
+    playerId: string;
+    teamId: string;
+    successfulAttacks: number;
+    ballsThrownOut: number;
+    droppedCatches: number;
+    playerScore: number;
+  }>;
+}
+
 export interface SportStandingDocument {
   id: string;
-  rows: Array<FieldSportStandingRow | CricketStandingRow>;
+  rows: Array<FieldSportStandingRow | CricketStandingRow | ThrowballStandingRow>;
 }

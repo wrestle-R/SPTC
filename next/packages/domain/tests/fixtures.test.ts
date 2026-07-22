@@ -6,6 +6,7 @@ describe("fixtures", () => {
     ["cricket", "CR-003"],
     ["football", "FB-003"],
     ["handball", "HB-003"],
+    ["throwball", "TB-003"],
   ] as const)("generates the next %s match number", (sport, expected) => {
     expect(nextMatchNumber(sport, [`${expected.slice(0, 3)}001`, `${expected.slice(0, 3)}002`])).toBe(expected);
   });

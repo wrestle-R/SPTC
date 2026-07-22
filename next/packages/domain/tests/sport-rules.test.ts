@@ -15,4 +15,9 @@ describe("sport settings", () => {
     expect(normalizeSportRules({ cricket: { maxOvers: 0 } }).cricket.maxOvers).toBe(5);
     expect(normalizeSportRules({ cricket: { maxOvers: Number.NaN } }).cricket.maxOvers).toBe(5);
   });
+
+  it("keeps throwball available in normalized sport rules", () => {
+    expect(normalizeSportRules().throwball).toEqual({});
+    expect(DEFAULT_SPORT_RULES.throwball).toEqual({});
+  });
 });

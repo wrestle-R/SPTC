@@ -3,6 +3,7 @@ import { CommandError } from "@/lib/supabase-admin";
 import {
   handleConfirmAward, handleConfirmFixtures, handleCreateMatch,
   handleEditMatchEvent, handleEndInnings, handleEndMatch, handleRecordCricketDelivery, handleRecordFieldSportEvent,
+  handleRecordThrowballRally,
   handleRefreshProjections, handleSavePlayer, handleSaveTeam, handleSaveTournamentSettings, handleSelectCricketBowler,
   handleSelectNextBatter, handleSetPlacementPoints, handleSetToss, handleStartInnings, handleStartMatch,
   handleUndoLastEvent, handleUpdateMatch, handleDeleteMatch,
@@ -41,6 +42,7 @@ async function dispatch(command: string, data: Record<string, unknown>): Promise
     case "selectNextBatter": return handleSelectNextBatter(data);
     case "selectCricketBowler": return handleSelectCricketBowler(data);
     case "recordFieldEvent": return handleRecordFieldSportEvent(data);
+    case "recordThrowballRally": return handleRecordThrowballRally(data);
     case "editMatchEvent": return handleEditMatchEvent(data);
     case "undoLastEvent": return handleUndoLastEvent(data);
     case "endInnings": return handleEndInnings(data);

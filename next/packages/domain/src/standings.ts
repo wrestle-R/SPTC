@@ -3,6 +3,8 @@ import type {
   FieldStandingInput,
   OverallStanding,
   OverallStandingInput,
+  ThrowballStanding,
+  ThrowballStandingInput,
 } from "./types";
 
 export const DEFAULT_PLACEMENT_POINTS = [10, 5, 3, 1] as const;
@@ -19,6 +21,25 @@ export function rankFieldStandings(rows: FieldStandingInput[]): FieldStanding[] 
       b.wins - a.wins
       || b.goalDifference - a.goalDifference
       || b.goalsFor - a.goalsFor
+      || b.points - a.points
+      || a.teamId.localeCompare(b.teamId),
+    )
+    .map((row, index) => ({ ...row, rank: index + 1 }));
+}
+
+export function rankThrowballStandings(rows: ThrowballStandingInput[]): ThrowballStanding[] {
+  return rows
+    .map((row) => ({
+      ...row,
+      rank: 0,
+      setDifference: row.setsFor - row.setsAgainst,
+      pointDifference: row.pointsFor - row.pointsAgainst,
+      points: row.wins * 3,
+    }))
+    .sort((a, b) =>
+      b.wins - a.wins
+      || b.setDifference - a.setDifference
+      || b.pointDifference - a.pointDifference
       || b.points - a.points
       || a.teamId.localeCompare(b.teamId),
     )

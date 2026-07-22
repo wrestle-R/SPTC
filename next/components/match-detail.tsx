@@ -7,11 +7,12 @@ import { useState } from "react";
 import { ContentSkeleton, DataError } from "@/components/data-state";
 import { MatchStatusBadge } from "@/components/match-status-badge";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { usePublicCollection, usePublicDocument } from "@/lib/public-data";
 import type { PublicMatch, PublicPlayer, PublicTeam } from "@/lib/web-types";
 
-type Sport = "football" | "handball" | "cricket";
+type Sport = "football" | "handball" | "cricket" | "throwball";
 
 export function MatchDetail({ sport, matchId }: { sport: Sport; matchId: string }) {
   const matchState = usePublicDocument<PublicMatch>("matches", matchId);
@@ -69,7 +70,9 @@ export function MatchDetail({ sport, matchId }: { sport: Sport; matchId: string 
           </div>
         </CardHeader>
         <CardContent className="flex flex-col gap-4 pt-4 sm:gap-6 sm:pt-6">
-          {sport === "cricket" ? (
+          {sport === "throwball" ? (
+            <ThrowballScore match={match} teamName={teamName} playerName={playerName} />
+          ) : sport === "cricket" ? (
             <CricketScore
               key={`${match.id}-${match.cricket?.currentInnings ?? 0}-${match.cricket?.innings.length ?? 0}`}
               match={match}
@@ -200,6 +203,130 @@ function FieldScore({ match, homeName, awayName, playerName, playerJersey, teamN
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+function ThrowballScore({ match, teamName, playerName }: {
+  match: PublicMatch;
+  teamName: (id: string) => string;
+  playerName: (id?: string | null) => string;
+}) {
+  const state = match.throwball;
+  if (!state) {
+    return <p className="text-center text-muted-foreground">The throwball score will appear when the match starts.</p>;
+  }
+
+  const homeSetsWon = state.sets.filter((set) => set.winnerTeamId === match.homeTeamId).length;
+  const awaySetsWon = state.sets.filter((set) => set.winnerTeamId === match.awayTeamId).length;
+  const currentSet = state.sets[state.currentSet];
+  const playerStats = Object.entries(state.playerStats)
+    .sort(([, a], [, b]) => b.playerScore - a.playerScore || a.playerId.localeCompare(b.playerId));
+
+  return (
+    <div className="flex flex-col gap-6 sm:gap-8">
+      <div className="relative overflow-hidden rounded-2xl border bg-gradient-to-b from-muted/50 to-muted/10 p-6 sm:p-10">
+        <div className="flex items-center justify-between gap-4 text-center sm:gap-8">
+          <div className="flex flex-1 flex-col items-center gap-3">
+            <p className="line-clamp-2 text-sm font-semibold uppercase tracking-wider text-muted-foreground sm:text-base">{teamName(match.homeTeamId)}</p>
+            <p className="text-6xl font-black tracking-tighter sm:text-8xl">{currentSet?.homeScore ?? 0}</p>
+            <p className="text-sm font-semibold text-emerald-500 sm:text-base">Sets: {homeSetsWon}</p>
+          </div>
+          <div className="flex flex-col items-center gap-2">
+            <span className="rounded-full bg-background px-3 py-1.5 text-xs font-bold tracking-widest text-muted-foreground shadow-sm">
+              Set {state.currentSet + 1}
+            </span>
+            <span className="text-xs font-medium text-muted-foreground">Best of 3</span>
+          </div>
+          <div className="flex flex-1 flex-col items-center gap-3">
+            <p className="line-clamp-2 text-sm font-semibold uppercase tracking-wider text-muted-foreground sm:text-base">{teamName(match.awayTeamId)}</p>
+            <p className="text-6xl font-black tracking-tighter sm:text-8xl">{currentSet?.awayScore ?? 0}</p>
+            <p className="text-sm font-semibold text-emerald-500 sm:text-base">Sets: {awaySetsWon}</p>
+          </div>
+        </div>
+      </div>
+
+      <div className="rounded-lg border max-sm:border-0 max-sm:bg-transparent">
+        <div className="flex flex-wrap items-center gap-2 border-b bg-muted/30 px-4 py-3 max-sm:border-b-0 max-sm:bg-transparent max-sm:px-0">
+          <h2 className="text-lg font-semibold">Set details</h2>
+        </div>
+        <div className="divide-y px-4 py-1 max-sm:divide-y-0 max-sm:space-y-2 max-sm:px-0">
+          {state.sets.map((set, index) => (
+            <div key={`${match.id}-set-${index}`} className="flex flex-wrap items-center justify-between gap-3 py-3">
+              <div className="min-w-0">
+                <p className="font-medium">Set {index + 1}</p>
+                <p className="text-sm text-muted-foreground">{set.homeScore} - {set.awayScore}</p>
+              </div>
+              {set.winnerTeamId ? (
+                <Badge variant="outline">{teamName(set.winnerTeamId)} won</Badge>
+              ) : set.completed ? (
+                <Badge variant="outline">Completed</Badge>
+              ) : (
+                <Badge variant="secondary">In progress</Badge>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div>
+        <h2 className="mb-3 text-lg font-semibold">Rally timeline</h2>
+        {state.events.length ? (
+          <div className="flex flex-col gap-2 sm:gap-3">
+            {[...state.events].reverse().map((rally, index) => (
+              <div key={rally.id ?? index} className="flex items-center gap-4 rounded-xl border bg-card p-3 shadow-sm sm:p-4">
+                <div className={`flex size-10 shrink-0 items-center justify-center rounded-full border text-base ${
+                  rally.type === "successful-attack"
+                    ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-500"
+                    : "border-destructive/20 bg-destructive/10 text-destructive"
+                }`}>
+                  {rally.type === "successful-attack" ? "✓" : "✗"}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-bold">{rally.type === "successful-attack" ? "Successful attack" : "Opponent error"}</span>
+                    <span className="text-xs text-muted-foreground">• {teamName(rally.teamId)}</span>
+                  </div>
+                  <p className="mt-1 break-words text-sm text-muted-foreground">
+                    {rally.type === "successful-attack"
+                      ? `Attacker: ${playerName(rally.attackingPlayerId)}${rally.droppedByPlayerId ? ` · Dropped by ${playerName(rally.droppedByPlayerId)}` : ""}`
+                      : `Error by ${playerName(rally.opponentPlayerId)}`}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="flex flex-col items-center justify-center rounded-xl border border-dashed py-12 text-center text-muted-foreground">
+            <p>No rallies recorded yet.</p>
+          </div>
+        )}
+      </div>
+
+      {playerStats.length ? (
+        <div className="rounded-lg border max-sm:border-0 max-sm:bg-transparent">
+          <div className="grid grid-cols-[minmax(0,1fr)_2rem_2rem_2.5rem_2.75rem] gap-1 bg-muted/30 px-3 py-2 text-xs font-semibold text-muted-foreground max-sm:bg-transparent max-sm:px-0">
+            <span>Player</span>
+            <span className="text-right">Att</span>
+            <span className="text-right">Err</span>
+            <span className="text-right">Drop</span>
+            <span className="text-right">Score</span>
+          </div>
+          <div className="divide-y px-3 max-sm:divide-y-0 max-sm:space-y-0.5 max-sm:px-0">
+            {playerStats.map(([playerId, stats]) => (
+              <div key={playerId} className="grid grid-cols-[minmax(0,1fr)_2rem_2rem_2.5rem_2.75rem] gap-1 py-2 text-sm">
+                <p className="break-words font-medium text-card-foreground">{playerName(playerId)}</p>
+                <p className="text-right tabular-nums text-emerald-500">{stats.successfulAttacks}</p>
+                <p className="text-right tabular-nums text-muted-foreground">{stats.ballsThrownOut}</p>
+                <p className="text-right tabular-nums text-muted-foreground">{stats.droppedCatches}</p>
+                <p className={`text-right font-semibold tabular-nums ${stats.playerScore > 0 ? "text-emerald-500" : stats.playerScore < 0 ? "text-destructive" : ""}`}>
+                  {stats.playerScore > 0 ? "+" : ""}{stats.playerScore}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

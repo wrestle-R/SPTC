@@ -46,6 +46,16 @@ export interface CricketMvpCandidate {
   winner?: boolean;
 }
 
+export interface ThrowballMvpCandidate {
+  playerId: string;
+  teamId: string;
+  successfulAttacks: number;
+  ballsThrownOut: number;
+  droppedCatches: number;
+  playerScore: number;
+  winner?: boolean;
+}
+
 export interface MvpSuggestion {
   playerId: string;
   teamId: string;
@@ -135,5 +145,22 @@ export function rankCricketMvpCandidates(candidates: CricketMvpCandidate[]) {
       ].filter(Boolean).join(", ") || "match impact";
       return { playerId: candidate.playerId, teamId: candidate.teamId, ...score, reason };
     })
+    .sort((a, b) => b.total - a.total || a.playerId.localeCompare(b.playerId));
+}
+
+export function calculateThrowballMvpScore(input: ThrowballMvpCandidate): MvpSuggestion {
+  const impact = input.winner ? 5 : 0;
+  const total = input.playerScore + impact;
+  const reason = [
+    input.successfulAttacks ? `${input.successfulAttacks} attack${input.successfulAttacks === 1 ? "" : "s"}` : null,
+    input.ballsThrownOut ? `${input.ballsThrownOut} error${input.ballsThrownOut === 1 ? "" : "s"}` : null,
+    input.droppedCatches ? `${input.droppedCatches} drop${input.droppedCatches === 1 ? "" : "s"}` : null,
+  ].filter(Boolean).join(", ") || "match impact";
+  return { playerId: input.playerId, teamId: input.teamId, total, impact, reason };
+}
+
+export function rankThrowballMvpCandidates(candidates: ThrowballMvpCandidate[]) {
+  return candidates
+    .map(calculateThrowballMvpScore)
     .sort((a, b) => b.total - a.total || a.playerId.localeCompare(b.playerId));
 }

@@ -1,4 +1,4 @@
-export type SportKey = "football" | "handball" | "cricket";
+export type SportKey = "football" | "handball" | "cricket" | "throwball";
 export type MatchStatus = "scheduled" | "live" | "innings-break" | "super-over" | "completed";
 
 export interface FixtureInput {
@@ -13,6 +13,7 @@ const MATCH_PREFIX: Record<SportKey, string> = {
   cricket: "CR",
   football: "FB",
   handball: "HB",
+  throwball: "TB",
 };
 
 export function nextMatchNumber(sport: SportKey, existing: readonly string[]) {

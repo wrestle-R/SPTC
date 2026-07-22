@@ -108,7 +108,7 @@ export const S9_SPORTS = [
   { id: "football", name: "Football", status: "active" },
   { id: "handball", name: "Handball", status: "active" },
   { id: "cricket", name: "Cricket", status: "active" },
-  { id: "throwball", name: "Throwball", status: "coming-soon" },
+  { id: "throwball", name: "Throwball", status: "active" },
   { id: "relay-race", name: "Relay Race", status: "coming-soon" },
   { id: "kids-game", name: "Kids' Game", status: "coming-soon" },
   { id: "womens-game", name: "Women's Game", status: "coming-soon" },

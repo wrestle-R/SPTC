@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { S9_PLAYERS, S9_SEEDED_MATCHES, S9_TEAMS } from "../src/seed";
+import { S9_PLAYERS, S9_SEEDED_MATCHES, S9_SPORTS, S9_TEAMS } from "../src/seed";
 
 const expectedRosters = {
   "crimson-warriors": ["Daniel Russel Paul", "Glen Gladin", "Sam Jeyaraj", "Jovin Samraj", "Melvin Benn", "Aaron Ditto", "Johan Jagdish", "Jenson Shaji", "Daniel Ratnaraj", "Edwin Anburaj", "Jemima John", "Rachel Edwin", "Hannah Mano", "Sharon Jane", "Cressida Jebastin", "Suja Jebakumar", "Christy Jagdish", "Anita Ditto", "Kaitlyn Eve"],
@@ -48,5 +48,9 @@ describe("finalized rosters", () => {
 
   it("keeps match seed data empty for a clean Supabase migration", () => {
     expect(S9_SEEDED_MATCHES).toEqual([]);
+  });
+
+  it("marks throwball as an active sport", () => {
+    expect(S9_SPORTS.find((sport) => sport.id === "throwball")?.status).toBe("active");
   });
 });

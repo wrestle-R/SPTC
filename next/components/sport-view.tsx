@@ -7,12 +7,22 @@ import { MatchCard } from "@/components/match-card";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { usePublicCollection, usePublicDocument } from "@/lib/public-data";
-import type { CricketStandingRow, FieldSportStandingRow, PublicMatch, PublicPlayer, PublicTeam, SportStandingDocument } from "@/lib/web-types";
+import type {
+  CricketStandingRow,
+  FieldSportStandingRow,
+  PublicMatch,
+  PublicPlayer,
+  PublicTeam,
+  SportStandingDocument,
+  ThrowballLeaders,
+  ThrowballStandingRow,
+} from "@/lib/web-types";
 
 const headings = {
   football: { title: "Football", description: "Fixtures, live goals, standings, and the road to the final." },
   handball: { title: "Handball", description: "Live scoring, results, and tournament progress." },
   cricket: { title: "Cricket", description: "Five-over fixtures, ball-by-ball scorecards, leaders, and match analytics." },
+  throwball: { title: "Throwball", description: "Fast-paced fixtures, set-by-set scorelines, and rally-driven player leaders." },
 } as const;
 
 export function SportView({ sport }: { sport: keyof typeof headings }) {
@@ -78,7 +88,7 @@ type CricketLeaders = {
   mostCatches?: Array<{ playerId: string; catches: number }>;
 };
 
-function SportLeaders({ sport, leaders, matches, players }: { sport: keyof typeof headings; leaders?: FieldLeaders | CricketLeaders | null; matches: PublicMatch[]; players: PublicPlayer[] }) {
+function SportLeaders({ sport, leaders, matches, players }: { sport: keyof typeof headings; leaders?: FieldLeaders | CricketLeaders | ThrowballLeaders | null; matches: PublicMatch[]; players: PublicPlayer[] }) {
   const playerName = (id: string) => players.find((player) => player.id === id)?.name ?? "Player";
   if (sport === "cricket") {
     const cricket = (leaders as CricketLeaders | undefined) ?? fallbackCricketLeaders(matches);
@@ -90,6 +100,32 @@ function SportLeaders({ sport, leaders, matches, players }: { sport: keyof typeo
       </section>
     );
   }
+  if (sport === "throwball") {
+    const throwball = (leaders as ThrowballLeaders | undefined) ?? fallbackThrowballLeaders(matches);
+    return (
+      <section className="grid gap-3 lg:grid-cols-2" aria-label="Throwball leaders">
+        <LeaderCard
+          title="Best Players"
+          label="Score"
+          rows={(throwball.bestPlayers ?? []).slice(0, 5).map((row) => ({
+            playerId: row.playerId,
+            value: row.playerScore,
+            subtitle: `${row.successfulAttacks}A / ${row.ballsThrownOut}E / ${row.droppedCatches}D`,
+          }))}
+          playerName={playerName}
+        />
+        <LeaderCard
+          title="Most Successful Attacks"
+          label="Att"
+          rows={(throwball.mostAttacks ?? []).slice(0, 5).map((row) => ({
+            playerId: row.playerId,
+            value: row.successfulAttacks,
+          }))}
+          playerName={playerName}
+        />
+      </section>
+    );
+  }
   const field = (leaders as FieldLeaders | undefined) ?? { topScorers: fallbackFieldLeaders(matches) };
   return (
     <section aria-label={`${sport} leaders`}>
@@ -98,15 +134,15 @@ function SportLeaders({ sport, leaders, matches, players }: { sport: keyof typeo
   );
 }
 
-function LeaderCard({ title, label, rows, playerName }: { title: string; label: string; rows: Array<{ playerId: string; value: number }>; playerName: (id: string) => string }) {
+function LeaderCard({ title, label, rows, playerName }: { title: string; label: string; rows: Array<{ playerId: string; value: number; subtitle?: string }>; playerName: (id: string) => string }) {
   return (
     <Card className="shadow-none">
       <CardHeader><CardTitle>{title}</CardTitle><CardDescription>Updated from recorded match events.</CardDescription></CardHeader>
       <CardContent>
-        {rows.some((row) => row.value > 0) ? (
+        {rows.some((row) => row.value !== 0) ? (
           <Table>
             <TableHeader><TableRow><TableHead>Player</TableHead><TableHead className="text-right">{label}</TableHead></TableRow></TableHeader>
-            <TableBody>{rows.filter((row) => row.value > 0).map((row, index) => <TableRow key={row.playerId}><TableCell>{index + 1}. {playerName(row.playerId)}</TableCell><TableCell className="text-right font-semibold tabular-nums">{row.value}</TableCell></TableRow>)}</TableBody>
+            <TableBody>{rows.filter((row) => row.value !== 0).map((row, index) => <TableRow key={row.playerId}><TableCell><div className="min-w-0"><p>{index + 1}. {playerName(row.playerId)}</p>{row.subtitle ? <p className="text-xs text-muted-foreground">{row.subtitle}</p> : null}</div></TableCell><TableCell className="text-right font-semibold tabular-nums">{row.value}</TableCell></TableRow>)}</TableBody>
           </Table>
         ) : <p className="py-8 text-center text-sm text-muted-foreground">Leaders will appear after scoring events.</p>}
       </CardContent>
@@ -158,7 +194,42 @@ function fallbackCricketLeaders(matches: PublicMatch[]): CricketLeaders {
 
 function fallbackStandings(sport: keyof typeof headings, matches: PublicMatch[]): SportStandingDocument["rows"] {
   if (sport === "cricket") return fallbackCricketStandings(matches);
+  if (sport === "throwball") return fallbackThrowballStandings(matches);
   return fallbackFieldStandings(matches);
+}
+
+function fallbackThrowballLeaders(matches: PublicMatch[]): ThrowballLeaders {
+  const rows = new Map<string, {
+    playerId: string;
+    teamId: string;
+    successfulAttacks: number;
+    ballsThrownOut: number;
+    droppedCatches: number;
+    playerScore: number;
+  }>();
+  for (const match of matches.filter((row) => row.sport === "throwball")) {
+    for (const stats of Object.values(match.throwball?.playerStats ?? {})) {
+      const row = rows.get(stats.playerId) ?? {
+        playerId: stats.playerId,
+        teamId: S9_PLAYERS.find((player) => player.id === stats.playerId)?.teamId ?? "",
+        successfulAttacks: 0,
+        ballsThrownOut: 0,
+        droppedCatches: 0,
+        playerScore: 0,
+      };
+      row.successfulAttacks += stats.successfulAttacks;
+      row.ballsThrownOut += stats.ballsThrownOut;
+      row.droppedCatches += stats.droppedCatches;
+      row.playerScore += stats.playerScore;
+      rows.set(stats.playerId, row);
+    }
+  }
+  const values = [...rows.values()];
+  return {
+    id: "throwball",
+    bestPlayers: [...values].sort((a, b) => b.playerScore - a.playerScore || a.playerId.localeCompare(b.playerId)),
+    mostAttacks: [...values].sort((a, b) => b.successfulAttacks - a.successfulAttacks || a.playerId.localeCompare(b.playerId)),
+  };
 }
 
 function fallbackFieldStandings(matches: PublicMatch[]): FieldSportStandingRow[] {
@@ -225,6 +296,60 @@ function fallbackCricketStandings(matches: PublicMatch[]): CricketStandingRow[] 
     .map((row, index) => ({ ...row, rank: index + 1 }));
 }
 
+function fallbackThrowballStandings(matches: PublicMatch[]): ThrowballStandingRow[] {
+  const rows = S9_TEAMS.map<ThrowballStandingRow>((team) => ({
+    rank: 0,
+    teamId: team.id,
+    played: 0,
+    wins: 0,
+    losses: 0,
+    setsFor: 0,
+    setsAgainst: 0,
+    setDifference: 0,
+    pointsFor: 0,
+    pointsAgainst: 0,
+    pointDifference: 0,
+    points: 0,
+  }));
+  const byTeam = new Map(rows.map((row) => [row.teamId, row]));
+  for (const match of matches.filter((row) => row.sport === "throwball" && row.status === "completed" && row.resultText && row.stage === "league")) {
+    const state = match.throwball;
+    const home = byTeam.get(match.homeTeamId);
+    const away = byTeam.get(match.awayTeamId);
+    if (!state || !home || !away) continue;
+    const homeSets = state.sets.filter((set) => set.winnerTeamId === match.homeTeamId).length;
+    const awaySets = state.sets.filter((set) => set.winnerTeamId === match.awayTeamId).length;
+    home.played += 1;
+    away.played += 1;
+    home.setsFor += homeSets;
+    home.setsAgainst += awaySets;
+    away.setsFor += awaySets;
+    away.setsAgainst += homeSets;
+    for (const set of state.sets.filter((entry) => entry.completed)) {
+      home.pointsFor += set.homeScore;
+      home.pointsAgainst += set.awayScore;
+      away.pointsFor += set.awayScore;
+      away.pointsAgainst += set.homeScore;
+    }
+    if (match.winnerTeamId === match.homeTeamId) {
+      home.wins += 1;
+      away.losses += 1;
+    } else if (match.winnerTeamId === match.awayTeamId) {
+      away.wins += 1;
+      home.losses += 1;
+    }
+  }
+  return rows
+    .map((row) => ({
+      ...row,
+      setDifference: row.setsFor - row.setsAgainst,
+      pointDifference: row.pointsFor - row.pointsAgainst,
+      points: row.wins * 3,
+    }))
+    .sort((a, b) => b.wins - a.wins || b.setDifference - a.setDifference || b.pointDifference - a.pointDifference || a.teamId.localeCompare(b.teamId))
+    .map((row, index) => ({ ...row, rank: index + 1 }));
+}
+
 function SportStandings({
   sport,
   standings,
@@ -237,6 +362,8 @@ function SportStandings({
   const teamName = (teamId: string) => teams.find((team) => team.id === teamId)?.name ?? teamId;
   const gridClass = sport === "cricket"
     ? "grid grid-cols-[1.25rem_minmax(5.75rem,1fr)_1.25rem_1.25rem_1.25rem_1.25rem_2.5rem_1.75rem] gap-1"
+    : sport === "throwball"
+    ? "grid grid-cols-[1.25rem_minmax(4.75rem,1fr)_1.25rem_1.25rem_1.5rem_1.5rem_1.5rem_1.5rem_1.75rem] gap-1"
     : sport === "handball"
     ? "grid grid-cols-[1.25rem_minmax(4.75rem,1fr)_1.25rem_1.25rem_1.25rem_1.5rem_1.5rem_1.5rem_1.75rem] gap-1"
     : "grid grid-cols-[1.25rem_minmax(4.75rem,1fr)_1.25rem_1.25rem_1.25rem_1.25rem_1.5rem_1.5rem_1.5rem_1.75rem] gap-1";
@@ -250,12 +377,24 @@ function SportStandings({
             <span>Team</span>
             <span className="text-right">P</span>
             <span className="text-right">W</span>
-            {sport === "handball" ? null : (
+            {sport === "handball" ? null : sport === "throwball" ? (
+              <span className="text-right">L</span>
+            ) : (
               <span className="text-right">{sport === "cricket" ? "T" : "D"}</span>
             )}
-            <span className="text-right">L</span>
+            {sport === "throwball" ? (
+              <>
+                <span className="text-right">SF</span>
+                <span className="text-right">SA</span>
+                <span className="text-right">PD</span>
+              </>
+            ) : (
+              <span className="text-right">L</span>
+            )}
             {sport === "cricket" ? (
               <span className="text-right">NRR</span>
+            ) : sport === "throwball" ? (
+              <span className="text-right">Pts</span>
             ) : (
               <>
                 <span className="text-right">GF</span>
@@ -263,7 +402,7 @@ function SportStandings({
                 <span className="text-right">GD</span>
               </>
             )}
-            <span className="text-right">Pts</span>
+            {sport === "throwball" ? null : <span className="text-right">Pts</span>}
           </div>
           <div className="divide-y max-sm:divide-y-0 max-sm:space-y-0.5">
             {standings.map((row) => (
@@ -272,7 +411,9 @@ function SportStandings({
                 <span className="break-words font-medium leading-snug">{teamName(row.teamId)}</span>
                 <span className="text-right tabular-nums">{row.played}</span>
                 <span className="text-right tabular-nums">{row.wins}</span>
-                {"ties" in row ? (
+                {"setsFor" in row ? (
+                  <ThrowballStandingCells row={row} />
+                ) : "ties" in row ? (
                   <CricketStandingCells row={row} />
                 ) : (
                   <FieldStandingCells row={row} showDraws={sport === "football"} />
@@ -307,6 +448,18 @@ function CricketStandingCells({ row }: { row: CricketStandingRow }) {
       <span className="text-right tabular-nums">{row.ties}</span>
       <span className="text-right tabular-nums">{row.losses}</span>
       <span className="text-right tabular-nums">{row.netRunRate.toFixed(3)}</span>
+      <span className="text-right font-semibold tabular-nums">{row.points}</span>
+    </>
+  );
+}
+
+function ThrowballStandingCells({ row }: { row: ThrowballStandingRow }) {
+  return (
+    <>
+      <span className="text-right tabular-nums">{row.losses}</span>
+      <span className="text-right tabular-nums">{row.setsFor}</span>
+      <span className="text-right tabular-nums">{row.setsAgainst}</span>
+      <span className="text-right tabular-nums">{row.pointDifference}</span>
       <span className="text-right font-semibold tabular-nums">{row.points}</span>
     </>
   );

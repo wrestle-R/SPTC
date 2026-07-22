@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { usePublicCollection, usePublicDocument } from "@/lib/public-data";
-import type { PublicPlayer } from "@/lib/web-types";
+import type { PublicPlayer, ThrowballLeaders } from "@/lib/web-types";
 
 type FieldLeaders = { id: string; topScorers?: Array<{ playerId: string; teamId: string; goals: number }> };
 type CricketLeaders = {
@@ -23,8 +23,9 @@ export function LeaderboardsView() {
   const football = usePublicDocument<FieldLeaders>("leaderboards", "football");
   const handball = usePublicDocument<FieldLeaders>("leaderboards", "handball");
   const cricket = usePublicDocument<CricketLeaders>("leaderboards", "cricket");
-  const loading = players.loading || football.loading || handball.loading || cricket.loading;
-  const error = players.error || football.error || handball.error || cricket.error;
+  const throwball = usePublicDocument<ThrowballLeaders>("leaderboards", "throwball");
+  const loading = players.loading || football.loading || handball.loading || cricket.loading || throwball.loading;
+  const error = players.error || football.error || handball.error || cricket.error || throwball.error;
   const name = (id: string) => players.data.find((player) => player.id === id)?.name ?? "Player";
 
   if (loading) return <ContentSkeleton />;
@@ -36,6 +37,7 @@ export function LeaderboardsView() {
         <TabsTrigger value="football" className="min-h-10 px-4">Football</TabsTrigger>
         <TabsTrigger value="handball" className="min-h-10 px-4">Handball</TabsTrigger>
         <TabsTrigger value="cricket" className="min-h-10 px-4">Cricket</TabsTrigger>
+        <TabsTrigger value="throwball" className="min-h-10 px-4">Throwball</TabsTrigger>
       </TabsList>
       <TabsContent value="football"><FieldLeaderboard title="Football top scorers" rows={football.data?.topScorers ?? []} name={name} /></TabsContent>
       <TabsContent value="handball"><FieldLeaderboard title="Handball top scorers" rows={handball.data?.topScorers ?? []} name={name} /></TabsContent>
@@ -44,6 +46,12 @@ export function LeaderboardsView() {
           <CricketLeaderboard title="Orange Cap" description="Most tournament runs" rows={cricket.data?.orangeCap ?? []} name={name} metric="runs" />
           <CricketLeaderboard title="Purple Cap" description="Most tournament wickets" rows={cricket.data?.purpleCap ?? []} name={name} metric="wickets" />
           <CricketLeaderboard title="Most Catches" description="Most tournament catches" rows={cricket.data?.mostCatches ?? []} name={name} metric="catches" />
+        </div>
+      </TabsContent>
+      <TabsContent value="throwball">
+        <div className="grid gap-4 lg:grid-cols-2">
+          <ThrowballLeaderboard title="Best players" description="Highest rally impact score" rows={throwball.data?.bestPlayers ?? []} name={name} metric="playerScore" />
+          <ThrowballLeaderboard title="Most successful attacks" description="Most scoring attacks recorded" rows={throwball.data?.mostAttacks ?? []} name={name} metric="successfulAttacks" />
         </div>
       </TabsContent>
     </Tabs>
@@ -70,6 +78,21 @@ function CricketLeaderboard({ title, description, rows, name, metric }: {
     <Card className="shadow-none">
       <CardHeader><div className="flex items-start justify-between gap-3"><div><CardTitle>{title}</CardTitle><CardDescription>{description}</CardDescription></div><Badge variant="secondary"><Medal /></Badge></div></CardHeader>
       <CardContent>{rows.length ? <div className="flex flex-col gap-2">{rows.slice(0, 10).map((row, index) => <div key={row.playerId} className="flex items-center justify-between gap-4 rounded-md border p-3"><span className="font-medium">{index + 1}. {name(row.playerId)}</span><span className="font-semibold tabular-nums">{row[metric] ?? 0}</span></div>)}</div> : <EmptyLeaderboard />}</CardContent>
+    </Card>
+  );
+}
+
+function ThrowballLeaderboard({ title, description, rows, name, metric }: {
+  title: string;
+  description: string;
+  rows: Array<{ playerId: string; successfulAttacks: number; playerScore: number; ballsThrownOut: number; droppedCatches: number }>;
+  name: (id: string) => string;
+  metric: "playerScore" | "successfulAttacks";
+}) {
+  return (
+    <Card className="shadow-none">
+      <CardHeader><div className="flex items-start justify-between gap-3"><div><CardTitle>{title}</CardTitle><CardDescription>{description}</CardDescription></div><Badge variant="secondary"><Medal /></Badge></div></CardHeader>
+      <CardContent>{rows.length ? <div className="flex flex-col gap-2">{rows.slice(0, 10).map((row, index) => <div key={row.playerId} className="rounded-md border p-3"><div className="flex items-center justify-between gap-4"><span className="font-medium">{index + 1}. {name(row.playerId)}</span><span className="font-semibold tabular-nums">{row[metric] ?? 0}</span></div><p className="mt-1 text-xs text-muted-foreground">{row.successfulAttacks} attacks · {row.ballsThrownOut} errors · {row.droppedCatches} drops</p></div>)}</div> : <EmptyLeaderboard />}</CardContent>
     </Card>
   );
 }

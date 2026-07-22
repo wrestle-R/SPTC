@@ -162,6 +162,63 @@ export interface FieldMatchState {
   events: FieldMatchEvent[];
 }
 
+export type ThrowballPointType = "successful-attack" | "opponent-error";
+
+export interface ThrowballRallyInput {
+  type: ThrowballPointType;
+  teamId: TeamId;
+  attackingPlayerId?: PlayerId;
+  opponentPlayerId?: PlayerId;
+  droppedByPlayerId?: PlayerId;
+}
+
+export interface ThrowballRally extends ThrowballRallyInput {
+  id: string;
+  scoringTeamId: TeamId;
+  timestamp: string;
+}
+
+export interface ThrowballPlayerStats {
+  playerId: PlayerId;
+  successfulAttacks: number;
+  ballsThrownOut: number;
+  droppedCatches: number;
+  playerScore: number;
+}
+
+export interface ThrowballSetState {
+  homeScore: number;
+  awayScore: number;
+  completed: boolean;
+  winnerTeamId: TeamId | null;
+}
+
+export interface ThrowballMatchState {
+  teamIds: [TeamId, TeamId];
+  sets: ThrowballSetState[];
+  currentSet: number;
+  events: ThrowballRally[];
+  playerStats: Record<PlayerId, ThrowballPlayerStats>;
+}
+
+export interface ThrowballStandingInput {
+  teamId: TeamId;
+  played: number;
+  wins: number;
+  losses: number;
+  setsFor: number;
+  setsAgainst: number;
+  pointsFor: number;
+  pointsAgainst: number;
+}
+
+export interface ThrowballStanding extends ThrowballStandingInput {
+  rank: number;
+  setDifference: number;
+  pointDifference: number;
+  points: number;
+}
+
 export interface FieldStandingInput {
   teamId: TeamId;
   played: number;
@@ -193,7 +250,7 @@ export interface OverallStanding extends OverallStandingInput {
 
 export interface SeedMatch {
   id: string;
-  sport: "football" | "handball" | "cricket";
+  sport: "football" | "handball" | "cricket" | "throwball";
   stage: "league" | "third-place" | "final";
   status: "scheduled" | "live" | "innings-break" | "super-over" | "completed";
   homeTeamId: TeamId;
@@ -210,6 +267,7 @@ export interface SeedMatch {
     innings: Array<{ initial: unknown; state: CricketInningsState; superOver?: boolean }>;
     currentInnings: number;
   };
+  throwball?: ThrowballMatchState;
   winnerTeamId?: TeamId | null;
   resultText?: string;
   manOfTheMatchPlayerId?: PlayerId | null;
