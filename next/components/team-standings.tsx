@@ -87,8 +87,8 @@ export function TeamStandings() {
                       <div className={`absolute bottom-0 left-0 h-1.5 w-full bg-gradient-to-r ${gradient} opacity-70 group-hover:opacity-100 group-hover:h-2 transition-all duration-300`} />
                       <div className="flex items-center gap-4">
                         {jersey && (
-                          <div className="relative h-24 w-20 shrink-0 overflow-hidden rounded-xl bg-stone-100 shadow-inner transition-transform duration-500 group-hover:scale-105 group-hover:-rotate-2 sm:h-28 sm:w-24">
-                            <Image src={jersey.front} alt={`${row.name} jersey`} fill className="object-cover drop-shadow-xl" sizes="(max-width: 640px) 80px, 96px" />
+                          <div className="relative h-24 w-20 shrink-0 transition-transform duration-500 group-hover:scale-105 group-hover:-rotate-2 sm:h-28 sm:w-24">
+                            <Image src={jersey.front} alt={`${row.name} jersey`} fill className="object-contain drop-shadow-[0_12px_14px_rgba(0,0,0,0.28)]" loading={i === 0 ? "eager" : "lazy"} sizes="(max-width: 640px) 80px, 96px" />
                           </div>
                         )}
                         <div className="min-w-0 flex-1">

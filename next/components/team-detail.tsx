@@ -142,34 +142,41 @@ export function TeamDetail({ team }: { team: Team }) {
 
 function JerseyFlipping({ front, back, alt }: { front: string; back: string; alt: string }) {
   const [flipped, setFlipped] = useState(false);
+  const [hovering, setHovering] = useState(false);
+  const showingBack = flipped || hovering;
 
   return (
     <button
       type="button"
-      aria-label={`Show ${flipped ? "front" : "back"} of ${alt} jersey`}
-      aria-pressed={flipped}
+      aria-label={`Show ${showingBack ? "front" : "back"} of ${alt} jersey`}
+      aria-pressed={showingBack}
       className="group relative z-10 aspect-[4/5] h-[390px] max-h-[72vh] max-w-full cursor-pointer outline-none transition-transform duration-300 hover:scale-[1.025] focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-4 focus-visible:ring-offset-background sm:h-[430px]"
-      onMouseEnter={() => setFlipped(true)}
-      onMouseLeave={() => setFlipped(false)}
-      onClick={() => setFlipped(!flipped)}
+      onMouseEnter={() => setHovering(true)}
+      onMouseLeave={() => setHovering(false)}
+      onClick={() => {
+        if (flipped) {
+          setFlipped(false);
+          setHovering(false);
+        } else {
+          setFlipped(true);
+        }
+      }}
     >
       <span className="pointer-events-none absolute -inset-4 -z-10 rounded-[2rem] bg-primary/15 opacity-50 blur-2xl transition-opacity group-hover:opacity-80" />
       <span
-        className="preserve-3d absolute inset-0 rounded-2xl transition-transform duration-700 ease-[cubic-bezier(.2,.8,.2,1)]"
-        style={{ transform: flipped ? "rotateY(180deg)" : "rotateY(0deg)" }}
+        className="preserve-3d absolute inset-0 transition-transform duration-700 ease-[cubic-bezier(.2,.8,.2,1)]"
+        style={{ transform: showingBack ? "rotateY(180deg)" : "rotateY(0deg)" }}
       >
-      <span className="backface-hidden absolute inset-0 overflow-hidden rounded-2xl border border-black/10 bg-stone-100 shadow-2xl">
-        <Image src={front} alt={`${alt} jersey front`} fill className="object-cover" priority sizes="(max-width: 640px) 82vw, 344px" />
-        <span className="pointer-events-none absolute inset-0 bg-gradient-to-tr from-white/15 via-transparent to-white/30 opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+      <span className="backface-hidden absolute inset-0">
+        <Image src={front} alt={`${alt} jersey front`} fill className="object-contain drop-shadow-[0_24px_28px_rgba(0,0,0,0.34)]" priority sizes="(max-width: 640px) 82vw, 344px" />
       </span>
-      <span className="backface-hidden rotate-y-180 absolute inset-0 overflow-hidden rounded-2xl border border-black/10 bg-stone-100 shadow-2xl">
-        <Image src={back} alt={`${alt} jersey back`} fill className="object-cover" priority sizes="(max-width: 640px) 82vw, 344px" />
-        <span className="pointer-events-none absolute inset-0 bg-gradient-to-tr from-white/15 via-transparent to-white/30 opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+      <span className="backface-hidden rotate-y-180 absolute inset-0">
+        <Image src={back} alt={`${alt} jersey back`} fill className="object-contain drop-shadow-[0_24px_28px_rgba(0,0,0,0.34)]" priority sizes="(max-width: 640px) 82vw, 344px" />
       </span>
       </span>
       <span className="absolute -bottom-3 left-1/2 flex -translate-x-1/2 items-center gap-2 whitespace-nowrap rounded-full border bg-background/90 px-3 py-1.5 text-xs font-bold shadow-lg backdrop-blur-xl">
         <Rotate3D className="size-3.5 text-primary transition-transform duration-500 group-hover:rotate-180" />
-        {flipped ? "Showing back" : "Tap or hover to flip"}
+        {showingBack ? "Showing back" : "Tap or hover to flip"}
       </span>
     </button>
   );
