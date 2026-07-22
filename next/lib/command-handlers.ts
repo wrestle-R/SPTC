@@ -5,6 +5,7 @@ import {
   createThrowballMatch,
   DEFAULT_SPORT_RULES,
   getMatchWinner,
+  getShootoutStatus,
   nextMatchNumber,
   normalizeSportRules,
   rankCricketMvpCandidates,
@@ -17,9 +18,11 @@ import {
   recordFieldEvent,
   recordThrowballRally,
   rankFieldStandings,
+  resolveShootoutToss as applyShootoutToss,
   S9_PLAYERS,
   S9_SPORTS,
   S9_TEAMS,
+  startShootout as applyStartShootout,
   setCricketBowler as applyCricketBowler,
   setNextBatter as applyNextBatter,
   throwballResultText,
@@ -131,33 +134,50 @@ function fieldResultText(match: MatchDocument) {
     };
   }
 
-  const shootout = match.fieldState?.shootout ?? {};
-  const homeShootout = Number(shootout[match.homeTeamId] ?? 0);
-  const awayShootout = Number(shootout[match.awayTeamId] ?? 0);
-  const shootoutAttempts = (match.fieldState?.events ?? []).filter(
-    (e) => e.type === "shootout-goal" || e.type === "shootout-miss",
-  ).length;
-
-  if (shootoutAttempts > 0 && homeShootout !== awayShootout) {
-    const winnerTeamId = homeShootout > awayShootout ? match.homeTeamId : match.awayTeamId;
-    const loserTeamId = winnerTeamId === match.homeTeamId ? match.awayTeamId : match.homeTeamId;
-    return {
-      winnerTeamId,
-      resultText: `${teamName(winnerTeamId)} beat ${teamName(loserTeamId)} ${homeScore}-${awayScore} (${homeShootout}-${awayShootout} pens)`,
-    };
-  }
-
   const isKnockout = match.stage === "third-place" || match.stage === "final";
-  if (match.sport === "handball") {
-    return { winnerTeamId: null, resultText: "Shootout required — handball match cannot end in a draw." };
-  }
-  if (match.sport === "football" && isKnockout) {
-    return { winnerTeamId: null, resultText: "Penalty shootout required — knockout match cannot end in a draw." };
+  const shootoutRequired = match.sport === "handball" || (match.sport === "football" && isKnockout);
+  if (shootoutRequired) {
+    const shootoutStatus = match.fieldState ? getShootoutStatus(match.fieldState) : null;
+    const shootout = match.fieldState?.shootout ?? {};
+    const homeShootout = Number(shootout[match.homeTeamId] ?? 0);
+    const awayShootout = Number(shootout[match.awayTeamId] ?? 0);
+    if (shootoutStatus?.complete && shootoutStatus.winnerTeamId) {
+      const winnerTeamId = shootoutStatus.winnerTeamId;
+      const loserTeamId = winnerTeamId === match.homeTeamId ? match.awayTeamId : match.homeTeamId;
+      return {
+        winnerTeamId,
+        resultText: shootoutStatus.phase === "toss"
+          ? `${teamName(winnerTeamId)} beat ${teamName(loserTeamId)} ${homeScore}-${awayScore} (${homeShootout}-${awayShootout} shootout, won toss)`
+          : `${teamName(winnerTeamId)} beat ${teamName(loserTeamId)} ${homeScore}-${awayScore} (${homeShootout}-${awayShootout} shootout)`,
+      };
+    }
+    if (shootoutStatus?.requiresTossWinner) {
+      return { winnerTeamId: null, resultText: "Shootout toss winner required before the match can end." };
+    }
+    if (shootoutStatus?.active) {
+      return { winnerTeamId: null, resultText: "Shootout is still in progress." };
+    }
+    return {
+      winnerTeamId: null,
+      resultText: match.sport === "handball"
+        ? "Shootout required — handball match cannot end in a draw."
+        : "Penalty shootout required — knockout football match cannot end in a draw.",
+    };
   }
   return {
     winnerTeamId: null,
     resultText: `${teamName(match.homeTeamId)} and ${teamName(match.awayTeamId)} drew ${homeScore}-${awayScore}`,
   };
+}
+
+function getShootoutConfig(match: MatchDocument) {
+  if (match.sport === "handball") {
+    return { initialAttemptsPerTeam: 3, maxSuddenDeathAttemptsPerTeam: 3 };
+  }
+  if (match.sport === "football" && ["third-place", "final"].includes(match.stage)) {
+    return { initialAttemptsPerTeam: 3, maxSuddenDeathAttemptsPerTeam: 4 };
+  }
+  return null;
 }
 
 function inningsSummary(innings: NonNullable<MatchDocument["cricket"]>["innings"]) {
@@ -456,6 +476,28 @@ export async function handleStartMatch(data: CallableData) {
   });
 }
 
+export async function handleStartShootout(data: CallableData) {
+  return mutateMatch(data, (match) => {
+    if (!["football", "handball"].includes(match.sport) || match.status !== "live") {
+      throw new CommandError(400, "FAILED_PRECONDITION", "Only a live football or handball match can start a shootout.");
+    }
+    const config = getShootoutConfig(match);
+    if (!config) throw new CommandError(400, "FAILED_PRECONDITION", "This match is not eligible for a shootout.");
+    const fieldState = match.fieldState ?? createFieldMatch(match.homeTeamId, match.awayTeamId);
+    if ((fieldState.score[match.homeTeamId] ?? 0) !== (fieldState.score[match.awayTeamId] ?? 0)) {
+      throw new CommandError(400, "FAILED_PRECONDITION", "Shootout can start only when the scores are level.");
+    }
+    const firstTeamId = asString(data.firstTeamId, "First shooting team");
+    let nextFieldState: FieldMatchState;
+    try {
+      nextFieldState = applyStartShootout(fieldState, { firstTeamId, ...config });
+    } catch (error) {
+      throw new CommandError(400, "INVALID_ARGUMENT", (error as Error).message);
+    }
+    return { match: { ...match, fieldState: nextFieldState, scoreSummary: nextFieldState.score } };
+  });
+}
+
 export async function handleStartInnings(data: CallableData) {
   const rules = await getSportRules();
   return mutateMatch(data, async (match) => {
@@ -526,10 +568,26 @@ export async function handleRecordFieldSportEvent(data: CallableData) {
     if (!["football", "handball"].includes(match.sport) || match.status !== "live") throw new CommandError(400, "FAILED_PRECONDITION", "The field-sport match is not live.");
     const event = data.event as FieldMatchEventInput;
     if (!event || typeof event !== "object") throw new CommandError(400, "INVALID_ARGUMENT", "Event is required.");
-    if (!["shootout-goal", "shootout-miss"].includes(event.type)) await assertRosterPlayer(match, event.teamId, event.playerId, "Player");
+    await assertRosterPlayer(match, event.teamId, event.playerId, event.type === "shootout-goal" || event.type === "shootout-miss" ? "Shooter" : "Player");
     if (event.assistPlayerId) await assertRosterPlayer(match, event.teamId, event.assistPlayerId, "Assist player");
     let fieldState: FieldMatchState;
     try { fieldState = recordFieldEvent(match.fieldState ?? createFieldMatch(match.homeTeamId, match.awayTeamId), event); } catch (error) { throw new CommandError(400, "INVALID_ARGUMENT", (error as Error).message); }
+    return { match: { ...match, fieldState, scoreSummary: fieldState.score } };
+  });
+}
+
+export async function handleResolveShootoutToss(data: CallableData) {
+  return mutateMatch(data, (match) => {
+    if (!["football", "handball"].includes(match.sport) || match.status !== "live") {
+      throw new CommandError(400, "FAILED_PRECONDITION", "Only a live football or handball match can resolve a shootout toss.");
+    }
+    const winnerTeamId = asString(data.winnerTeamId, "Toss winner");
+    let fieldState: FieldMatchState;
+    try {
+      fieldState = applyShootoutToss(match.fieldState ?? createFieldMatch(match.homeTeamId, match.awayTeamId), winnerTeamId);
+    } catch (error) {
+      throw new CommandError(400, "INVALID_ARGUMENT", (error as Error).message);
+    }
     return { match: { ...match, fieldState, scoreSummary: fieldState.score } };
   });
 }

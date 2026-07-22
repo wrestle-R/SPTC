@@ -160,6 +160,14 @@ export interface FieldMatchState {
   score: Record<TeamId, number>;
   shootout: Record<TeamId, number>;
   events: FieldMatchEvent[];
+  shootoutState?: {
+    active: boolean;
+    firstTeamId: TeamId;
+    currentTeamId: TeamId | null;
+    initialAttemptsPerTeam: number;
+    maxSuddenDeathAttemptsPerTeam: number;
+    tossWinnerTeamId: TeamId | null;
+  } | null;
 }
 
 export type ThrowballPointType = "successful-attack" | "opponent-error";

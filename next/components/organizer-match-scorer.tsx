@@ -30,7 +30,11 @@ export function OrganizerMatchScorer({ matchId }: { matchId: string }) {
     
     const previousMatch = { ...match };
     
-    if (name === "recordFieldEvent" && (match.sport === "football" || match.sport === "handball")) {
+    if (
+      name === "recordFieldEvent"
+      && (match.sport === "football" || match.sport === "handball")
+      && !["shootout-goal", "shootout-miss"].includes(String((data.event as { type?: string } | undefined)?.type ?? ""))
+    ) {
       const eventData = (data.event ?? {}) as {
         type?: string;
         teamId?: string;
@@ -59,7 +63,7 @@ export function OrganizerMatchScorer({ matchId }: { matchId: string }) {
           }
         };
       });
-    } else if (name === "undoLastEvent" && (match.sport === "football" || match.sport === "handball")) {
+    } else if (name === "undoLastEvent" && (match.sport === "football" || match.sport === "handball") && !match.fieldState?.shootoutState?.active) {
       matchState.mutate((prev) => {
         if (!prev || !prev.fieldState?.events?.length) return prev;
         const fieldState = prev.fieldState;
@@ -606,6 +610,10 @@ function FieldConsole({ match, players, teams, pending, run, completeMatch, conf
   const [teamId, setTeamId] = useState(match.homeTeamId);
   const [playerId, setPlayerId] = useState("");
   const [type, setType] = useState<FieldEventType>("goal");
+  const [shootoutSetupOpen, setShootoutSetupOpen] = useState(false);
+  const [firstShootoutTeamId, setFirstShootoutTeamId] = useState(match.homeTeamId);
+  const [shootoutPlayerId, setShootoutPlayerId] = useState("");
+  const [tossWinnerTeamId, setTossWinnerTeamId] = useState(match.homeTeamId);
   if (match.status === "scheduled") return null;
   const eligible = players.filter((player) => player.teamId === teamId);
   const score = match.fieldState?.score ?? { [match.homeTeamId]: 0, [match.awayTeamId]: 0 };
@@ -615,10 +623,13 @@ function FieldConsole({ match, players, teams, pending, run, completeMatch, conf
   const jerseyFor = (id: string) => players.find((player) => player.id === id)?.jerseyNumber ?? null;
 
   const scoresLevel = homeScore === awayScore;
-  const shootoutAvailable = match.sport === "handball" || match.stage === "third-place" || match.stage === "final";
-  const hasShootoutEvents = (match.fieldState?.events ?? []).some((e) => e.type === "shootout-goal" || e.type === "shootout-miss");
-  const showShootout = shootoutAvailable && (scoresLevel || hasShootoutEvents);
-  const shootoutStatus = showShootout && match.fieldState ? getShootoutStatus(match.fieldState) : null;
+  const shootoutAvailable = match.sport === "handball" || (match.sport === "football" && (match.stage === "third-place" || match.stage === "final"));
+  const shootoutStatus = match.fieldState ? getShootoutStatus(match.fieldState) : null;
+  const shootoutActive = Boolean(shootoutStatus?.active);
+  const shootoutCurrentTeamId = shootoutStatus?.nextTeamId ?? null;
+  const shootoutEligiblePlayers = shootoutCurrentTeamId ? players.filter((player) => player.teamId === shootoutCurrentTeamId) : [];
+  const canFinishMatch = !(shootoutAvailable && scoresLevel) || Boolean(shootoutStatus?.complete);
+  const showRegularEventControls = !shootoutActive && !shootoutSetupOpen;
 
   const getEventMeta = (type: string) => {
     switch (type) {
@@ -642,8 +653,10 @@ function FieldConsole({ match, players, teams, pending, run, completeMatch, conf
               <div className="flex flex-1 flex-col items-center gap-2">
                 <p className="line-clamp-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">{teamName(match.homeTeamId)}</p>
                 <p className="text-5xl font-black tracking-tighter">{homeScore}</p>
-                {showShootout && hasShootoutEvents ? (
-                  <p className="text-lg font-bold tabular-nums text-emerald-500">({shootoutScore[match.homeTeamId] ?? 0})</p>
+                {shootoutActive ? (
+                  <p className="text-sm font-bold tabular-nums text-emerald-500">
+                    {shootoutScore[match.homeTeamId] ?? 0}/{shootoutStatus?.attempts?.[match.homeTeamId] ?? 0}
+                  </p>
                 ) : null}
               </div>
               <div className="flex flex-col items-center">
@@ -652,8 +665,10 @@ function FieldConsole({ match, players, teams, pending, run, completeMatch, conf
               <div className="flex flex-1 flex-col items-center gap-2">
                 <p className="line-clamp-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">{teamName(match.awayTeamId)}</p>
                 <p className="text-5xl font-black tracking-tighter">{awayScore}</p>
-                {showShootout && hasShootoutEvents ? (
-                  <p className="text-lg font-bold tabular-nums text-emerald-500">({shootoutScore[match.awayTeamId] ?? 0})</p>
+                {shootoutActive ? (
+                  <p className="text-sm font-bold tabular-nums text-emerald-500">
+                    {shootoutScore[match.awayTeamId] ?? 0}/{shootoutStatus?.attempts?.[match.awayTeamId] ?? 0}
+                  </p>
                 ) : null}
               </div>
             </div>
@@ -692,43 +707,10 @@ function FieldConsole({ match, players, teams, pending, run, completeMatch, conf
         <CardHeader><CardTitle>Record event</CardTitle></CardHeader>
         <CardContent>
           <FieldGroup>
-            <div>
-              <p className="mb-2 text-sm font-medium">Event Type</p>
-              <div className="flex flex-wrap gap-2">
-                {[
-                  { id: "goal", icon: match.sport === "handball" ? "🤾" : "⚽", label: "Goal" },
-                  { id: "own-goal", icon: match.sport === "handball" ? "🤾" : "⚽", label: "Own Goal" },
-                  { id: "yellow-card", icon: "🟨", label: "Yellow Card" },
-                  { id: "red-card", icon: "🟥", label: "Red Card" },
-                  ...(showShootout ? [
-                    { id: "shootout-goal", icon: "✅", label: "Shootout Goal" },
-                    { id: "shootout-miss", icon: "❌", label: "Shootout Miss" },
-                  ] : [])
-                ].map((item) => {
-                  const isActive = type === item.id;
-                  return (
-                    <button
-                      key={item.id}
-                      type="button"
-                      onClick={() => setType(item.id as FieldEventType)}
-                      className={`flex items-center gap-2 rounded-md border px-4 py-2 text-sm font-medium transition-colors ${
-                        isActive 
-                          ? "border-primary bg-primary/10 text-primary"
-                          : "bg-background hover:bg-muted"
-                      }`}
-                    >
-                      <span className="text-base">{item.icon}</span>
-                      <span>{item.label}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {showShootout ? (
+            {shootoutActive ? (
               <div className="rounded-md border bg-muted/20 p-4">
                 <p className="mb-2 flex items-center gap-2 text-sm font-semibold">
-                  {hasShootoutEvents ? "🔴 Shootout in progress" : "⚪ Shootout mode"}
+                  ⚪ Shootout mode
                 </p>
                 {shootoutStatus ? (
                   <div className="mb-3 space-y-1 text-sm">
@@ -737,8 +719,8 @@ function FieldConsole({ match, players, teams, pending, run, completeMatch, conf
                       {" "}· {teamName(match.awayTeamId)}: {shootoutScore[match.awayTeamId] ?? 0}/{shootoutStatus.attempts[match.awayTeamId]}
                     </p>
                     <p className="text-muted-foreground">
-                      Phase: {shootoutStatus.phase === "sudden-death" ? "Sudden Death" : "Best of 5"}
-                      {hasShootoutEvents && !shootoutStatus.complete ? (
+                      Phase: {shootoutStatus.phase === "sudden-death" ? "Sudden Death" : shootoutStatus.phase === "toss" ? "Toss" : "Best of 3"}
+                      {!shootoutStatus.complete && shootoutStatus.nextTeamId ? (
                         <span className="ml-2 font-semibold text-foreground">
                           Next: {teamName(shootoutStatus.nextTeamId)}
                         </span>
@@ -754,13 +736,100 @@ function FieldConsole({ match, players, teams, pending, run, completeMatch, conf
               </div>
             ) : null}
 
-            <SimpleSelect label="Team" value={teamId} setValue={(value) => { setTeamId(value); setPlayerId(""); }} items={teams.filter((team) => [match.homeTeamId, match.awayTeamId].includes(team.id)).map((team) => ({ value: team.id, label: team.name }))} />
-            <SimpleSelect label="Player" value={playerId} setValue={setPlayerId} items={eligible.map((player) => ({ value: player.id, label: playerLabel(player) }))} />
-            <Button size="lg" disabled={pending || !teamId || (!playerId && !type.startsWith("shootout"))} onClick={() => run("recordFieldEvent", { event: { type, teamId, playerId: playerId || undefined } })}>Record event</Button>
+            {showRegularEventControls ? (
+              <>
+                <div>
+                  <p className="mb-2 text-sm font-medium">Event Type</p>
+                  <div className="flex flex-wrap gap-2">
+                    {[
+                      { id: "goal", icon: match.sport === "handball" ? "🤾" : "⚽", label: "Goal" },
+                      { id: "own-goal", icon: match.sport === "handball" ? "🤾" : "⚽", label: "Own Goal" },
+                      { id: "yellow-card", icon: "🟨", label: "Yellow Card" },
+                      { id: "red-card", icon: "🟥", label: "Red Card" },
+                    ].map((item) => {
+                      const isActive = type === item.id;
+                      return (
+                        <button
+                          key={item.id}
+                          type="button"
+                          onClick={() => setType(item.id as FieldEventType)}
+                          className={`flex items-center gap-2 rounded-md border px-4 py-2 text-sm font-medium transition-colors ${
+                            isActive
+                              ? "border-primary bg-primary/10 text-primary"
+                              : "bg-background hover:bg-muted"
+                          }`}
+                        >
+                          <span className="text-base">{item.icon}</span>
+                          <span>{item.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <SimpleSelect label="Team" value={teamId} setValue={(value) => { setTeamId(value); setPlayerId(""); }} items={teams.filter((team) => [match.homeTeamId, match.awayTeamId].includes(team.id)).map((team) => ({ value: team.id, label: team.name }))} />
+                <SimpleSelect label="Player" value={playerId} setValue={setPlayerId} items={eligible.map((player) => ({ value: player.id, label: playerLabel(player) }))} />
+                <Button size="lg" disabled={pending || !teamId || !playerId} onClick={() => run("recordFieldEvent", { event: { type, teamId, playerId } })}>Record event</Button>
+              </>
+            ) : null}
+
+            {!shootoutActive && shootoutAvailable && scoresLevel ? (
+              !shootoutSetupOpen ? (
+                <Button variant="outline" size="lg" disabled={pending} onClick={() => setShootoutSetupOpen(true)}>
+                  Proceed with shootout
+                </Button>
+              ) : (
+                <div className="rounded-md border p-4">
+                  <FieldGroup>
+                    <div>
+                      <p className="font-semibold">Proceed with shootout</p>
+                      <p className="text-sm text-muted-foreground">Choose which team shoots first. Regular event buttons are hidden once the shootout starts.</p>
+                    </div>
+                    <SimpleSelect label="First shooting team" value={firstShootoutTeamId} setValue={setFirstShootoutTeamId} items={teams.filter((team) => [match.homeTeamId, match.awayTeamId].includes(team.id)).map((team) => ({ value: team.id, label: team.name }))} />
+                    <div className="flex flex-wrap gap-2">
+                      <Button size="lg" disabled={pending || !firstShootoutTeamId} onClick={() => run("startShootout", { firstTeamId: firstShootoutTeamId })}>Start shootout</Button>
+                      <Button variant="outline" disabled={pending} onClick={() => setShootoutSetupOpen(false)}>Cancel</Button>
+                    </div>
+                  </FieldGroup>
+                </div>
+              )
+            ) : null}
+
+            {shootoutActive && !shootoutStatus?.complete && !shootoutStatus?.requiresTossWinner ? (
+              <>
+                <div className="rounded-md border p-4">
+                  <FieldGroup>
+                    <div>
+                      <p className="font-semibold">Next attempt</p>
+                      <p className="text-sm text-muted-foreground">{shootoutCurrentTeamId ? `${teamName(shootoutCurrentTeamId)} shoots now.` : "Waiting for the next attempt."}</p>
+                    </div>
+                    {shootoutCurrentTeamId ? <SimpleSelect label="Shooter" value={shootoutPlayerId} setValue={setShootoutPlayerId} items={shootoutEligiblePlayers.map((player) => ({ value: player.id, label: playerLabel(player) }))} /> : null}
+                    <div className="flex flex-wrap gap-2">
+                      <Button size="lg" disabled={pending || !shootoutCurrentTeamId || !shootoutPlayerId} onClick={() => { run("recordFieldEvent", { event: { type: "shootout-goal", teamId: shootoutCurrentTeamId, playerId: shootoutPlayerId } }); setShootoutPlayerId(""); }}>Scored</Button>
+                      <Button variant="outline" size="lg" disabled={pending || !shootoutCurrentTeamId || !shootoutPlayerId} onClick={() => { run("recordFieldEvent", { event: { type: "shootout-miss", teamId: shootoutCurrentTeamId, playerId: shootoutPlayerId } }); setShootoutPlayerId(""); }}>Missed</Button>
+                    </div>
+                  </FieldGroup>
+                </div>
+              </>
+            ) : null}
+
+            {shootoutActive && shootoutStatus?.requiresTossWinner ? (
+              <div className="rounded-md border p-4">
+                <FieldGroup>
+                  <div>
+                    <p className="font-semibold">Resolve by toss</p>
+                    <p className="text-sm text-muted-foreground">The shootout stayed level through the allowed attempts. Choose the toss winner.</p>
+                  </div>
+                  <SimpleSelect label="Toss winner" value={tossWinnerTeamId} setValue={setTossWinnerTeamId} items={teams.filter((team) => [match.homeTeamId, match.awayTeamId].includes(team.id)).map((team) => ({ value: team.id, label: team.name }))} />
+                  <Button size="lg" disabled={pending || !tossWinnerTeamId} onClick={() => run("resolveShootoutToss", { winnerTeamId: tossWinnerTeamId })}>Save toss winner</Button>
+                </FieldGroup>
+              </div>
+            ) : null}
+
             <div className="flex flex-wrap gap-2">
               <Button variant="outline" onClick={() => run("undoLastEvent")} disabled={pending || !(match.fieldState?.events.length)}><RotateCcw data-icon="inline-start" /> Undo</Button>
             </div>
-            <MotmPicker players={confirmedPlayers} pending={pending} onComplete={completeMatch} />
+            {canFinishMatch ? <MotmPicker players={confirmedPlayers} pending={pending} onComplete={completeMatch} /> : null}
           </FieldGroup>
         </CardContent>
       </Card>

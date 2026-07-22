@@ -4,8 +4,9 @@ import {
   handleConfirmAward, handleConfirmFixtures, handleCreateMatch,
   handleEditMatchEvent, handleEndInnings, handleEndMatch, handleRecordCricketDelivery, handleRecordFieldSportEvent,
   handleRecordThrowballRally,
-  handleRefreshProjections, handleSavePlayer, handleSaveTeam, handleSaveTournamentSettings, handleSelectCricketBowler,
+  handleRefreshProjections, handleResolveShootoutToss, handleSavePlayer, handleSaveTeam, handleSaveTournamentSettings, handleSelectCricketBowler,
   handleSelectNextBatter, handleSetPlacementPoints, handleSetToss, handleStartInnings, handleStartMatch,
+  handleStartShootout,
   handleUndoLastEvent, handleUpdateMatch, handleDeleteMatch,
 } from "@/lib/command-handlers";
 
@@ -37,11 +38,13 @@ async function dispatch(command: string, data: Record<string, unknown>): Promise
     case "confirmFixtures": return handleConfirmFixtures(data);
     case "setToss": return handleSetToss(data);
     case "startMatch": return handleStartMatch(data);
+    case "startShootout": return handleStartShootout(data);
     case "startInnings": return handleStartInnings(data);
     case "recordCricketDelivery": return handleRecordCricketDelivery(data);
     case "selectNextBatter": return handleSelectNextBatter(data);
     case "selectCricketBowler": return handleSelectCricketBowler(data);
     case "recordFieldEvent": return handleRecordFieldSportEvent(data);
+    case "resolveShootoutToss": return handleResolveShootoutToss(data);
     case "recordThrowballRally": return handleRecordThrowballRally(data);
     case "editMatchEvent": return handleEditMatchEvent(data);
     case "undoLastEvent": return handleUndoLastEvent(data);
