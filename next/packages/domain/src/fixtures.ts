@@ -1,5 +1,5 @@
 export type SportKey = "football" | "handball" | "cricket";
-export type MatchStatus = "scheduled" | "lineup" | "live" | "innings-break" | "completed";
+export type MatchStatus = "scheduled" | "live" | "innings-break" | "super-over" | "completed";
 
 export interface FixtureInput {
   sport: SportKey;

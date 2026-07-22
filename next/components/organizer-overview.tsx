@@ -1,15 +1,12 @@
 "use client";
 
 import type { Player, Team } from "@sports-fiesta/domain";
-import { Activity, CalendarDays, DatabaseZap, LoaderCircle, Users } from "lucide-react";
-import { toast } from "sonner";
+import { Activity, CalendarDays, Users } from "lucide-react";
 import { ContentSkeleton, DataError } from "@/components/data-state";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { callOrganizerCommand, usePrivateCollection } from "@/lib/organizer-data";
+import { usePrivateCollection } from "@/lib/organizer-data";
 import type { PublicMatch } from "@/lib/web-types";
-import { useState } from "react";
 
 const metrics = [
   { key: "live", label: "Live matches", icon: Activity },
@@ -22,7 +19,6 @@ export function OrganizerOverview() {
   const matches = usePrivateCollection<PublicMatch>("matches");
   const teams = usePrivateCollection<Team>("teams");
   const players = usePrivateCollection<Player>("players");
-  const [pending, setPending] = useState(false);
   const values = {
     live: matches.data.filter((match) => match.status === "live").length,
     fixtures: matches.data.length,
@@ -31,18 +27,6 @@ export function OrganizerOverview() {
   };
   const loading = matches.loading || teams.loading || players.loading;
   const error = matches.error || teams.error || players.error;
-
-  async function bootstrap() {
-    setPending(true);
-    try {
-      const result = await callOrganizerCommand<{ bootstrapped: boolean }>("bootstrapTournament");
-      toast.success(result.bootstrapped ? "Tournament data added." : "Fixtures and jersey numbers synchronized.");
-    } catch (cause) {
-      toast.error(cause instanceof Error ? cause.message : "Tournament setup failed.");
-    } finally {
-      setPending(false);
-    }
-  }
 
   if (loading) return <ContentSkeleton />;
   if (error) return <DataError message={error} retry={matches.retry} />;
@@ -55,12 +39,11 @@ export function OrganizerOverview() {
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {metrics.map(({ key, label, icon: Icon }) => <Card key={key} className="shadow-none"><CardHeader><div className="flex items-center justify-between gap-3"><CardDescription>{label}</CardDescription><Icon /></div><CardTitle className="text-3xl tabular-nums">{values[key]}</CardTitle></CardHeader></Card>)}
       </div>
-      {!teams.data.length || !matches.data.length ? (
+      {!matches.data.length ? (
         <Card className="shadow-none">
           <CardContent className="flex min-h-64 flex-col items-center justify-center gap-4 text-center">
-            <span className="grid size-12 place-items-center rounded-md bg-muted"><DatabaseZap /></span>
-            <div><h2 className="font-semibold">{teams.data.length ? "Restore tournament fixtures" : "Set up Sports Fiesta"}</h2><p className="mt-1 max-w-md text-sm text-muted-foreground">Synchronize the approved teams, jersey numbers, and editable sample fixtures with organizer and public data.</p></div>
-            <Button onClick={bootstrap} disabled={pending}>{pending ? <LoaderCircle data-icon="inline-start" className="animate-spin" /> : <DatabaseZap data-icon="inline-start" />}{pending ? "Synchronizing" : "Synchronize tournament"}</Button>
+            <span className="grid size-12 place-items-center rounded-md bg-muted"><CalendarDays /></span>
+            <div><h2 className="font-semibold">No fixtures in the database</h2><p className="mt-1 max-w-md text-sm text-muted-foreground">Use the Matches page to create fixtures manually. The database will stay clean until an organizer creates a match.</p></div>
           </CardContent>
         </Card>
       ) : null}

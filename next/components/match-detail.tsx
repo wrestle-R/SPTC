@@ -1,6 +1,6 @@
 "use client";
 
-import { cricketChaseText, cricketInningsMetrics, fallOfWickets, S9_PLAYERS, S9_SEEDED_MATCHES, S9_TEAMS, type CricketDelivery } from "@sports-fiesta/domain";
+import { cricketChaseText, cricketInningsMetrics, fallOfWickets, S9_PLAYERS, S9_TEAMS, type CricketDelivery } from "@sports-fiesta/domain";
 import { ArrowLeft, CircleDashed } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
@@ -17,7 +17,7 @@ export function MatchDetail({ sport, matchId }: { sport: Sport; matchId: string 
   const matchState = usePublicDocument<PublicMatch>("matches", matchId);
   const teamsState = usePublicCollection<PublicTeam>("teams");
   const playersState = usePublicCollection<PublicPlayer>("players");
-  const match = matchState.data ?? S9_SEEDED_MATCHES.find((seededMatch) => seededMatch.id === matchId) as PublicMatch | undefined;
+  const match = matchState.data;
   const teams = teamsState.data.length ? teamsState.data : S9_TEAMS;
   const players = [
     ...S9_PLAYERS.map((seededPlayer) => {

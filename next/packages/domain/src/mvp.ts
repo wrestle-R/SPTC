@@ -105,7 +105,7 @@ export function calculateFieldMvpScore(input: FieldMvpCandidate): MvpSuggestion 
     input.assists ? `${input.assists} assist${input.assists === 1 ? "" : "s"}` : null,
     input.winner ? "winner impact" : null,
     defense ? "defensive credit" : null,
-  ].filter(Boolean).join(", ") || "lineup impact";
+  ].filter(Boolean).join(", ") || "team impact";
   return { playerId: input.playerId, teamId: input.teamId, total, impact, reason };
 }
 

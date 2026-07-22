@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
-import { CommandError } from "@/lib/firebase-admin";
+import { CommandError } from "@/lib/supabase-admin";
 import {
-  handleBootstrap, handleConfirmAward, handleConfirmFixtures, handleCreateMatch,
+  handleConfirmAward, handleConfirmFixtures, handleCreateMatch,
   handleEditMatchEvent, handleEndInnings, handleEndMatch, handleRecordCricketDelivery, handleRecordFieldSportEvent,
   handleRefreshProjections, handleSavePlayer, handleSaveTeam, handleSaveTournamentSettings, handleSelectCricketBowler,
-  handleSelectNextBatter, handleSetLineup, handleSetPlacementPoints, handleSetToss, handleStartInnings, handleStartMatch,
+  handleSelectNextBatter, handleSetPlacementPoints, handleSetToss, handleStartInnings, handleStartMatch,
   handleUndoLastEvent, handleUpdateMatch,
 } from "@/lib/command-handlers";
 
@@ -27,14 +27,12 @@ export async function POST(request: Request) {
 
 async function dispatch(command: string, data: Record<string, unknown>): Promise<unknown> {
   switch (command) {
-    case "bootstrapTournament": return handleBootstrap();
     case "saveTournamentSettings": return handleSaveTournamentSettings(data);
     case "saveTeam": return handleSaveTeam(data);
     case "savePlayer": return handleSavePlayer(data);
     case "createMatch": return handleCreateMatch(data);
     case "updateMatch": return handleUpdateMatch(data);
     case "confirmFixtures": return handleConfirmFixtures(data);
-    case "setLineup": return handleSetLineup(data);
     case "setToss": return handleSetToss(data);
     case "startMatch": return handleStartMatch(data);
     case "startInnings": return handleStartInnings(data);

@@ -7,14 +7,13 @@ export interface PublicMatch {
   id: string;
   sport: "football" | "handball" | "cricket";
   stage: "league" | "decider" | "final";
-  status: "scheduled" | "lineup" | "live" | "innings-break" | "super-over" | "completed";
+  status: "scheduled" | "live" | "innings-break" | "super-over" | "completed";
   homeTeamId: string;
   awayTeamId: string;
   matchNumber?: string;
   startsAt?: string;
   venue?: string;
   revision: number;
-  lineups: Record<string, { starters: string[]; substitutes: string[] }>;
   scoreSummary: Record<string, number> & {
     innings?: Array<{ battingTeamId: string; score: number; wickets: number; overs: string }>;
   };

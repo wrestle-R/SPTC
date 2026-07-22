@@ -11,13 +11,13 @@ import {
   setNextBatter,
 } from "../src/cricket";
 
-const lineup = ["a", "b", "c", "d", "e", "f"];
+const battingOrder = ["a", "b", "c", "d", "e", "f"];
 
 function innings() {
   return createCricketInnings({
     battingTeamId: "red",
     bowlingTeamId: "green",
-    lineup,
+    battingLineup: battingOrder,
     strikerId: "a",
     nonStrikerId: "b",
     bowlerId: "g1",
@@ -214,7 +214,7 @@ describe("five-over cricket scoring", () => {
     expect(state.completed).toBe(true);
   });
 
-  it("marks a nine-player cricket lineup all out after eight wickets", () => {
+  it("marks a nine-player cricket roster snapshot all out after eight wickets", () => {
     const nine = ["a", "b", "c", "d", "e", "f", "g", "h", "i"];
     let state = createCricketInnings({
       battingTeamId: "red",
@@ -240,7 +240,7 @@ describe("five-over cricket scoring", () => {
     const initial = {
       battingTeamId: "red",
       bowlingTeamId: "green",
-      lineup,
+      battingLineup: battingOrder,
       strikerId: "a",
       nonStrikerId: "b",
       bowlerId: "g1",

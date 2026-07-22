@@ -16,7 +16,18 @@ export function PublicShell({ children }: { children: React.ReactNode }) {
             <Link href="/teams" className="font-medium text-muted-foreground transition-colors hover:text-foreground">Standings</Link>
             <Link href="/leaderboards" className="font-medium text-muted-foreground transition-colors hover:text-foreground">Leaders</Link>
           </nav>
-          <p className="text-sm text-muted-foreground">Made with love by Russel and Patrick</p>
+          <p className="text-sm text-muted-foreground">
+            Made with love by{" "}
+            <a
+              href="https://russel.is-a.dev"
+              target="_blank"
+              rel="noreferrer"
+              className="font-medium text-foreground underline-offset-4 transition-colors hover:text-primary hover:underline"
+            >
+              Russel
+            </a>{" "}
+            and Patrick
+          </p>
         </div>
       </footer>
     </div>

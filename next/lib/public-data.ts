@@ -1,14 +1,8 @@
 "use client";
 
-import { publicTournamentPath } from "@sports-fiesta/firebase";
-import {
-  collection,
-  doc,
-  onSnapshot,
-  type DocumentData,
-} from "firebase/firestore";
 import { useCallback, useEffect, useState } from "react";
-import { db } from "@/lib/firebase";
+import { supabase } from "@/lib/supabase";
+import type { CollectionName } from "@/lib/supabase-admin";
 
 interface LiveData<T> {
   data: T;
@@ -17,9 +11,11 @@ interface LiveData<T> {
   retry: () => void;
 }
 
-export function usePublicCollection<T extends DocumentData>(
-  collectionName: string,
-): LiveData<T[]> {
+function fromRow<T>(row: { id: string; data: unknown }) {
+  return { id: row.id, ...(row.data as object) } as T;
+}
+
+export function usePublicCollection<T>(collectionName: CollectionName): LiveData<T[]> {
   const [data, setData] = useState<T[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -31,29 +27,35 @@ export function usePublicCollection<T extends DocumentData>(
   }, []);
 
   useEffect(() => {
-    const source = collection(db, publicTournamentPath(collectionName));
-    const timeout = window.setTimeout(() => setLoading(false), 4000);
-    const unsubscribe = onSnapshot(source, (snapshot) => {
-      setData(snapshot.docs.map((item) => ({ id: item.id, ...item.data() }) as unknown as T));
+    let active = true;
+    async function load() {
+      const { data: rows, error: loadError } = await supabase.from(collectionName).select("id,data").order("id");
+      if (!active) return;
+      if (loadError) {
+        console.error(loadError);
+        setError("Failed to load data. Please check your connection or permissions.");
+        setLoading(false);
+        return;
+      }
+      setData((rows ?? []).map(fromRow<T>));
+      setError(null);
       setLoading(false);
-    }, (snapshotError) => {
-      console.error(snapshotError);
-      setError("Failed to load data. Please check your connection or permissions.");
-      setLoading(false);
-    });
+    }
+    void load();
+    const channel = supabase
+      .channel(`public-${collectionName}-${version}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: collectionName }, () => void load())
+      .subscribe();
     return () => {
-      window.clearTimeout(timeout);
-      unsubscribe();
+      active = false;
+      void supabase.removeChannel(channel);
     };
   }, [collectionName, version]);
 
   return { data, loading, error, retry };
 }
 
-export function usePublicDocument<T extends DocumentData>(
-  collectionName: string,
-  documentId: string,
-): LiveData<T | null> {
+export function usePublicDocument<T>(collectionName: CollectionName, documentId: string): LiveData<T | null> {
   const [data, setData] = useState<T | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -65,19 +67,28 @@ export function usePublicDocument<T extends DocumentData>(
   }, []);
 
   useEffect(() => {
-    const timeout = window.setTimeout(() => setLoading(false), 4000);
-    const unsubscribe = onSnapshot(doc(db, publicTournamentPath(collectionName, documentId)), (snapshot) => {
-      setData(snapshot.exists() ? ({ id: snapshot.id, ...snapshot.data() } as unknown as T) : null);
+    let active = true;
+    async function load() {
+      const { data: row, error: loadError } = await supabase.from(collectionName).select("id,data").eq("id", documentId).maybeSingle();
+      if (!active) return;
+      if (loadError) {
+        console.error(loadError);
+        setError("Failed to load data. Please check your connection or permissions.");
+        setLoading(false);
+        return;
+      }
+      setData(row ? fromRow<T>(row) : null);
       setError(null);
       setLoading(false);
-    }, (snapshotError) => {
-      console.error(snapshotError);
-      setError("Failed to load data. Please check your connection or permissions.");
-      setLoading(false);
-    });
+    }
+    void load();
+    const channel = supabase
+      .channel(`public-${collectionName}-${documentId}-${version}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: collectionName, filter: `id=eq.${documentId}` }, () => void load())
+      .subscribe();
     return () => {
-      window.clearTimeout(timeout);
-      unsubscribe();
+      active = false;
+      void supabase.removeChannel(channel);
     };
   }, [collectionName, documentId, version]);
 

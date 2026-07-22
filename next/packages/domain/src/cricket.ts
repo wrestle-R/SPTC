@@ -10,7 +10,6 @@ import type {
 export interface CreateInningsInput {
   battingTeamId: string;
   bowlingTeamId: string;
-  lineup?: PlayerId[];
   battingLineup?: PlayerId[];
   bowlingLineup?: PlayerId[];
   strikerId: PlayerId;
@@ -57,23 +56,23 @@ function emptyBowler(playerId: PlayerId): BowlerInnings {
   };
 }
 
-function assertLineupMember(lineup: PlayerId[], playerId: PlayerId, label: string) {
-  if (!lineup.includes(playerId)) {
-    throw new Error(`${label} must be selected from the playing lineup.`);
+function assertRosterSnapshotMember(rosterSnapshot: PlayerId[], playerId: PlayerId, label: string) {
+  if (!rosterSnapshot.includes(playerId)) {
+    throw new Error(`${label} must be selected from the batting or bowling roster snapshot.`);
   }
 }
 
 export function createCricketInnings(input: CreateInningsInput): CricketInningsState {
-  const battingLineup = input.battingLineup ?? input.lineup ?? [];
+  const battingLineup = input.battingLineup ?? [];
   const bowlingLineup = input.bowlingLineup ?? [input.bowlerId];
   if (battingLineup.length < 2) {
-    throw new Error("A batting lineup needs at least two players.");
+    throw new Error("A batting roster snapshot needs at least two players.");
   }
   if (input.strikerId === input.nonStrikerId) {
     throw new Error("Striker and non-striker must be different players.");
   }
-  assertLineupMember(battingLineup, input.strikerId, "Striker");
-  assertLineupMember(battingLineup, input.nonStrikerId, "Non-striker");
+  assertRosterSnapshotMember(battingLineup, input.strikerId, "Striker");
+  assertRosterSnapshotMember(battingLineup, input.nonStrikerId, "Non-striker");
 
   return {
     battingTeamId: input.battingTeamId,
@@ -306,7 +305,7 @@ export function setCricketBowler(state: CricketInningsState, bowlerId: PlayerId)
   if (state.completed) throw new Error("This innings is complete.");
   if (state.currentBowlerId) throw new Error("The current over already has a bowler.");
   if (state.bowlingLineup.length > 1) {
-    assertLineupMember(state.bowlingLineup, bowlerId, "Bowler");
+    assertRosterSnapshotMember(state.bowlingLineup, bowlerId, "Bowler");
   }
   if (bowlerId === state.previousOverBowlerId) {
     throw new Error("A bowler cannot bowl consecutive overs.");
@@ -326,7 +325,7 @@ export function setCricketBowler(state: CricketInningsState, bowlerId: PlayerId)
 
 export function setNextBatter(state: CricketInningsState, playerId: PlayerId) {
   if (state.strikerId) throw new Error("A striker is already selected.");
-  assertLineupMember(state.battingLineup, playerId, "Batter");
+  assertRosterSnapshotMember(state.battingLineup, playerId, "Batter");
   if (playerId === state.nonStrikerId || state.batters[playerId]?.dismissal) {
     throw new Error("That batter is not available.");
   }

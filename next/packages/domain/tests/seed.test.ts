@@ -46,34 +46,7 @@ describe("finalized rosters", () => {
     expect(new Set(S9_PLAYERS.map((player) => player.id)).size).toBe(77);
   });
 
-  it("seeds one live and one completed match for each active sport", () => {
-    expect(S9_SEEDED_MATCHES).toHaveLength(6);
-    for (const sport of ["football", "handball", "cricket"] as const) {
-      const matches = S9_SEEDED_MATCHES.filter((match) => match.sport === sport);
-      expect(matches.map((match) => match.status).sort()).toEqual(["completed", "live"]);
-    }
-  });
-
-  it("never seeds a completed match without a real result", () => {
-    const completed = S9_SEEDED_MATCHES.filter((match) => match.status === "completed");
-    expect(completed).toHaveLength(3);
-    for (const match of completed) {
-      expect(match.winnerTeamId).toBeTruthy();
-      expect(match.resultText).toMatch(/beat/);
-      if (match.sport === "cricket") {
-        expect(match.resultText).toBe("Crimson Warriors beat God's Gladiators by 6 wickets");
-        expect(match.scoreSummary.innings).toHaveLength(2);
-      }
-    }
-  });
-
-  it("seeds field-sport goal events that match the visible score", () => {
-    const fieldMatches = S9_SEEDED_MATCHES.filter((match) => match.sport === "football" || match.sport === "handball");
-    for (const match of fieldMatches) {
-      expect(match.fieldState).toBeTruthy();
-      const expectedGoals = Object.values(match.scoreSummary).reduce((sum, score) => sum + score, 0);
-      const recordedGoals = match.fieldState?.events.filter((event) => event.type === "goal" || event.type === "own-goal").length;
-      expect(recordedGoals).toBe(expectedGoals);
-    }
+  it("keeps match seed data empty for a clean Supabase migration", () => {
+    expect(S9_SEEDED_MATCHES).toEqual([]);
   });
 });

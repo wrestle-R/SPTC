@@ -1,7 +1,7 @@
 "use client";
 
 import type { Team } from "@sports-fiesta/domain";
-import { Activity, CalendarPlus, CheckCircle2, ChevronRight, Clock3, DatabaseZap, LoaderCircle } from "lucide-react";
+import { Activity, CalendarPlus, CheckCircle2, ChevronRight, Clock3, LoaderCircle } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -24,19 +24,6 @@ export function OrganizerMatches() {
   const [away, setAway] = useState("");
   const [stage, setStage] = useState("league");
   const [pending, setPending] = useState(false);
-  const [syncPending, setSyncPending] = useState(false);
-
-  async function synchronize() {
-    setSyncPending(true);
-    try {
-      await callOrganizerCommand("bootstrapTournament");
-      toast.success("Fixtures and jersey numbers synchronized.");
-    } catch (cause) {
-      toast.error(cause instanceof Error ? cause.message : "Tournament synchronization failed.");
-    } finally {
-      setSyncPending(false);
-    }
-  }
 
   async function create(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -60,12 +47,12 @@ export function OrganizerMatches() {
   const sortedMatches = [...matches.data].sort((a, b) => (a.matchNumber ?? a.id).localeCompare(b.matchNumber ?? b.id));
   const groups = {
     live: sortedMatches.filter((match) => ["live", "innings-break", "super-over"].includes(match.status)),
-    scheduled: sortedMatches.filter((match) => ["scheduled", "lineup"].includes(match.status)),
+    scheduled: sortedMatches.filter((match) => match.status === "scheduled"),
     completed: sortedMatches.filter((match) => match.status === "completed"),
   };
   return (
     <div className="flex flex-col gap-6">
-      <div><h1 className="text-2xl font-semibold">Matches</h1><p className="mt-1 text-sm text-muted-foreground">Create fixtures, prepare lineups, and open the scoring console.</p></div>
+      <div><h1 className="text-2xl font-semibold">Matches</h1><p className="mt-1 text-sm text-muted-foreground">Create fixtures and open the scoring console.</p></div>
       <Card className="shadow-none">
         <CardHeader><CardTitle>Create fixture</CardTitle><CardDescription>Fixtures begin empty and are added by an organizer.</CardDescription></CardHeader>
         <CardContent>
@@ -81,8 +68,8 @@ export function OrganizerMatches() {
         </CardContent>
       </Card>
       <section className="flex flex-col gap-3">
-        <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-lg font-semibold">Tournament fixtures</h2><p className="text-sm text-muted-foreground">Open any fixture to manage lineups and scoring.</p></div><Badge variant="outline">{matches.data.length} total</Badge></div>
-        {!matches.data.length ? <Card className="border-dashed shadow-none"><CardContent className="flex min-h-44 flex-col items-center justify-center gap-4 text-center"><span className="grid size-11 place-items-center rounded-xl bg-primary/10 text-primary"><DatabaseZap /></span><div><p className="font-semibold">Organizer fixtures are not synchronized</p><p className="mt-1 max-w-md text-sm text-muted-foreground">Restore the approved sample fixtures to organizer and public data so every match can be opened and scored.</p></div><Button onClick={synchronize} disabled={syncPending}>{syncPending ? <LoaderCircle className="animate-spin" /> : <DatabaseZap />} {syncPending ? "Synchronizing" : "Restore fixtures"}</Button></CardContent></Card> : (
+        <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-lg font-semibold">Tournament fixtures</h2><p className="text-sm text-muted-foreground">Open any fixture to manage scoring.</p></div><Badge variant="outline">{matches.data.length} total</Badge></div>
+        {!matches.data.length ? <Card className="border-dashed shadow-none"><CardContent className="flex min-h-44 flex-col items-center justify-center gap-3 text-center"><p className="font-semibold">No fixtures yet</p><p className="mt-1 max-w-md text-sm text-muted-foreground">Create a fixture above. Nothing will be restored automatically.</p></CardContent></Card> : (
           <Tabs defaultValue="live" className="gap-4">
             <TabsList className="grid h-auto w-full grid-cols-3 bg-muted/60 p-1 sm:w-fit sm:min-w-lg">
               <TabsTrigger value="live" className="min-h-10 px-3"><Activity /> Live <Badge variant="secondary">{groups.live.length}</Badge></TabsTrigger>

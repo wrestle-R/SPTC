@@ -192,14 +192,13 @@ export interface SeedMatch {
   id: string;
   sport: "football" | "handball" | "cricket";
   stage: "league" | "decider" | "final";
-  status: "scheduled" | "lineup" | "live" | "innings-break" | "super-over" | "completed";
+  status: "scheduled" | "live" | "innings-break" | "super-over" | "completed";
   homeTeamId: TeamId;
   awayTeamId: TeamId;
   matchNumber: string;
   startsAt?: string;
   venue?: string;
   revision: number;
-  lineups: Record<TeamId, { starters: PlayerId[]; substitutes: PlayerId[] }>;
   scoreSummary: Record<TeamId, number> | {
     innings: Array<{ battingTeamId: TeamId; score: number; wickets: number; overs: string }>;
   };
@@ -210,4 +209,7 @@ export interface SeedMatch {
   };
   winnerTeamId?: TeamId | null;
   resultText?: string;
+  manOfTheMatchPlayerId?: PlayerId | null;
+  manOfTheMatchSuggestedPlayerIds?: PlayerId[];
+  manOfTheMatchScoreBreakdown?: Record<string, unknown> | null;
 }

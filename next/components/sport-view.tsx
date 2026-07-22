@@ -1,6 +1,6 @@
 "use client";
 
-import { S9_PLAYERS, S9_SEEDED_MATCHES, S9_TEAMS } from "@sports-fiesta/domain";
+import { S9_PLAYERS, S9_TEAMS } from "@sports-fiesta/domain";
 import { CircleDashed } from "lucide-react";
 import { DataError, ContentSkeleton } from "@/components/data-state";
 import { MatchCard } from "@/components/match-card";
@@ -10,8 +10,8 @@ import { usePublicCollection, usePublicDocument } from "@/lib/public-data";
 import type { CricketStandingRow, FieldSportStandingRow, PublicMatch, PublicPlayer, PublicTeam, SportStandingDocument } from "@/lib/web-types";
 
 const headings = {
-  football: { title: "Football", description: "Fixtures, live goals, lineups, standings, and the road to the final." },
-  handball: { title: "Handball", description: "Live scoring, lineups, results, and tournament progress." },
+  football: { title: "Football", description: "Fixtures, live goals, standings, and the road to the final." },
+  handball: { title: "Handball", description: "Live scoring, results, and tournament progress." },
   cricket: { title: "Cricket", description: "Five-over fixtures, ball-by-ball scorecards, leaders, and match analytics." },
 } as const;
 
@@ -22,14 +22,13 @@ export function SportView({ sport }: { sport: keyof typeof headings }) {
   const standingsState = usePublicDocument<SportStandingDocument>("standings", sport);
   const leadersState = usePublicDocument<FieldLeaders | CricketLeaders>("leaderboards", sport);
   const teams = teamsState.data.length ? teamsState.data : S9_TEAMS;
-  const sourceMatches = matchesState.data.length ? matchesState.data : S9_SEEDED_MATCHES as unknown as PublicMatch[];
-  const matches = sourceMatches
+  const matches = matchesState.data
     .filter((match) => match.sport === sport)
     .sort((a, b) => (a.matchNumber ?? a.id).localeCompare(b.matchNumber ?? b.id));
   const standings = standingsState.data?.rows?.length ? standingsState.data.rows : fallbackStandings(sport, matches);
   const groups = [
     { title: "Live now", matches: matches.filter((match) => ["live", "innings-break", "super-over"].includes(match.status)) },
-    { title: "Upcoming", matches: matches.filter((match) => ["scheduled", "lineup"].includes(match.status)) },
+    { title: "Upcoming", matches: matches.filter((match) => match.status === "scheduled") },
     { title: "Results", matches: matches.filter((match) => match.status === "completed") },
   ];
 

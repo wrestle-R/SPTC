@@ -1,6 +1,6 @@
 "use client";
 
-import { S9_SEEDED_MATCHES, S9_TEAMS } from "@sports-fiesta/domain";
+import { S9_TEAMS } from "@sports-fiesta/domain";
 import { ArrowRight, ArrowUpRight, CheckCircle2, Clock, Radio, Users } from "lucide-react";
 import { TbPlayFootball, TbPlayHandball, TbCricket } from "react-icons/tb";
 import Link from "next/link";
@@ -22,7 +22,7 @@ export function HomeView() {
   const matchesState = usePublicCollection<PublicMatch>("matches");
   const teamsState = usePublicCollection<PublicTeam>("teams");
   const teams = teamsState.data.length ? teamsState.data : S9_TEAMS;
-  const matches = matchesState.data.length ? matchesState.data : S9_SEEDED_MATCHES as unknown as PublicMatch[];
+  const matches = matchesState.data;
 
   const liveMatches = matches
     .filter((match) => ["live", "innings-break", "super-over"].includes(match.status))
@@ -34,7 +34,7 @@ export function HomeView() {
     .slice(0, 3);
 
   const upcomingMatches = matches
-    .filter((match) => ["scheduled", "lineup"].includes(match.status))
+    .filter((match) => match.status === "scheduled")
     .sort((a, b) => (a.matchNumber ?? a.id).localeCompare(b.matchNumber ?? b.id))
     .slice(0, 3);
 
