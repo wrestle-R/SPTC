@@ -55,6 +55,23 @@ export function MatchDetail({ sport, matchId }: { sport: Sport; matchId: string 
   const teamName = (id: string) => teams.find((team) => team.id === id)?.name ?? "Team";
   const resultText = match.resultText || (match.status === "completed" ? "Result pending - organizer must confirm." : null);
   const motmTeamId = playerTeam(match.manOfTheMatchPlayerId);
+  const isComplete = match.status === "completed" && Boolean(match.winnerTeamId);
+
+  useEffect(() => {
+    if (!isComplete) return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+
+    const duration = 1500;
+    const end = Date.now() + duration;
+
+    const frame = () => {
+      confetti({ particleCount: 3, angle: 60, spread: 55, origin: { x: 0, y: 0.6 } });
+      confetti({ particleCount: 3, angle: 120, spread: 55, origin: { x: 1, y: 0.6 } });
+      if (Date.now() < end) requestAnimationFrame(frame);
+    };
+
+    frame();
+  }, [isComplete]);
 
   return (
     <div className="flex flex-col gap-6">
@@ -84,7 +101,29 @@ export function MatchDetail({ sport, matchId }: { sport: Sport; matchId: string 
           ) : (
             <FieldScore match={match} homeName={home?.name ?? "Team"} awayName={away?.name ?? "Team"} playerName={playerName} playerJersey={playerJersey} teamName={teamName} sport={sport} />
           )}
-          {resultText ? <p className="rounded-md bg-muted p-3 font-medium">{resultText}</p> : null}
+          {resultText ? (
+            match.stage === "final" ? (
+              <motion.div
+                initial={{ scale: 0.85, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                transition={{ type: "spring", duration: 0.6, bounce: 0.4 }}
+                className="rounded-xl bg-gradient-to-br from-amber-500/20 via-yellow-500/15 to-amber-500/20 border-2 border-amber-500/40 p-6 text-center shadow-lg"
+              >
+                <motion.span
+                  initial={{ rotate: -15, scale: 0.5 }}
+                  animate={{ rotate: 0, scale: 1 }}
+                  transition={{ type: "spring", delay: 0.15, duration: 0.5 }}
+                  className="inline-block text-5xl"
+                >
+                  🏆
+                </motion.span>
+                <p className="mt-2 text-lg font-extrabold tracking-tight">{resultText}</p>
+                <p className="mt-1 text-sm font-medium text-amber-600 dark:text-amber-400">Champions</p>
+              </motion.div>
+            ) : (
+              <p className="rounded-md bg-muted p-3 font-medium">{resultText}</p>
+            )
+          ) : null}
           {match.manOfTheMatchPlayerId ? (
             <div className="rounded-md border p-3">
               <p className="text-xs font-semibold uppercase text-muted-foreground">Man of the Match</p>
