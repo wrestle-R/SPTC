@@ -1,10 +1,11 @@
+import { S9_PLAYERS } from "@sports-fiesta/domain";
 import { ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { MatchStatusBadge } from "@/components/match-status-badge";
 import { Card, CardContent } from "@/components/ui/card";
-import type { PublicMatch, PublicTeam } from "@/lib/web-types";
+import type { PublicMatch, PublicPlayer, PublicTeam } from "@/lib/web-types";
 
-export function MatchCard({ match, teams, featured = false }: { match: PublicMatch; teams: PublicTeam[]; featured?: boolean }) {
+export function MatchCard({ match, teams, players = S9_PLAYERS, featured = false }: { match: PublicMatch; teams: PublicTeam[]; players?: PublicPlayer[]; featured?: boolean }) {
   const home = teams.find((team) => team.id === match.homeTeamId);
   const away = teams.find((team) => team.id === match.awayTeamId);
   const isCricket = match.sport === "cricket";
@@ -16,6 +17,7 @@ export function MatchCard({ match, teams, featured = false }: { match: PublicMat
     : null;
   const href = `/${match.sport}/${match.id}`;
   const resultText = match.resultText || (match.status === "completed" ? "Result pending - organizer must confirm." : null);
+  const motm = players.find((player) => player.id === match.manOfTheMatchPlayerId);
 
   return (
     <Link href={href} className="block rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
@@ -34,6 +36,11 @@ export function MatchCard({ match, teams, featured = false }: { match: PublicMat
           </div>
           {resultText ? (
             <p className="mt-4 rounded-md bg-muted px-3 py-2 text-sm font-medium text-card-foreground">{resultText}</p>
+          ) : null}
+          {motm ? (
+            <p className="mt-2 rounded-md border px-3 py-2 text-sm text-muted-foreground">
+              Man of the Match: <span className="font-semibold text-card-foreground">{motm.jerseyNumber === null ? "" : `#${motm.jerseyNumber} `}{motm.name}</span>
+            </p>
           ) : null}
           <div className="mt-4 flex items-center justify-between gap-3 border-t pt-3 text-sm text-muted-foreground">
             <span className="truncate capitalize">{match.sport} · {match.stage}</span>

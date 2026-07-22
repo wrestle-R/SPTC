@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { calculateMvpScore } from "../src/mvp";
+import { calculateMvpScore, rankCricketMvpCandidates, rankFieldMvpCandidates } from "../src/mvp";
 
 describe("MVP scoring", () => {
   it("uses the published fielding weights and winner impact bonus", () => {
@@ -15,5 +15,23 @@ describe("MVP scoring", () => {
     expect(result.fielding).toBe(50);
     expect(result.impact).toBe(10);
     expect(result.total).toBe(60);
+  });
+
+  it("ranks field-sport scorers above lower-impact players", () => {
+    const [leader] = rankFieldMvpCandidates([
+      { playerId: "p1", teamId: "red", goals: 2, winner: true, goalsConceded: 1 },
+      { playerId: "p2", teamId: "red", goals: 0, winner: true, goalsConceded: 0 },
+    ]);
+
+    expect(leader.playerId).toBe("p1");
+  });
+
+  it("ranks cricket all-round impact above one-dimensional efforts", () => {
+    const [leader] = rankCricketMvpCandidates([
+      { playerId: "p1", teamId: "red", runs: 20, balls: 12, winner: true },
+      { playerId: "p2", teamId: "red", runs: 12, balls: 8, wickets: 2, bowlingBalls: 12, bowlingRuns: 9, catches: 1, winner: true },
+    ]);
+
+    expect(leader.playerId).toBe("p2");
   });
 });

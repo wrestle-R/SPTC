@@ -3,5 +3,6 @@ export * from "./field-sports";
 export * from "./fixtures";
 export * from "./mvp";
 export * from "./seed";
+export * from "./sport-rules";
 export * from "./standings";
 export * from "./types";

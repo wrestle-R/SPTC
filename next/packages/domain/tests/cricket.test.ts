@@ -214,6 +214,28 @@ describe("five-over cricket scoring", () => {
     expect(state.completed).toBe(true);
   });
 
+  it("marks a nine-player cricket lineup all out after eight wickets", () => {
+    const nine = ["a", "b", "c", "d", "e", "f", "g", "h", "i"];
+    let state = createCricketInnings({
+      battingTeamId: "red",
+      bowlingTeamId: "green",
+      battingLineup: nine,
+      bowlingLineup: ["g1", "g2"],
+      strikerId: "a",
+      nonStrikerId: "b",
+      bowlerId: "g1",
+    });
+
+    for (const playerId of ["a", "c", "d", "e", "f", "g", "h", "i"]) {
+      if (!state.currentBowlerId) state = setCricketBowler(state, "g2");
+      state = recordCricketDelivery(state, { runsOffBat: 0, dismissal: { type: "bowled", playerOutId: state.strikerId ?? playerId } });
+      if (!state.completed) state = setNextBatter(state, playerId === "a" ? "c" : nine[nine.indexOf(playerId) + 1]);
+    }
+
+    expect(state.wickets).toBe(8);
+    expect(state.completed).toBe(true);
+  });
+
   it("recalculates a corrected scorecard from stored deliveries", () => {
     const initial = {
       battingTeamId: "red",

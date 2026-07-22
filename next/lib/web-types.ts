@@ -29,6 +29,9 @@ export interface PublicMatch {
   };
   winnerTeamId?: string | null;
   resultText?: string;
+  manOfTheMatchPlayerId?: string | null;
+  manOfTheMatchSuggestedPlayerIds?: string[];
+  manOfTheMatchScoreBreakdown?: Record<string, unknown> | null;
 }
 
 export interface OverallStandingRow {

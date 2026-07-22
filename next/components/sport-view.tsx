@@ -1,12 +1,13 @@
 "use client";
 
-import { S9_SEEDED_MATCHES, S9_TEAMS } from "@sports-fiesta/domain";
+import { S9_PLAYERS, S9_SEEDED_MATCHES, S9_TEAMS } from "@sports-fiesta/domain";
 import { CircleDashed } from "lucide-react";
 import { DataError, ContentSkeleton } from "@/components/data-state";
 import { MatchCard } from "@/components/match-card";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { usePublicCollection, usePublicDocument } from "@/lib/public-data";
-import type { CricketStandingRow, FieldSportStandingRow, PublicMatch, PublicTeam, SportStandingDocument } from "@/lib/web-types";
+import type { CricketStandingRow, FieldSportStandingRow, PublicMatch, PublicPlayer, PublicTeam, SportStandingDocument } from "@/lib/web-types";
 
 const headings = {
   football: { title: "Football", description: "Fixtures, live goals, lineups, standings, and the road to the final." },
@@ -17,7 +18,9 @@ const headings = {
 export function SportView({ sport }: { sport: keyof typeof headings }) {
   const matchesState = usePublicCollection<PublicMatch>("matches");
   const teamsState = usePublicCollection<PublicTeam>("teams");
+  const playersState = usePublicCollection<PublicPlayer>("players");
   const standingsState = usePublicDocument<SportStandingDocument>("standings", sport);
+  const leadersState = usePublicDocument<FieldLeaders | CricketLeaders>("leaderboards", sport);
   const teams = teamsState.data.length ? teamsState.data : S9_TEAMS;
   const sourceMatches = matchesState.data.length ? matchesState.data : S9_SEEDED_MATCHES as unknown as PublicMatch[];
   const matches = sourceMatches
@@ -37,11 +40,14 @@ export function SportView({ sport }: { sport: keyof typeof headings }) {
         <h1 className="mt-2 text-3xl font-semibold sm:text-4xl">{headings[sport].title}</h1>
         <p className="mt-3 text-base leading-7 text-muted-foreground">{headings[sport].description}</p>
       </header>
-      {matchesState.loading || teamsState.loading || standingsState.loading ? <ContentSkeleton /> : null}
+      {matchesState.loading || teamsState.loading || standingsState.loading || playersState.loading || leadersState.loading ? <ContentSkeleton /> : null}
       {matchesState.error ? <DataError message={matchesState.error} retry={matchesState.retry} /> : null}
       {standingsState.error ? <DataError message={standingsState.error} retry={standingsState.retry} /> : null}
       {!standingsState.loading && !standingsState.error ? (
         <SportStandings sport={sport} standings={standings} teams={teams} />
+      ) : null}
+      {!leadersState.loading && !leadersState.error ? (
+        <SportLeaders sport={sport} leaders={leadersState.data} matches={matches} players={playersState.data.length ? playersState.data : S9_PLAYERS} />
       ) : null}
       {!matchesState.loading && !matchesState.error && matches.length === 0 ? (
         <Card className="shadow-none">
@@ -58,12 +64,97 @@ export function SportView({ sport }: { sport: keyof typeof headings }) {
         <section key={group.title} className="flex flex-col gap-3">
           <h2 className="text-lg font-semibold">{group.title}</h2>
           <div className="grid gap-3 lg:grid-cols-2">
-            {group.matches.map((match) => <MatchCard key={match.id} match={match} teams={teams} />)}
+            {group.matches.map((match) => <MatchCard key={match.id} match={match} teams={teams} players={playersState.data.length ? playersState.data : S9_PLAYERS} />)}
           </div>
         </section>
       ) : null)}
     </div>
   );
+}
+
+type FieldLeaders = { topScorers?: Array<{ playerId: string; teamId: string; goals: number }> };
+type CricketLeaders = {
+  orangeCap?: Array<{ playerId: string; runs: number; innings: number; strikeRate: number }>;
+  purpleCap?: Array<{ playerId: string; wickets: number; economy: number }>;
+  mostCatches?: Array<{ playerId: string; catches: number }>;
+};
+
+function SportLeaders({ sport, leaders, matches, players }: { sport: keyof typeof headings; leaders?: FieldLeaders | CricketLeaders | null; matches: PublicMatch[]; players: PublicPlayer[] }) {
+  const playerName = (id: string) => players.find((player) => player.id === id)?.name ?? "Player";
+  if (sport === "cricket") {
+    const cricket = (leaders as CricketLeaders | undefined) ?? fallbackCricketLeaders(matches);
+    return (
+      <section className="grid gap-3 lg:grid-cols-3" aria-label="Cricket leaders">
+        <LeaderCard title="Most Runs" label="Runs" rows={(cricket.orangeCap ?? []).slice(0, 5).map((row) => ({ playerId: row.playerId, value: row.runs }))} playerName={playerName} />
+        <LeaderCard title="Most Wickets" label="Wickets" rows={(cricket.purpleCap ?? []).slice(0, 5).map((row) => ({ playerId: row.playerId, value: row.wickets }))} playerName={playerName} />
+        <LeaderCard title="Most Catches" label="Catches" rows={(cricket.mostCatches ?? []).slice(0, 5).map((row) => ({ playerId: row.playerId, value: row.catches }))} playerName={playerName} />
+      </section>
+    );
+  }
+  const field = (leaders as FieldLeaders | undefined) ?? { topScorers: fallbackFieldLeaders(matches) };
+  return (
+    <section aria-label={`${sport} leaders`}>
+      <LeaderCard title={sport === "football" ? "Most Goals" : "Most Goals"} label="Goals" rows={(field.topScorers ?? []).slice(0, 8).map((row) => ({ playerId: row.playerId, value: row.goals }))} playerName={playerName} />
+    </section>
+  );
+}
+
+function LeaderCard({ title, label, rows, playerName }: { title: string; label: string; rows: Array<{ playerId: string; value: number }>; playerName: (id: string) => string }) {
+  return (
+    <Card className="shadow-none">
+      <CardHeader><CardTitle>{title}</CardTitle><CardDescription>Updated from recorded match events.</CardDescription></CardHeader>
+      <CardContent>
+        {rows.some((row) => row.value > 0) ? (
+          <Table>
+            <TableHeader><TableRow><TableHead>Player</TableHead><TableHead className="text-right">{label}</TableHead></TableRow></TableHeader>
+            <TableBody>{rows.filter((row) => row.value > 0).map((row, index) => <TableRow key={row.playerId}><TableCell>{index + 1}. {playerName(row.playerId)}</TableCell><TableCell className="text-right font-semibold tabular-nums">{row.value}</TableCell></TableRow>)}</TableBody>
+          </Table>
+        ) : <p className="py-8 text-center text-sm text-muted-foreground">Leaders will appear after scoring events.</p>}
+      </CardContent>
+    </Card>
+  );
+}
+
+function fallbackFieldLeaders(matches: PublicMatch[]) {
+  const rows = new Map<string, { playerId: string; teamId: string; goals: number }>();
+  for (const match of matches) {
+    for (const event of match.fieldState?.events ?? []) {
+      if (event.type !== "goal" || typeof event.playerId !== "string" || typeof event.teamId !== "string") continue;
+      const row = rows.get(event.playerId) ?? { playerId: event.playerId, teamId: event.teamId, goals: 0 };
+      row.goals += 1; rows.set(event.playerId, row);
+    }
+  }
+  return [...rows.values()].sort((a, b) => b.goals - a.goals || a.playerId.localeCompare(b.playerId));
+}
+
+function fallbackCricketLeaders(matches: PublicMatch[]): CricketLeaders {
+  const rows = new Map<string, { playerId: string; runs: number; innings: number; balls: number; wickets: number; bowlingRuns: number; bowlingBalls: number; catches: number }>();
+  const ensure = (playerId: string) => {
+    const row = rows.get(playerId) ?? { playerId, runs: 0, innings: 0, balls: 0, wickets: 0, bowlingRuns: 0, bowlingBalls: 0, catches: 0 };
+    rows.set(playerId, row);
+    return row;
+  };
+  for (const match of matches) {
+    for (const entry of match.cricket?.innings ?? []) {
+      for (const batter of Object.values(entry.state.batters)) {
+        const row = ensure(batter.playerId);
+        row.runs += batter.runs; row.balls += batter.balls; row.innings += 1;
+      }
+      for (const bowler of Object.values(entry.state.bowlers)) {
+        const row = ensure(bowler.playerId);
+        row.wickets += bowler.wickets; row.bowlingRuns += bowler.runs; row.bowlingBalls += bowler.legalBalls;
+      }
+      for (const event of entry.state.events) {
+        if (event.dismissal?.type === "caught" && event.dismissal.fielderId) ensure(event.dismissal.fielderId).catches += 1;
+      }
+    }
+  }
+  const values = [...rows.values()].map((row) => ({ ...row, strikeRate: row.balls ? Number(((row.runs / row.balls) * 100).toFixed(2)) : 0, economy: row.bowlingBalls ? Number(((row.bowlingRuns / row.bowlingBalls) * 6).toFixed(2)) : 0 }));
+  return {
+    orangeCap: [...values].sort((a, b) => b.runs - a.runs || a.innings - b.innings || b.strikeRate - a.strikeRate),
+    purpleCap: [...values].sort((a, b) => b.wickets - a.wickets || a.economy - b.economy),
+    mostCatches: [...values].sort((a, b) => b.catches - a.catches || a.playerId.localeCompare(b.playerId)),
+  };
 }
 
 function fallbackStandings(sport: keyof typeof headings, matches: PublicMatch[]): SportStandingDocument["rows"] {

@@ -48,8 +48,10 @@ export function MatchDetail({ sport, matchId }: { sport: Sport; matchId: string 
   const away = teams.find((team) => team.id === match.awayTeamId);
   const playerName = (id: string | null | undefined) => players.find((player) => player.id === id)?.name ?? fallbackPlayerName(id, teams);
   const playerJersey = (id: string | null | undefined) => players.find((player) => player.id === id)?.jerseyNumber ?? null;
+  const playerTeam = (id: string | null | undefined) => players.find((player) => player.id === id)?.teamId ?? null;
   const teamName = (id: string) => teams.find((team) => team.id === id)?.name ?? "Team";
   const resultText = match.resultText || (match.status === "completed" ? "Result pending - organizer must confirm." : null);
+  const motmTeamId = playerTeam(match.manOfTheMatchPlayerId);
 
   return (
     <div className="flex flex-col gap-6">
@@ -73,6 +75,13 @@ export function MatchDetail({ sport, matchId }: { sport: Sport; matchId: string 
             <FieldScore match={match} homeName={home?.name ?? "Team"} awayName={away?.name ?? "Team"} playerName={playerName} playerJersey={playerJersey} teamName={teamName} />
           )}
           {resultText ? <p className="rounded-md bg-muted p-3 font-medium">{resultText}</p> : null}
+          {match.manOfTheMatchPlayerId ? (
+            <div className="rounded-md border p-3">
+              <p className="text-xs font-semibold uppercase text-muted-foreground">Man of the Match</p>
+              <p className="mt-1 font-semibold">{playerJersey(match.manOfTheMatchPlayerId) !== null ? `#${playerJersey(match.manOfTheMatchPlayerId)} ` : ""}{playerName(match.manOfTheMatchPlayerId)}</p>
+              {motmTeamId ? <p className="text-sm text-muted-foreground">{teamName(motmTeamId)}</p> : null}
+            </div>
+          ) : null}
         </CardContent>
       </Card>
     </div>

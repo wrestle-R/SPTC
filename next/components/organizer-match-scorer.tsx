@@ -1,8 +1,9 @@
 "use client";
 
-import type { CricketDelivery, CricketExtraType, DismissalType, FieldEventType, Player, Team } from "@sports-fiesta/domain";
+import { normalizeSportRules, type CricketDelivery, type CricketExtraType, type DismissalType, type FieldEventType, type Player, type SportRules, type Team } from "@sports-fiesta/domain";
 import { ArrowLeft, LoaderCircle, RotateCcw, Square, Trophy } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
 import { ContentSkeleton, DataError } from "@/components/data-state";
@@ -12,14 +13,17 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { callOrganizerCommand, revisionCommand, usePrivateCollection, usePrivateDocument } from "@/lib/organizer-data";
+import { callOrganizerCommand, revisionCommand, usePrivateCollection, usePrivateDocument, usePrivateTournament } from "@/lib/organizer-data";
 import type { PublicMatch } from "@/lib/web-types";
 
 export function OrganizerMatchScorer({ matchId }: { matchId: string }) {
+  const router = useRouter();
   const matchState = usePrivateDocument<PublicMatch>("matches", matchId);
+  const tournament = usePrivateTournament<{ sportRules?: Partial<SportRules> }>();
   const teams = usePrivateCollection<Team>("teams");
   const players = usePrivateCollection<Player>("players");
   const [pending, setPending] = useState(false);
+  const [motmSuggestions, setMotmSuggestions] = useState<Array<{ playerId: string; total: number; reason: string }>>([]);
   const match = matchState.data;
 
   async function run(name: string, data: Record<string, unknown> = {}) {
@@ -38,8 +42,28 @@ export function OrganizerMatchScorer({ matchId }: { matchId: string }) {
     } finally { setPending(false); }
   }
 
-  if (matchState.loading || teams.loading || players.loading) return <ContentSkeleton />;
-  const error = matchState.error || teams.error || players.error;
+  async function completeMatch(manOfTheMatchPlayerId?: string) {
+    if (!match) return;
+    setPending(true);
+    try {
+      await callOrganizerCommand("endMatch", revisionCommand(match.id, match.revision, { manOfTheMatchPlayerId }));
+      router.push("/organizer/matches");
+    } catch (cause) {
+      const msg = cause instanceof Error ? cause.message : "Match completion failed.";
+      try {
+        const parsed = JSON.parse(msg) as { reason?: string; message?: string; suggestions?: Array<{ playerId: string; total: number; reason: string }> };
+        if (parsed.reason === "MOTM_REQUIRED") {
+          setMotmSuggestions(parsed.suggestions ?? []);
+          toast.error(parsed.message ?? "Select Man of the Match.");
+        } else toast.error(msg);
+      } catch {
+        toast.error(msg);
+      }
+    } finally { setPending(false); }
+  }
+
+  if (matchState.loading || teams.loading || players.loading || tournament.loading) return <ContentSkeleton />;
+  const error = matchState.error || teams.error || players.error || tournament.error;
   if (error) return <DataError message={error} retry={matchState.retry} />;
   if (!match) return <p>Match not found.</p>;
   const home = teams.data.find((team) => team.id === match.homeTeamId);
@@ -47,19 +71,27 @@ export function OrganizerMatchScorer({ matchId }: { matchId: string }) {
   const teamName = (id: string) => teams.data.find((team) => team.id === id)?.name ?? "Team";
   const playerName = (id: string | null | undefined) => players.data.find((player) => player.id === id)?.name ?? "Player";
   const roster = (teamId: string) => players.data.filter((player) => player.teamId === teamId && player.active);
+  const sportRules = normalizeSportRules(tournament.data?.sportRules)[match.sport];
+  const lineupIds = (teamId: string) => {
+    const lineup = match.lineups?.[teamId];
+    return lineup ? [...lineup.starters, ...lineup.substitutes] : [];
+  };
+  const confirmedPlayers = players.data.filter((player) => [match.homeTeamId, match.awayTeamId].includes(player.teamId) && lineupIds(player.teamId).includes(player.id));
 
   return <div className="flex flex-col gap-6">
     <div className="flex flex-wrap items-start justify-between gap-4"><div><Button nativeButton={false} variant="ghost" className="mb-3" render={<Link href="/organizer/matches" />}><ArrowLeft data-icon="inline-start" /> Matches</Button><h1 className="text-2xl font-semibold">{home?.name ?? "Home"} vs {away?.name ?? "Away"}</h1><p className="mt-1 text-sm capitalize text-muted-foreground">{match.sport} · {match.stage} · revision {match.revision}</p></div><Badge variant={match.status === "live" ? "destructive" : "secondary"}>{match.status.replace("-", " ")}</Badge></div>
 
-    {match.status === "scheduled" ? <Card className="shadow-none"><CardHeader><CardTitle>Match setup</CardTitle><CardDescription>Publish each team lineup, then start the match.</CardDescription></CardHeader><CardContent className="flex flex-col gap-5"><div className="grid gap-4 lg:grid-cols-2"><LineupForm team={home} players={roster(match.homeTeamId)} pending={pending} onSave={(starters) => run("setLineup", { teamId: match.homeTeamId, starters, substitutes: [] })} /><LineupForm team={away} players={roster(match.awayTeamId)} pending={pending} onSave={(starters) => run("setLineup", { teamId: match.awayTeamId, starters, substitutes: [] })} /></div><Button size="lg" onClick={() => run("startMatch")} disabled={pending}>{pending ? <LoaderCircle data-icon="inline-start" className="animate-spin" /> : null}Start match setup</Button></CardContent></Card> : null}
+    {["scheduled", "lineup"].includes(match.status) ? <Card className="shadow-none"><CardHeader><CardTitle>Match setup</CardTitle><CardDescription>Publish each team lineup, then start the match.</CardDescription></CardHeader><CardContent className="flex flex-col gap-5"><div className="grid gap-4 lg:grid-cols-2"><LineupForm team={home} players={roster(match.homeTeamId)} existing={match.lineups?.[match.homeTeamId]} rule={sportRules} sport={match.sport} pending={pending} onSave={(starters, substitutes) => run("setLineup", { teamId: match.homeTeamId, starters, substitutes })} /><LineupForm team={away} players={roster(match.awayTeamId)} existing={match.lineups?.[match.awayTeamId]} rule={sportRules} sport={match.sport} pending={pending} onSave={(starters, substitutes) => run("setLineup", { teamId: match.awayTeamId, starters, substitutes })} /></div><Button size="lg" onClick={() => run("startMatch")} disabled={pending}>{pending ? <LoaderCircle data-icon="inline-start" className="animate-spin" /> : null}{match.sport === "cricket" ? "Start innings setup" : "Start match"}</Button></CardContent></Card> : null}
 
-    {match.sport === "cricket" ? <CricketConsole key={`${match.id}-${match.status}-${match.revision}`} match={match} players={players.data} teams={teams.data} pending={pending} run={run} teamName={teamName} playerName={playerName} /> : <FieldConsole match={match} players={players.data} teams={teams.data} pending={pending} run={run} teamName={teamName} playerName={playerName} />}
+    {match.sport === "cricket" ? <CricketConsole key={`${match.id}-${match.status}-${match.revision}`} match={match} players={players.data} teams={teams.data} pending={pending} run={run} completeMatch={completeMatch} motmSuggestions={motmSuggestions} confirmedPlayers={confirmedPlayers} teamName={teamName} playerName={playerName} /> : <FieldConsole match={match} players={players.data} teams={teams.data} pending={pending} run={run} completeMatch={completeMatch} motmSuggestions={motmSuggestions} confirmedPlayers={confirmedPlayers} teamName={teamName} playerName={playerName} />}
   </div>;
 }
 
-function LineupForm({ team, players, pending, onSave }: { team?: Team; players: Player[]; pending: boolean; onSave: (ids: string[]) => void }) {
-  function submit(event: React.FormEvent<HTMLFormElement>) { event.preventDefault(); onSave(new FormData(event.currentTarget).getAll("players").map(String)); }
-  return <form onSubmit={submit} className="rounded-md border p-4"><FieldGroup><div><p className="font-semibold">{team?.name ?? "Team"}</p><p className="text-sm text-muted-foreground">Select the playing lineup.</p></div><div className="grid max-h-60 gap-2 overflow-y-auto">{players.map((player) => <label key={player.id} className="flex min-h-10 items-center gap-3 rounded-md border px-3 text-sm"><input type="checkbox" name="players" value={player.id} defaultChecked /> {playerLabel(player)}</label>)}</div><Button type="submit" variant="outline" disabled={pending || players.length === 0}>Publish lineup</Button></FieldGroup></form>;
+function LineupForm({ team, players, existing, rule, sport, pending, onSave }: { team?: Team; players: Player[]; existing?: { starters: string[]; substitutes: string[] }; rule: { starters: number; substitutes: number }; sport: PublicMatch["sport"]; pending: boolean; onSave: (starters: string[], substitutes: string[]) => void }) {
+  const initialStarters = existing?.starters?.length ? existing.starters : players.slice(0, rule.starters).map((player) => player.id);
+  const initialSubstitutes = sport === "cricket" ? [] : existing?.substitutes?.length ? existing.substitutes : players.slice(rule.starters, rule.starters + rule.substitutes).map((player) => player.id);
+  function submit(event: React.FormEvent<HTMLFormElement>) { event.preventDefault(); const form = new FormData(event.currentTarget); onSave(form.getAll("starters").map(String), form.getAll("substitutes").map(String)); }
+  return <form onSubmit={submit} className="rounded-md border p-4"><FieldGroup><div><p className="font-semibold">{team?.name ?? "Team"}</p><p className="text-sm text-muted-foreground">{sport === "cricket" ? `${rule.starters} players required` : `${rule.starters} starters + ${rule.substitutes} substitutes required`}</p></div><div className="grid max-h-72 gap-2 overflow-y-auto">{players.map((player) => <label key={player.id} className="grid min-h-10 grid-cols-[1fr_auto_auto] items-center gap-3 rounded-md border px-3 text-sm"><span>{playerLabel(player)}</span><span className="flex items-center gap-1 text-xs text-muted-foreground"><input type="checkbox" name="starters" value={player.id} defaultChecked={initialStarters.includes(player.id)} /> Start</span>{sport !== "cricket" ? <span className="flex items-center gap-1 text-xs text-muted-foreground"><input type="checkbox" name="substitutes" value={player.id} defaultChecked={initialSubstitutes.includes(player.id)} /> Sub</span> : null}</label>)}</div><Button type="submit" variant="outline" disabled={pending || players.length === 0}>Publish lineup</Button></FieldGroup></form>;
 }
 
 type RunCommand = (name: string, data?: Record<string, unknown>) => Promise<void>;
@@ -68,7 +100,7 @@ function playerLabel(player: Player) {
   return player.jerseyNumber === null ? player.name : `#${player.jerseyNumber} · ${player.name}`;
 }
 
-function CricketConsole({ match, players, teams, pending, run, teamName, playerName }: { match: PublicMatch; players: Player[]; teams: Team[]; pending: boolean; run: RunCommand; teamName: (id: string) => string; playerName: (id?: string | null) => string }) {
+function CricketConsole({ match, players, teams, pending, run, completeMatch, motmSuggestions, confirmedPlayers, teamName, playerName }: { match: PublicMatch; players: Player[]; teams: Team[]; pending: boolean; run: RunCommand; completeMatch: (playerId?: string) => void; motmSuggestions: Array<{ playerId: string; total: number; reason: string }>; confirmedPlayers: Player[]; teamName: (id: string) => string; playerName: (id?: string | null) => string }) {
   const entries = match.cricket?.innings ?? [];
   const currentIndex = match.cricket?.currentInnings ?? -1;
   const current = entries[currentIndex]?.state;
@@ -83,8 +115,9 @@ function CricketConsole({ match, players, teams, pending, run, teamName, playerN
     <Card className="shadow-none"><CardHeader><CardTitle>Ball-by-ball scoring</CardTitle><CardDescription>Strike, totals, overs, and player figures update automatically.</CardDescription></CardHeader><CardContent>
       {!current.strikerId ? <ParticipantSelect label="Next batter" players={battingPlayers.filter((player) => player.id !== current.nonStrikerId && !current.batters[player.id]?.dismissal)} pending={pending} onSelect={(playerId) => run("selectNextBatter", { playerId })} /> : null}
       {!current.currentBowlerId ? <ParticipantSelect label="Bowler for this over" players={bowlingPlayers.filter((player) => player.id !== current.previousOverBowlerId)} pending={pending} onSelect={(playerId) => run("selectCricketBowler", { playerId })} /> : null}
-      {current.strikerId && current.currentBowlerId ? <DeliveryControls current={current} pending={pending} run={run} bowlingPlayers={bowlingPlayers} playerName={playerName} /> : null}
-      <div className="mt-5 flex flex-wrap gap-2"><Button variant="outline" onClick={() => run("undoLastEvent")} disabled={pending || current.events.length === 0}><RotateCcw data-icon="inline-start" /> Undo last ball</Button><Button variant="destructive" onClick={() => run("endInnings")} disabled={pending}><Square data-icon="inline-start" /> End innings</Button></div>
+      {current.strikerId && current.currentBowlerId && !current.completed ? <DeliveryControls current={current} pending={pending} run={run} bowlingPlayers={bowlingPlayers} playerName={playerName} /> : null}
+      <div className="mt-5 flex flex-wrap gap-2"><Button variant="outline" onClick={() => run("undoLastEvent")} disabled={pending || current.events.length === 0}><RotateCcw data-icon="inline-start" /> Undo last ball</Button><Button variant="destructive" onClick={() => run("endInnings")} disabled={pending || current.completed}><Square data-icon="inline-start" /> End innings</Button></div>
+      {match.resultText || current.completed ? <MotmPicker players={confirmedPlayers} suggestions={motmSuggestions} pending={pending} onComplete={completeMatch} /> : null}
     </CardContent></Card>
   </div>;
 }
@@ -93,11 +126,11 @@ function CricketInningsSetup({ match, players, teams, pending, run, superOver }:
   const previous = match.cricket?.innings.at(-1)?.state;
   const [batting, setBatting] = useState(previous ? previous.bowlingTeamId : match.homeTeamId);
   const bowling = batting === match.homeTeamId ? match.awayTeamId : match.homeTeamId;
-  const battingLineup = match.lineups?.[batting]?.starters?.length ? match.lineups[batting].starters : players.filter((player) => player.teamId === batting && player.active).map((player) => player.id);
-  const bowlingLineup = match.lineups?.[bowling]?.starters?.length ? match.lineups[bowling].starters : players.filter((player) => player.teamId === bowling && player.active).map((player) => player.id);
+  const battingLineup = match.lineups?.[batting]?.starters ?? [];
+  const bowlingLineup = match.lineups?.[bowling]?.starters ?? [];
   const [striker, setStriker] = useState(""); const [nonStriker, setNonStriker] = useState(""); const [bowler, setBowler] = useState("");
   const options = (ids: string[]) => players.filter((player) => ids.includes(player.id)).map((player) => ({ value: player.id, label: player.name }));
-  return <Card className="shadow-none"><CardHeader><CardTitle>{superOver ? "Start Super Over" : previous ? "Start next innings" : "Start first innings"}</CardTitle><CardDescription>Select the opening participants. The match uses {superOver ? "one" : "five"} over per innings.</CardDescription></CardHeader><CardContent><FieldGroup className="grid md:grid-cols-2"><SimpleSelect label="Batting team" value={batting} setValue={setBatting} items={match.homeTeamId === match.awayTeamId ? [] : [{ value: match.homeTeamId, label: teams.find((team) => team.id === match.homeTeamId)?.name ?? "Home team" }, { value: match.awayTeamId, label: teams.find((team) => team.id === match.awayTeamId)?.name ?? "Away team" }]} /><SimpleSelect label="Striker" value={striker} setValue={setStriker} items={options(battingLineup)} /><SimpleSelect label="Non-striker" value={nonStriker} setValue={setNonStriker} items={options(battingLineup).filter((item) => item.value !== striker)} /><SimpleSelect label="Opening bowler" value={bowler} setValue={setBowler} items={options(bowlingLineup)} /><Button className="md:col-span-2" size="lg" disabled={pending || !striker || !nonStriker || !bowler || striker === nonStriker} onClick={() => run("startInnings", { battingTeamId: batting, bowlingTeamId: bowling, battingLineup, bowlingLineup, strikerId: striker, nonStrikerId: nonStriker, bowlerId: bowler, superOver })}>Start innings</Button></FieldGroup></CardContent></Card>;
+  return <Card className="shadow-none"><CardHeader><CardTitle>{superOver ? "Start Super Over" : previous ? "Start next innings" : "Start first innings"}</CardTitle><CardDescription>Select the opening participants from confirmed lineups.</CardDescription></CardHeader><CardContent><FieldGroup className="grid md:grid-cols-2"><SimpleSelect label="Batting team" value={batting} setValue={setBatting} items={match.homeTeamId === match.awayTeamId ? [] : [{ value: match.homeTeamId, label: teams.find((team) => team.id === match.homeTeamId)?.name ?? "Home team" }, { value: match.awayTeamId, label: teams.find((team) => team.id === match.awayTeamId)?.name ?? "Away team" }]} /><SimpleSelect label="Striker" value={striker} setValue={setStriker} items={options(battingLineup)} /><SimpleSelect label="Non-striker" value={nonStriker} setValue={setNonStriker} items={options(battingLineup).filter((item) => item.value !== striker)} /><SimpleSelect label="Opening bowler" value={bowler} setValue={setBowler} items={options(bowlingLineup)} /><Button className="md:col-span-2" size="lg" disabled={pending || !striker || !nonStriker || !bowler || striker === nonStriker} onClick={() => run("startInnings", { battingTeamId: batting, bowlingTeamId: bowling, strikerId: striker, nonStrikerId: nonStriker, bowlerId: bowler, superOver })}>Start innings</Button></FieldGroup></CardContent></Card>;
 }
 
 function cricketEventLabel(event: CricketDelivery) {
@@ -173,23 +206,15 @@ function DeliveryControls({ current, pending, run, bowlingPlayers, playerName }:
 
 function ParticipantSelect({ label, players, pending, onSelect }: { label: string; players: Player[]; pending: boolean; onSelect: (id: string) => void }) { const [value, setValue] = useState(""); return <div className="mb-5 rounded-md border p-4"><FieldGroup><SimpleSelect label={label} value={value} setValue={setValue} items={players.map((player) => ({ value: player.id, label: player.name }))} /><Button disabled={pending || !value} onClick={() => onSelect(value)}>Confirm {label.toLowerCase()}</Button></FieldGroup></div>; }
 
-function FieldConsole({ match, players, teams, pending, run, teamName, playerName }: { match: PublicMatch; players: Player[]; teams: Team[]; pending: boolean; run: RunCommand; teamName: (id: string) => string; playerName: (id?: string | null) => string }) {
+function FieldConsole({ match, players, teams, pending, run, completeMatch, motmSuggestions, confirmedPlayers, teamName, playerName }: { match: PublicMatch; players: Player[]; teams: Team[]; pending: boolean; run: RunCommand; completeMatch: (playerId?: string) => void; motmSuggestions: Array<{ playerId: string; total: number; reason: string }>; confirmedPlayers: Player[]; teamName: (id: string) => string; playerName: (id?: string | null) => string }) {
   const [teamId, setTeamId] = useState(match.homeTeamId);
   const [playerId, setPlayerId] = useState("");
   const [type, setType] = useState<FieldEventType>("goal");
-  const [manualResult, setManualResult] = useState("");
   if (match.status === "scheduled") return null;
-  const eligible = players.filter((player) => player.teamId === teamId && player.active);
+  const eligible = players.filter((player) => player.teamId === teamId && player.active && match.lineups?.[teamId] && [...match.lineups[teamId].starters, ...match.lineups[teamId].substitutes].includes(player.id));
   const score = match.fieldState?.score ?? { [match.homeTeamId]: 0, [match.awayTeamId]: 0 };
   const homeScore = score[match.homeTeamId] ?? 0;
   const awayScore = score[match.awayTeamId] ?? 0;
-  const tied = homeScore === awayScore;
-  const winnerTeamId = tied ? null : homeScore > awayScore ? match.homeTeamId : match.awayTeamId;
-  const loserTeamId = winnerTeamId === match.homeTeamId ? match.awayTeamId : match.homeTeamId;
-  const automaticResult = winnerTeamId
-    ? `${teamName(winnerTeamId)} beat ${teamName(loserTeamId)} ${Math.max(homeScore, awayScore)}-${Math.min(homeScore, awayScore)}`
-    : "";
-  const finalResult = tied ? manualResult.trim() : automaticResult;
   const jerseyFor = (id: string) => players.find((player) => player.id === id)?.jerseyNumber ?? null;
 
   return (
@@ -220,26 +245,33 @@ function FieldConsole({ match, players, teams, pending, run, teamName, playerNam
             <SimpleSelect label="Team" value={teamId} setValue={(value) => { setTeamId(value); setPlayerId(""); }} items={teams.filter((team) => [match.homeTeamId, match.awayTeamId].includes(team.id)).map((team) => ({ value: team.id, label: team.name }))} />
             <SimpleSelect label="Player" value={playerId} setValue={setPlayerId} items={eligible.map((player) => ({ value: player.id, label: playerLabel(player) }))} />
             <Button size="lg" disabled={pending || !teamId || (!playerId && !type.startsWith("shootout"))} onClick={() => run("recordFieldEvent", { event: { type, teamId, playerId: playerId || undefined } })}>Record event</Button>
-            {tied ? (
-              <Field>
-                <FieldLabel htmlFor="manual-result">Final result</FieldLabel>
-                <Input
-                  id="manual-result"
-                  value={manualResult}
-                  onChange={(event) => setManualResult(event.target.value)}
-                  placeholder="Enter organizer-confirmed result"
-                />
-              </Field>
-            ) : null}
             <div className="flex flex-wrap gap-2">
               <Button variant="outline" onClick={() => run("undoLastEvent")} disabled={pending || !(match.fieldState?.events.length)}><RotateCcw data-icon="inline-start" /> Undo</Button>
-              <Button variant="destructive" onClick={() => run("endMatch", { winnerTeamId, resultText: finalResult })} disabled={pending || !finalResult}>
-                <Trophy data-icon="inline-start" /> End match
-              </Button>
             </div>
+            <MotmPicker players={confirmedPlayers} suggestions={motmSuggestions} pending={pending} onComplete={completeMatch} />
           </FieldGroup>
         </CardContent>
       </Card>
+    </div>
+  );
+}
+
+function MotmPicker({ players, suggestions, pending, onComplete }: { players: Player[]; suggestions: Array<{ playerId: string; total: number; reason: string }>; pending: boolean; onComplete: (playerId?: string) => void }) {
+  const [value, setValue] = useState("");
+  const suggestedIds = suggestions.map((row) => row.playerId);
+  const ordered = [...players].sort((a, b) => {
+    const ai = suggestedIds.indexOf(a.id);
+    const bi = suggestedIds.indexOf(b.id);
+    return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi) || a.name.localeCompare(b.name);
+  });
+  return (
+    <div className="rounded-md border p-4">
+      <FieldGroup>
+        <div><p className="font-semibold">Man of the Match</p><p className="text-sm text-muted-foreground">Get suggestions, then select the award winner before completing.</p></div>
+        {suggestions.length ? <div className="grid gap-2">{suggestions.map((row) => <button key={row.playerId} type="button" onClick={() => setValue(row.playerId)} className="rounded-md border px-3 py-2 text-left text-sm hover:bg-muted"><span className="font-medium">{players.find((player) => player.id === row.playerId)?.name ?? "Player"}</span><span className="block text-xs text-muted-foreground">{row.reason} · score {row.total}</span></button>)}</div> : null}
+        <SimpleSelect label="Award winner" value={value} setValue={setValue} items={ordered.map((player) => ({ value: player.id, label: playerLabel(player) }))} />
+        <div className="flex flex-wrap gap-2"><Button variant="outline" onClick={() => onComplete()} disabled={pending}>Suggest names</Button><Button variant="destructive" onClick={() => onComplete(value)} disabled={pending || !value}><Trophy data-icon="inline-start" /> End match</Button></div>
+      </FieldGroup>
     </div>
   );
 }

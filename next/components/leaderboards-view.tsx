@@ -15,6 +15,7 @@ type CricketLeaders = {
   id: string;
   orangeCap?: Array<{ playerId: string; runs: number; innings: number; strikeRate: number }>;
   purpleCap?: Array<{ playerId: string; wickets: number; economy: number }>;
+  mostCatches?: Array<{ playerId: string; catches: number }>;
 };
 
 export function LeaderboardsView() {
@@ -39,9 +40,10 @@ export function LeaderboardsView() {
       <TabsContent value="football"><FieldLeaderboard title="Football top scorers" rows={football.data?.topScorers ?? []} name={name} /></TabsContent>
       <TabsContent value="handball"><FieldLeaderboard title="Handball top scorers" rows={handball.data?.topScorers ?? []} name={name} /></TabsContent>
       <TabsContent value="cricket">
-        <div className="grid gap-4 lg:grid-cols-2">
+        <div className="grid gap-4 lg:grid-cols-3">
           <CricketLeaderboard title="Orange Cap" description="Most tournament runs" rows={cricket.data?.orangeCap ?? []} name={name} metric="runs" />
           <CricketLeaderboard title="Purple Cap" description="Most tournament wickets" rows={cricket.data?.purpleCap ?? []} name={name} metric="wickets" />
+          <CricketLeaderboard title="Most Catches" description="Most tournament catches" rows={cricket.data?.mostCatches ?? []} name={name} metric="catches" />
         </div>
       </TabsContent>
     </Tabs>
@@ -60,9 +62,9 @@ function FieldLeaderboard({ title, rows, name }: { title: string; rows: Array<{ 
 function CricketLeaderboard({ title, description, rows, name, metric }: {
   title: string;
   description: string;
-  rows: Array<{ playerId: string; runs?: number; wickets?: number }>;
+  rows: Array<{ playerId: string; runs?: number; wickets?: number; catches?: number }>;
   name: (id: string) => string;
-  metric: "runs" | "wickets";
+  metric: "runs" | "wickets" | "catches";
 }) {
   return (
     <Card className="shadow-none">

@@ -17,6 +17,11 @@ export const metadata: Metadata = {
   },
   description:
     "Live scores, fixtures, standings, brackets, and tournament operations in one place.",
+  icons: {
+    icon: "/logo.png",
+    shortcut: "/logo.png",
+    apple: "/logo.png",
+  },
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

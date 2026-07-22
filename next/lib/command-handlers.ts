@@ -2,7 +2,12 @@ import {
   cricketResultText,
   createCricketInnings,
   createFieldMatch,
+  DEFAULT_SPORT_RULES,
+  isConfirmedLineupPlayer,
   nextMatchNumber,
+  normalizeSportRules,
+  rankCricketMvpCandidates,
+  rankFieldMvpCandidates,
   recalculateCricketInnings,
   recordCricketDelivery as applyCricketDelivery,
   recordFieldEvent,
@@ -13,12 +18,14 @@ import {
   S9_TEAMS,
   setCricketBowler as applyCricketBowler,
   setNextBatter as applyNextBatter,
+  validateLineupSelection,
   validateFixture,
   type CricketDeliveryInput,
   type CricketInningsState,
   type FieldMatchEventInput,
   type FieldMatchState,
   type Player,
+  type SportRules,
 } from "@sports-fiesta/domain";
 import type { DocumentData } from "firebase-admin/firestore";
 import { CommandError, getRefs, FieldValue } from "./firebase-admin";
@@ -26,6 +33,8 @@ import { CommandError, getRefs, FieldValue } from "./firebase-admin";
 const ACTOR = { uid: "organizer", name: "Organizer" };
 const _r = () => getRefs();
 type CallableData = Record<string, unknown>;
+
+type Lineups = Record<string, { starters: string[]; substitutes: string[] }>;
 
 function asString(value: unknown, label: string, max = 160) {
   const result = String(value ?? "").trim();
@@ -56,6 +65,124 @@ async function writeMirrored(collection: string, id: string, value: DocumentData
 
 function seededTeamName(teamId: string) {
   return S9_TEAMS.find((team) => team.id === teamId)?.name ?? "Team";
+}
+
+async function getSportRules() {
+  const snapshot = await _r().privateRoot.get();
+  return normalizeSportRules(snapshot.data()?.sportRules as Partial<SportRules> | undefined);
+}
+
+async function getActivePlayerIds(teamId: string) {
+  const snapshot = await _r().privateCollection("players").where("teamId", "==", teamId).where("active", "==", true).get();
+  return snapshot.docs.map((doc) => doc.id);
+}
+
+function teamLineup(match: DocumentData, teamId: string) {
+  return (match.lineups as Lineups | undefined)?.[teamId] ?? { starters: [], substitutes: [] };
+}
+
+function matchLineupIds(match: DocumentData, teamId: string) {
+  const lineup = teamLineup(match, teamId);
+  return [...lineup.starters, ...lineup.substitutes];
+}
+
+function ensureConfiguredLineups(match: DocumentData, rules: SportRules) {
+  for (const teamId of [match.homeTeamId, match.awayTeamId]) {
+    const lineup = teamLineup(match, teamId);
+    const rule = rules[match.sport as keyof SportRules];
+    if (lineup.starters.length !== rule.starters || lineup.substitutes.length !== rule.substitutes) {
+      throw new CommandError(400, "FAILED_PRECONDITION", `Publish valid ${match.sport} lineups before starting.`);
+    }
+  }
+}
+
+function assertConfirmedEventPlayer(match: DocumentData, teamId: string, playerId: string | null | undefined, label = "Player") {
+  if (!playerId || !isConfirmedLineupPlayer(match.lineups as Lineups, teamId, playerId)) {
+    throw new CommandError(400, "INVALID_ARGUMENT", `${label} must be selected from the confirmed lineup.`);
+  }
+}
+
+function fieldResultText(match: DocumentData) {
+  const score = match.fieldState?.score ?? {};
+  const homeScore = Number(score[match.homeTeamId] ?? 0);
+  const awayScore = Number(score[match.awayTeamId] ?? 0);
+  if (homeScore === awayScore) return {
+    winnerTeamId: null,
+    resultText: `${seededTeamName(match.homeTeamId)} and ${seededTeamName(match.awayTeamId)} drew ${homeScore}-${awayScore}`,
+  };
+  const winnerTeamId = homeScore > awayScore ? match.homeTeamId : match.awayTeamId;
+  const loserTeamId = winnerTeamId === match.homeTeamId ? match.awayTeamId : match.homeTeamId;
+  return {
+    winnerTeamId,
+    resultText: `${seededTeamName(winnerTeamId)} beat ${seededTeamName(loserTeamId)} ${Math.max(homeScore, awayScore)}-${Math.min(homeScore, awayScore)}`,
+  };
+}
+
+function cricketPlayerTeam(match: DocumentData, playerId: string) {
+  if (matchLineupIds(match, match.homeTeamId).includes(playerId)) return match.homeTeamId as string;
+  if (matchLineupIds(match, match.awayTeamId).includes(playerId)) return match.awayTeamId as string;
+  return "";
+}
+
+function suggestManOfTheMatch(match: DocumentData) {
+  if (match.sport === "cricket") {
+    const rows = new Map<string, {
+      playerId: string; teamId: string; runs: number; balls: number; fours: number; sixes: number;
+      wickets: number; bowlingRuns: number; bowlingBalls: number; dotBalls: number; maidens: number;
+      catches: number; directRunOuts: number; assistedRunOuts: number; stumpings: number; winner: boolean;
+    }>();
+    for (const playerId of matchLineupIds(match, match.homeTeamId).concat(matchLineupIds(match, match.awayTeamId))) {
+      const teamId = cricketPlayerTeam(match, playerId);
+      rows.set(playerId, { playerId, teamId, runs: 0, balls: 0, fours: 0, sixes: 0, wickets: 0, bowlingRuns: 0, bowlingBalls: 0, dotBalls: 0, maidens: 0, catches: 0, directRunOuts: 0, assistedRunOuts: 0, stumpings: 0, winner: match.winnerTeamId === teamId });
+    }
+    for (const entry of match.cricket?.innings ?? []) {
+      for (const batter of Object.values(entry.state.batters) as Array<{ playerId: string; runs?: number; balls?: number; fours?: number; sixes?: number }>) {
+        const row = rows.get(String(batter.playerId));
+        if (!row) continue;
+        row.runs += Number(batter.runs ?? 0);
+        row.balls += Number(batter.balls ?? 0);
+        row.fours += Number(batter.fours ?? 0);
+        row.sixes += Number(batter.sixes ?? 0);
+      }
+      for (const bowler of Object.values(entry.state.bowlers) as Array<{ playerId: string; wickets?: number; runs?: number; legalBalls?: number; dots?: number; maidens?: number }>) {
+        const row = rows.get(String(bowler.playerId));
+        if (!row) continue;
+        row.wickets += Number(bowler.wickets ?? 0);
+        row.bowlingRuns += Number(bowler.runs ?? 0);
+        row.bowlingBalls += Number(bowler.legalBalls ?? 0);
+        row.dotBalls += Number(bowler.dots ?? 0);
+        row.maidens += Number(bowler.maidens ?? 0);
+      }
+      for (const event of entry.state.events ?? []) {
+        const dismissal = event.dismissal;
+        if (!dismissal?.fielderId) continue;
+        const row = rows.get(String(dismissal.fielderId));
+        if (!row) continue;
+        if (dismissal.type === "caught") row.catches += 1;
+        if (dismissal.type === "run-out") row.directRunOuts += 1;
+        if (dismissal.type === "stumped") row.stumpings += 1;
+      }
+    }
+    return rankCricketMvpCandidates([...rows.values()]).slice(0, 5);
+  }
+  const score = match.fieldState?.score ?? {};
+  const rows = new Map<string, { playerId: string; teamId: string; goals: number; assists: number; yellowCards: number; redCards: number; winner: boolean; goalsConceded: number }>();
+  for (const teamId of [match.homeTeamId, match.awayTeamId]) {
+    const opponentId = teamId === match.homeTeamId ? match.awayTeamId : match.homeTeamId;
+    for (const playerId of matchLineupIds(match, teamId)) {
+      rows.set(playerId, { playerId, teamId, goals: 0, assists: 0, yellowCards: 0, redCards: 0, winner: match.winnerTeamId === teamId, goalsConceded: Number(score[opponentId] ?? 0) });
+    }
+  }
+  for (const event of match.fieldState?.events ?? []) {
+    if (event.playerId && rows.has(String(event.playerId))) {
+      const row = rows.get(String(event.playerId))!;
+      if (event.type === "goal") row.goals += 1;
+      if (event.type === "yellow-card") row.yellowCards += 1;
+      if (event.type === "red-card") row.redCards += 1;
+    }
+    if (event.assistPlayerId && rows.has(String(event.assistPlayerId))) rows.get(String(event.assistPlayerId))!.assists += 1;
+  }
+  return rankFieldMvpCandidates([...rows.values()]).slice(0, 5);
 }
 
 async function backfillSeedMatches() {
@@ -125,6 +252,7 @@ export async function handleBootstrap() {
     endDate: null,
     venues: [],
     cricketOvers: 5,
+    sportRules: DEFAULT_SPORT_RULES,
     placementPoints: { football: [10, 5, 3, 1], handball: [10, 5, 3, 1], cricket: [10, 5, 3, 1] },
     bootstrapped: true,
     bootstrappedBy: ACTOR.name,
@@ -171,18 +299,23 @@ export async function handleBootstrap() {
     batch.set(_r().publicCollection("standings").doc(key), { rows });
   }
   await batch.commit();
+  await handleRefreshProjections();
   return { bootstrapped: true, synchronized: true, teams: S9_TEAMS.length, players: S9_PLAYERS.length, matches: S9_SEEDED_MATCHES.length };
 }
 
 // --- CRUD Commands ---
 
 export async function handleSaveTournamentSettings(data: CallableData) {
+  const sportRules = data.sportRules && typeof data.sportRules === "object"
+    ? normalizeSportRules(data.sportRules as Partial<SportRules>)
+    : undefined;
   const allowed: DocumentData = {
     name: data.name ? asString(data.name, "Tournament name") : undefined,
     organizer: data.organizer ? asString(data.organizer, "Organizer") : undefined,
     startDate: data.startDate ?? undefined,
     endDate: data.endDate ?? undefined,
     venues: Array.isArray(data.venues) ? data.venues.map((value) => String(value).trim()).filter(Boolean) : undefined,
+    sportRules,
     updatedAt: FieldValue.serverTimestamp(),
     updatedBy: ACTOR.name,
   };
@@ -346,11 +479,25 @@ async function mutateMatch(data: CallableData, mutate: (match: DocumentData) => 
 }
 
 export async function handleSetLineup(data: CallableData) {
+  const rules = await getSportRules();
+  const teamId = asString(data.teamId, "Team");
+  const activePlayerIds = await getActivePlayerIds(teamId);
   return mutateMatch(data, (match) => {
-    const teamId = asString(data.teamId, "Team");
     if (![match.homeTeamId, match.awayTeamId].includes(teamId)) throw new CommandError(400, "INVALID_ARGUMENT", "That team is not in this match.");
-    const starters = asStringArray(data.starters, "Starters");
-    const substitutes = asStringArray(data.substitutes ?? [], "Substitutes");
+    if (!["scheduled", "lineup"].includes(match.status)) throw new CommandError(400, "FAILED_PRECONDITION", "Lineups can only be changed before scoring starts.");
+    let starters: string[];
+    let substitutes: string[];
+    try {
+      ({ starters, substitutes } = validateLineupSelection({
+        sport: match.sport,
+        starters: asStringArray(data.starters, "Starters"),
+        substitutes: asStringArray(data.substitutes ?? [], "Substitutes"),
+        activePlayerIds,
+        rules,
+      }));
+    } catch (error) {
+      throw new CommandError(400, "INVALID_ARGUMENT", (error as Error).message);
+    }
     return { match: { ...match, lineups: { ...match.lineups, [teamId]: { starters, substitutes } } } };
   });
 }
@@ -365,8 +512,10 @@ export async function handleSetToss(data: CallableData) {
 }
 
 export async function handleStartMatch(data: CallableData) {
+  const rules = await getSportRules();
   return mutateMatch(data, (match) => {
     if (match.status !== "scheduled" && match.status !== "lineup") throw new CommandError(400, "FAILED_PRECONDITION", "This match cannot be started.");
+    ensureConfiguredLineups(match, rules);
     if (match.sport === "cricket") return { match: { ...match, status: "lineup" } };
     const fieldState = createFieldMatch(match.homeTeamId, match.awayTeamId);
     return { match: { ...match, status: "live", fieldState, scoreSummary: fieldState.score } };
@@ -374,6 +523,7 @@ export async function handleStartMatch(data: CallableData) {
 }
 
 export async function handleStartInnings(data: CallableData) {
+  const rules = await getSportRules();
   return mutateMatch(data, (match) => {
     if (match.sport !== "cricket") throw new CommandError(400, "FAILED_PRECONDITION", "This is not a cricket match.");
     const battingTeamId = asString(data.battingTeamId, "Batting team");
@@ -381,15 +531,21 @@ export async function handleStartInnings(data: CallableData) {
     if (battingTeamId === bowlingTeamId || ![match.homeTeamId, match.awayTeamId].includes(battingTeamId) || ![match.homeTeamId, match.awayTeamId].includes(bowlingTeamId)) {
       throw new CommandError(400, "INVALID_ARGUMENT", "Choose the two teams in this fixture.");
     }
+    ensureConfiguredLineups(match, rules);
+    const battingLineup = teamLineup(match, battingTeamId).starters;
+    const bowlingLineup = teamLineup(match, bowlingTeamId).starters;
+    assertConfirmedEventPlayer(match, battingTeamId, asString(data.strikerId, "Striker"), "Striker");
+    assertConfirmedEventPlayer(match, battingTeamId, asString(data.nonStrikerId, "Non-striker"), "Non-striker");
+    assertConfirmedEventPlayer(match, bowlingTeamId, asString(data.bowlerId, "Bowler"), "Bowler");
     const initial = {
       battingTeamId,
       bowlingTeamId,
-      battingLineup: asStringArray(data.battingLineup, "Batting lineup"),
-      bowlingLineup: asStringArray(data.bowlingLineup, "Bowling lineup"),
+      battingLineup,
+      bowlingLineup,
       strikerId: asString(data.strikerId, "Striker"),
       nonStrikerId: asString(data.nonStrikerId, "Non-striker"),
       bowlerId: asString(data.bowlerId, "Bowler"),
-      maxOvers: data.superOver ? 1 : 5,
+      maxOvers: data.superOver ? 1 : rules.cricket.maxOvers ?? 5,
     };
     let state: CricketInningsState;
     try { state = createCricketInnings(initial); } catch (error) { throw new CommandError(400, "INVALID_ARGUMENT", (error as Error).message); }
@@ -410,7 +566,7 @@ function cricketStatus(match: DocumentData, state: CricketInningsState) {
   if (chaseWon) {
     const previous = innings[index - 1]?.state;
     return {
-      status: "completed",
+      status: "live",
       winnerTeamId: state.battingTeamId,
       resultText: cricketResultText(previous, state, seededTeamName),
       target,
@@ -425,7 +581,7 @@ function cricketStatus(match: DocumentData, state: CricketInningsState) {
       : { status: "super-over", resultText: "Scores tied - Super Over required", target };
   }
   return {
-    status: "completed",
+    status: "live",
     winnerTeamId: state.score > (previous?.score ?? 0) ? state.battingTeamId : state.bowlingTeamId,
     resultText: cricketResultText(previous, state, seededTeamName),
     target,
@@ -439,6 +595,14 @@ export async function handleRecordCricketDelivery(data: CallableData) {
     const innings = [...(match.cricket?.innings ?? [])];
     if (!Number.isInteger(index) || !innings[index]) throw new CommandError(400, "FAILED_PRECONDITION", "Start an innings first.");
     const input = data.delivery as CricketDeliveryInput;
+    if (input.dismissal?.fielderId) {
+      const bowlingTeamId = innings[index].state.bowlingTeamId;
+      assertConfirmedEventPlayer(match, bowlingTeamId, input.dismissal.fielderId, "Fielder");
+    }
+    if (input.dismissal?.assistFielderId) {
+      const bowlingTeamId = innings[index].state.bowlingTeamId;
+      assertConfirmedEventPlayer(match, bowlingTeamId, input.dismissal.assistFielderId, "Assist fielder");
+    }
     let state: CricketInningsState;
     try { state = applyCricketDelivery(innings[index].state, input); } catch (error) { throw new CommandError(400, "FAILED_PRECONDITION", (error as Error).message); }
     const event = state.events.at(-1)!;
@@ -476,10 +640,13 @@ export async function handleSelectCricketBowler(data: CallableData) {
 export async function handleRecordFieldSportEvent(data: CallableData) {
   return mutateMatch(data, (match) => {
     if (!["football", "handball"].includes(match.sport) || match.status !== "live") throw new CommandError(400, "FAILED_PRECONDITION", "The field-sport match is not live.");
+    const event = data.event as FieldMatchEventInput;
+    assertConfirmedEventPlayer(match, event.teamId, event.playerId, "Player");
+    if (event.assistPlayerId) assertConfirmedEventPlayer(match, event.teamId, event.assistPlayerId, "Assist player");
     let fieldState: FieldMatchState;
-    try { fieldState = recordFieldEvent(match.fieldState, data.event as FieldMatchEventInput); } catch (error) { throw new CommandError(400, "INVALID_ARGUMENT", (error as Error).message); }
-    const event = fieldState.events.at(-1)!;
-    return { match: { ...match, fieldState, scoreSummary: fieldState.score }, event };
+    try { fieldState = recordFieldEvent(match.fieldState, event); } catch (error) { throw new CommandError(400, "INVALID_ARGUMENT", (error as Error).message); }
+    const recorded = fieldState.events.at(-1)!;
+    return { match: { ...match, fieldState, scoreSummary: fieldState.score }, event: recorded };
   });
 }
 
@@ -518,7 +685,17 @@ export async function handleUndoLastEvent(data: CallableData) {
       const removed = entry.state.events.at(-1);
       if (!removed) throw new CommandError(400, "FAILED_PRECONDITION", "There is no delivery to undo.");
       innings[index] = { ...entry, state: recalculateCricketInnings(entry.initial, entry.state.events.slice(0, -1)) };
-      return { match: { ...match, status: "live", cricket: { ...match.cricket, innings } }, deleteEventId: removed.id };
+      return {
+        match: {
+          ...match,
+          status: "live",
+          winnerTeamId: null,
+          resultText: null,
+          cricket: { ...match.cricket, innings },
+          scoreSummary: { innings: innings.map((entry) => ({ battingTeamId: entry.state.battingTeamId, score: entry.state.score, wickets: entry.state.wickets, overs: entry.state.overs })) },
+        },
+        deleteEventId: removed.id,
+      };
     }
     const events = match.fieldState?.events ?? [];
     const removed = events.at(-1);
@@ -546,17 +723,40 @@ export async function handleEndInnings(data: CallableData) {
 }
 
 export async function handleEndMatch(data: CallableData) {
-  return mutateMatch(data, (match) => {
-    const resultText = data.resultText ? asString(data.resultText, "Result", 300) : "";
-    if (!resultText) {
-      throw new CommandError(400, "FAILED_PRECONDITION", "Enter the final result before completing this match.");
+  const response = await mutateMatch(data, (match) => {
+    if (!["live", "innings-break", "super-over"].includes(match.status)) {
+      throw new CommandError(400, "FAILED_PRECONDITION", "Only an active match can be completed.");
     }
-    const winnerTeamId = data.winnerTeamId ? asString(data.winnerTeamId, "Winner") : null;
-    if (winnerTeamId && ![match.homeTeamId, match.awayTeamId].includes(winnerTeamId)) {
-      throw new CommandError(400, "INVALID_ARGUMENT", "Winner must be one of the match teams.");
+    let completed = { ...match };
+    if (["football", "handball"].includes(match.sport)) {
+      completed = { ...completed, ...fieldResultText(match) };
+    } else if (match.sport === "cricket") {
+      if (!match.resultText) throw new CommandError(400, "FAILED_PRECONDITION", "Cricket result is not ready yet.");
     }
-    return { match: { ...match, status: "completed", winnerTeamId, resultText } };
+    const suggestions = suggestManOfTheMatch(completed);
+    const manOfTheMatchPlayerId = data.manOfTheMatchPlayerId ? asString(data.manOfTheMatchPlayerId, "Man of the match") : "";
+    if (!manOfTheMatchPlayerId) {
+      throw new CommandError(400, "FAILED_PRECONDITION", JSON.stringify({
+        reason: "MOTM_REQUIRED",
+        message: "Select Man of the Match before completing this match.",
+        suggestions,
+      }));
+    }
+    const selectedTeamId = [completed.homeTeamId, completed.awayTeamId].find((teamId) => matchLineupIds(completed, teamId).includes(manOfTheMatchPlayerId));
+    if (!selectedTeamId) throw new CommandError(400, "INVALID_ARGUMENT", "Man of the Match must be selected from confirmed lineups.");
+    const breakdown = suggestions.find((row) => row.playerId === manOfTheMatchPlayerId) ?? null;
+    return {
+      match: {
+        ...completed,
+        status: "completed",
+        manOfTheMatchPlayerId,
+        manOfTheMatchSuggestedPlayerIds: suggestions.map((row) => row.playerId),
+        manOfTheMatchScoreBreakdown: breakdown,
+      },
+    };
   });
+  await handleRefreshProjections();
+  return response;
 }
 
 // --- Awards ---
@@ -663,21 +863,31 @@ function fieldLeaders(matches: MatchRow[], sport: "football" | "handball") {
 }
 
 function cricketLeaders(matches: MatchRow[]) {
-  const players = new Map<string, { playerId: string; runs: number; innings: number; balls: number; wickets: number; bowlingRuns: number; bowlingBalls: number }>();
+  const players = new Map<string, { playerId: string; runs: number; innings: number; balls: number; wickets: number; bowlingRuns: number; bowlingBalls: number; catches: number }>();
   for (const match of matches.filter((row) => row.sport === "cricket")) {
     for (const entry of match.cricket?.innings ?? []) {
       for (const batter of Object.values(entry.state.batters)) {
-        const row = players.get(batter.playerId) ?? { playerId: batter.playerId, runs: 0, innings: 0, balls: 0, wickets: 0, bowlingRuns: 0, bowlingBalls: 0 };
+        const row = players.get(batter.playerId) ?? { playerId: batter.playerId, runs: 0, innings: 0, balls: 0, wickets: 0, bowlingRuns: 0, bowlingBalls: 0, catches: 0 };
         row.runs += batter.runs; row.balls += batter.balls; row.innings += 1; players.set(batter.playerId, row);
       }
       for (const bowler of Object.values(entry.state.bowlers)) {
-        const row = players.get(bowler.playerId) ?? { playerId: bowler.playerId, runs: 0, innings: 0, balls: 0, wickets: 0, bowlingRuns: 0, bowlingBalls: 0 };
+        const row = players.get(bowler.playerId) ?? { playerId: bowler.playerId, runs: 0, innings: 0, balls: 0, wickets: 0, bowlingRuns: 0, bowlingBalls: 0, catches: 0 };
         row.wickets += bowler.wickets; row.bowlingRuns += bowler.runs; row.bowlingBalls += bowler.legalBalls; players.set(bowler.playerId, row);
+      }
+      for (const event of entry.state.events ?? []) {
+        if (event.dismissal?.type !== "caught" || !event.dismissal.fielderId) continue;
+        const playerId = event.dismissal.fielderId;
+        const row = players.get(playerId) ?? { playerId, runs: 0, innings: 0, balls: 0, wickets: 0, bowlingRuns: 0, bowlingBalls: 0, catches: 0 };
+        row.catches += 1; players.set(playerId, row);
       }
     }
   }
   const values = [...players.values()].map((row) => ({ ...row, strikeRate: row.balls ? Number(((row.runs / row.balls) * 100).toFixed(2)) : 0, economy: row.bowlingBalls ? Number(((row.bowlingRuns / row.bowlingBalls) * 6).toFixed(2)) : 0, bowlingStrikeRate: row.wickets ? Number((row.bowlingBalls / row.wickets).toFixed(2)) : null }));
-  return { orangeCap: [...values].sort((a, b) => b.runs - a.runs || a.innings - b.innings || b.strikeRate - a.strikeRate), purpleCap: [...values].sort((a, b) => b.wickets - a.wickets || a.economy - b.economy || (a.bowlingStrikeRate ?? Infinity) - (b.bowlingStrikeRate ?? Infinity)) };
+  return {
+    orangeCap: [...values].sort((a, b) => b.runs - a.runs || a.innings - b.innings || b.strikeRate - a.strikeRate),
+    purpleCap: [...values].sort((a, b) => b.wickets - a.wickets || a.economy - b.economy || (a.bowlingStrikeRate ?? Infinity) - (b.bowlingStrikeRate ?? Infinity)),
+    mostCatches: [...values].sort((a, b) => b.catches - a.catches || a.playerId.localeCompare(b.playerId)),
+  };
 }
 
 export async function handleRefreshProjections() {

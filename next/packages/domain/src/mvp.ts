@@ -16,6 +16,47 @@ export interface MvpInput {
   matchImpact?: boolean;
 }
 
+export interface FieldMvpCandidate {
+  playerId: string;
+  teamId: string;
+  goals: number;
+  assists?: number;
+  yellowCards?: number;
+  redCards?: number;
+  winner?: boolean;
+  goalsConceded?: number;
+}
+
+export interface CricketMvpCandidate {
+  playerId: string;
+  teamId: string;
+  runs?: number;
+  balls?: number;
+  fours?: number;
+  sixes?: number;
+  wickets?: number;
+  bowlingRuns?: number;
+  bowlingBalls?: number;
+  dotBalls?: number;
+  maidens?: number;
+  catches?: number;
+  directRunOuts?: number;
+  assistedRunOuts?: number;
+  stumpings?: number;
+  winner?: boolean;
+}
+
+export interface MvpSuggestion {
+  playerId: string;
+  teamId: string;
+  total: number;
+  batting?: number;
+  bowling?: number;
+  fielding?: number;
+  impact?: number;
+  reason: string;
+}
+
 const clamp = (value: number, minimum: number, maximum: number) =>
   Math.min(maximum, Math.max(minimum, value));
 
@@ -51,4 +92,55 @@ export function calculateMvpScore(input: MvpInput) {
     impact,
     total: Number((batting + bowling + fielding + impact).toFixed(2)),
   };
+}
+
+export function calculateFieldMvpScore(input: FieldMvpCandidate): MvpSuggestion {
+  const attack = input.goals * 35 + (input.assists ?? 0) * 12;
+  const discipline = (input.yellowCards ?? 0) * -5 + (input.redCards ?? 0) * -18;
+  const defense = input.goalsConceded === 0 ? 12 : input.goalsConceded === 1 ? 5 : 0;
+  const impact = input.winner ? 10 : 0;
+  const total = attack + discipline + defense + impact;
+  const reason = [
+    input.goals ? `${input.goals} goal${input.goals === 1 ? "" : "s"}` : null,
+    input.assists ? `${input.assists} assist${input.assists === 1 ? "" : "s"}` : null,
+    input.winner ? "winner impact" : null,
+    defense ? "defensive credit" : null,
+  ].filter(Boolean).join(", ") || "lineup impact";
+  return { playerId: input.playerId, teamId: input.teamId, total, impact, reason };
+}
+
+export function rankFieldMvpCandidates(candidates: FieldMvpCandidate[]) {
+  return candidates
+    .map(calculateFieldMvpScore)
+    .sort((a, b) => b.total - a.total || a.playerId.localeCompare(b.playerId));
+}
+
+export function rankCricketMvpCandidates(candidates: CricketMvpCandidate[]) {
+  return candidates
+    .map((candidate) => {
+      const score = calculateMvpScore({
+        runs: candidate.runs,
+        balls: candidate.balls,
+        fours: candidate.fours,
+        sixes: candidate.sixes,
+        wickets: candidate.wickets,
+        bowlingRuns: candidate.bowlingRuns,
+        bowlingBalls: candidate.bowlingBalls,
+        dotBalls: candidate.dotBalls,
+        maidens: candidate.maidens,
+        catches: candidate.catches,
+        directRunOuts: candidate.directRunOuts,
+        assistedRunOuts: candidate.assistedRunOuts,
+        stumpings: candidate.stumpings,
+        matchImpact: candidate.winner,
+      });
+      const reason = [
+        candidate.runs ? `${candidate.runs} run${candidate.runs === 1 ? "" : "s"}` : null,
+        candidate.wickets ? `${candidate.wickets} wicket${candidate.wickets === 1 ? "" : "s"}` : null,
+        candidate.catches ? `${candidate.catches} catch${candidate.catches === 1 ? "" : "es"}` : null,
+        candidate.winner ? "winner impact" : null,
+      ].filter(Boolean).join(", ") || "match impact";
+      return { playerId: candidate.playerId, teamId: candidate.teamId, ...score, reason };
+    })
+    .sort((a, b) => b.total - a.total || a.playerId.localeCompare(b.playerId));
 }
