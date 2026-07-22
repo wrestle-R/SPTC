@@ -59,7 +59,7 @@ export function MatchDetail({ sport, matchId }: { sport: Sport; matchId: string 
         <ArrowLeft data-icon="inline-start" /> Fixtures
       </Button>
       <Card className="overflow-hidden shadow-none max-sm:border-0 max-sm:bg-transparent">
-        <CardHeader className="border-b bg-muted/30">
+        <CardHeader className="border-b bg-muted/30 max-sm:border-b-0">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <CardDescription className="capitalize">{match.matchNumber ?? "Match"} · {match.stage} {sport}</CardDescription>
@@ -68,7 +68,7 @@ export function MatchDetail({ sport, matchId }: { sport: Sport; matchId: string 
             <MatchStatusBadge status={match.status} />
           </div>
         </CardHeader>
-        <CardContent className="flex flex-col gap-6 pt-6">
+        <CardContent className="flex flex-col gap-4 pt-4 sm:gap-6 sm:pt-6">
           {sport === "cricket" ? (
             <CricketScore
               key={`${match.id}-${match.cricket?.currentInnings ?? 0}-${match.cricket?.innings.length ?? 0}`}
@@ -273,7 +273,7 @@ function CricketScore({ match, teamName, playerName }: {
   const fow = fallOfWickets(state);
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-4 sm:gap-6">
       {canSwitchInnings ? (
         <div className="flex overflow-hidden rounded-lg border bg-muted/30 p-1">
           {entries.map((_, i) => {
@@ -299,8 +299,8 @@ function CricketScore({ match, teamName, playerName }: {
         </div>
       ) : null}
 
-      <div className="rounded-lg border">
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b bg-muted/30 px-4 py-3">
+      <div className="rounded-lg border max-sm:border-0 max-sm:bg-transparent">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b bg-muted/30 px-4 py-3 max-sm:border-b-0 max-sm:bg-transparent max-sm:px-0">
           <p className="text-2xl font-bold tabular-nums">{state.score}/{state.wickets}</p>
           <p className="text-sm text-muted-foreground">
             {state.overs} ov{target ? ` · Target ${target}` : ""} · RR {metrics?.runRate.toFixed(2)}
@@ -312,7 +312,7 @@ function CricketScore({ match, teamName, playerName }: {
           ) : null}
         </div>
 
-        <div className="overflow-x-auto p-3 sm:p-4">
+        <div className="overflow-x-auto max-sm:px-0 sm:p-4">
           <div className="w-full min-w-0">
           <div className="mb-1 grid grid-cols-[minmax(0,1fr)_1.75rem_1.5rem_1.5rem_1.5rem_2.75rem] gap-1 px-1 py-2 text-xs font-semibold text-muted-foreground sm:px-3">
             <span>Batter</span>
@@ -322,7 +322,7 @@ function CricketScore({ match, teamName, playerName }: {
             <span className="text-right">6s</span>
             <span className="text-right">S/R</span>
           </div>
-          <div className="divide-y">
+          <div className="divide-y max-sm:divide-y-0 max-sm:space-y-0.5">
             {batters
               .sort((a, b) => {
                 const aIdx = battingOrder.indexOf(a.playerId);
@@ -354,13 +354,13 @@ function CricketScore({ match, teamName, playerName }: {
               })}
           </div>
 
-          <div className="mt-2 grid grid-cols-[minmax(0,1fr)_1.75rem_1.5rem_1.5rem_1.5rem_2.75rem] gap-1 border-t px-1 py-2 text-sm text-muted-foreground sm:px-3">
+          <div className="mt-2 grid grid-cols-[minmax(0,1fr)_1.75rem_1.5rem_1.5rem_1.5rem_2.75rem] gap-1 border-t px-1 py-2 max-sm:border-t-0 text-sm text-muted-foreground sm:px-3">
             <span>Extras</span>
             <span className="text-right font-medium text-card-foreground">{extrasTotal}</span>
             <span className="col-span-4 text-right text-xs">{extrasParts.length ? `(${extrasParts.join(", ")})` : ""}</span>
           </div>
 
-          <div className="grid grid-cols-[minmax(0,1fr)_1.75rem_1.5rem_1.5rem_1.5rem_2.75rem] gap-1 border-t px-1 py-2 text-sm font-semibold sm:px-3">
+          <div className="grid grid-cols-[minmax(0,1fr)_1.75rem_1.5rem_1.5rem_1.5rem_2.75rem] gap-1 border-t px-1 py-2 max-sm:border-t-0 text-sm font-semibold sm:px-3">
             <span className="text-muted-foreground">Total</span>
             <span className="text-right text-card-foreground">{state.score}/{state.wickets}</span>
             <span className="col-span-4 text-right text-xs text-muted-foreground">({state.overs} ov)</span>
@@ -369,14 +369,14 @@ function CricketScore({ match, teamName, playerName }: {
         </div>
 
         {yetToBat.length > 0 ? (
-          <div className="border-t px-5 py-3">
+          <div className="border-t px-5 py-3 max-sm:border-t-0 max-sm:px-0">
             <p className="mb-1 text-xs font-semibold text-muted-foreground">Yet to bat</p>
             <p className="text-sm text-card-foreground">{yetToBat.map((id) => playerName(id)).join(" · ")}</p>
           </div>
         ) : null}
 
         {fow.length > 0 ? (
-          <div className="border-t px-5 py-3">
+          <div className="border-t px-5 py-3 max-sm:border-t-0 max-sm:px-0">
             <p className="mb-1 text-xs font-semibold text-muted-foreground">Fall of wickets</p>
             <p className="text-sm text-card-foreground">
               {fow
@@ -387,10 +387,10 @@ function CricketScore({ match, teamName, playerName }: {
         ) : null}
       </div>
 
-      <div className="rounded-lg border">
+      <div className="rounded-lg border max-sm:border-0 max-sm:bg-transparent">
         <div className="overflow-x-auto">
           <div className="w-full min-w-0">
-            <div className="grid grid-cols-[minmax(0,1fr)_1.75rem_1.5rem_1.75rem_1.5rem_2.75rem] gap-1 bg-muted/30 px-3 py-3 text-xs font-semibold text-muted-foreground sm:px-5">
+            <div className="grid grid-cols-[minmax(0,1fr)_1.75rem_1.5rem_1.75rem_1.5rem_2.75rem] gap-1 bg-muted/30 px-3 py-3 text-xs font-semibold text-muted-foreground sm:px-5 max-sm:bg-transparent max-sm:px-0">
               <span>Bowler</span>
               <span className="text-right">O</span>
               <span className="text-right">M</span>
@@ -398,7 +398,7 @@ function CricketScore({ match, teamName, playerName }: {
               <span className="text-right">W</span>
               <span className="text-right">Econ</span>
             </div>
-            <div className="divide-y px-3 sm:px-5">
+            <div className="divide-y px-3 sm:px-5 max-sm:divide-y-0 max-sm:space-y-0.5 max-sm:px-0">
               {bowlers.map((bowler) => {
                 const activeLabel = bowler.playerId === state.currentBowlerId ? "*" : "";
                 return (
@@ -420,9 +420,9 @@ function CricketScore({ match, teamName, playerName }: {
       </div>
 
       <div>
-        <h2 className="mb-3 text-lg font-semibold">Ball progression</h2>
+        <h2 className="mb-2 text-lg font-semibold sm:mb-3">Ball progression</h2>
         {state.events.length ? (
-          <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-2 sm:gap-3">
             {Object.entries(
               state.events.reduce((acc, event) => {
                 if (!acc[event.over]) acc[event.over] = [];

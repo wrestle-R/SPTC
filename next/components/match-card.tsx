@@ -42,7 +42,7 @@ export function MatchCard({ match, teams, players = S9_PLAYERS, featured = false
               Man of the Match: <span className="font-semibold text-card-foreground">{motm.jerseyNumber === null ? "" : `#${motm.jerseyNumber} `}{motm.name}</span>
             </p>
           ) : null}
-          <div className="mt-4 flex items-center justify-between gap-3 border-t pt-3 text-sm text-muted-foreground">
+      <div className="mt-4 flex items-center justify-between gap-3 border-t pt-3 max-sm:border-t-0 max-sm:pt-2 text-sm text-muted-foreground">
             <span className="truncate capitalize">{match.sport} · {match.stage}</span>
             <ChevronRight className="size-4 shrink-0" />
           </div>

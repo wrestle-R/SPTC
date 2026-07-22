@@ -243,7 +243,7 @@ function SportStandings({
       <h2 id={`${sport}-standings-heading`} className="text-lg font-semibold">Points standings</h2>
       <Card className="overflow-hidden shadow-none">
         <CardContent className="p-3 sm:p-4">
-          <div className={`${gridClass} border-b pb-2 text-xs font-semibold text-muted-foreground sm:text-sm`}>
+          <div className={`${gridClass} border-b pb-2 max-sm:border-b-0 text-xs font-semibold text-muted-foreground sm:text-sm`}>
             <span>#</span>
             <span>Team</span>
             <span className="text-right">P</span>
@@ -261,7 +261,7 @@ function SportStandings({
             )}
             <span className="text-right">Pts</span>
           </div>
-          <div className="divide-y">
+          <div className="divide-y max-sm:divide-y-0 max-sm:space-y-0.5">
             {standings.map((row) => (
               <div key={row.teamId} className={`${gridClass} py-2 text-xs sm:text-sm`}>
                 <span className="font-medium tabular-nums">{row.rank}</span>

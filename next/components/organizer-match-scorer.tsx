@@ -165,7 +165,7 @@ function CricketConsole({ match, players, teams, pending, run, completeMatch, co
   if (!current) return <Card className="shadow-none max-sm:border-0 max-sm:bg-transparent"><CardContent className="py-12 text-center text-muted-foreground">Start the first innings to open scoring.</CardContent></Card>;
   const battingPlayers = players.filter((player) => current.battingLineup.includes(player.id));
   const bowlingPlayers = players.filter((player) => current.bowlingLineup.includes(player.id));
-  return <div className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
+  return <div className="grid gap-3 xl:grid-cols-[1.15fr_0.85fr] sm:gap-4">
     <OrganizerCricketScorecard entries={entries} currentIndex={currentIndex} teamName={teamName} playerName={playerName} />
     <Card className="shadow-none max-sm:border-0 max-sm:bg-transparent"><CardHeader><CardTitle>Ball-by-ball scoring</CardTitle><CardDescription>Score controls stay synced with the full scorecard.</CardDescription></CardHeader><CardContent className="max-sm:px-0">
       {!current.strikerId ? <ParticipantSelect label="Next batter" players={battingPlayers.filter((player) => player.id !== current.nonStrikerId && !current.batters[player.id]?.dismissal)} pending={pending} onSelect={(playerId) => run("selectNextBatter", { playerId })} /> : null}
@@ -208,7 +208,7 @@ function OrganizerCricketScorecard({ entries, currentIndex, teamName, playerName
 
   return (
     <Card className="overflow-hidden shadow-none max-sm:border-0 max-sm:bg-transparent">
-      <CardHeader className="border-b bg-muted/30">
+      <CardHeader className="border-b bg-muted/30 max-sm:border-b-0">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <CardDescription>{teamName(state.battingTeamId)} batting</CardDescription>
@@ -218,17 +218,17 @@ function OrganizerCricketScorecard({ entries, currentIndex, teamName, playerName
           {chaseText ? <Badge variant="outline">{chaseText}</Badge> : null}
         </div>
       </CardHeader>
-      <CardContent className="flex flex-col gap-5 pt-5">
+      <CardContent className="flex flex-col gap-3 pt-3 sm:gap-5 sm:pt-5">
         {entries.length > 1 ? (
           <div className="flex overflow-hidden rounded-md border">
             {entries.map((_, index) => <button key={index} type="button" onClick={() => setActiveInnings(index)} className={`flex-1 px-4 py-2.5 text-center text-sm font-semibold transition-colors ${index === safeIndex ? "bg-card text-card-foreground shadow-sm" : "bg-muted/50 text-muted-foreground hover:bg-muted"}`}>{inningsLabel(index)}</button>)}
           </div>
         ) : null}
-        <div className="rounded-lg border">
-          <div className="grid grid-cols-[minmax(0,1fr)_1.75rem_1.5rem_1.5rem_1.5rem_2.75rem] gap-1 bg-muted/30 px-3 py-2 text-xs font-semibold text-muted-foreground">
+        <div className="rounded-lg border max-sm:border-0 max-sm:bg-transparent">
+          <div className="grid grid-cols-[minmax(0,1fr)_1.75rem_1.5rem_1.5rem_1.5rem_2.75rem] gap-1 bg-muted/30 px-3 py-2 text-xs font-semibold text-muted-foreground max-sm:bg-transparent max-sm:px-0">
             <span>Batter</span><span className="text-right">R</span><span className="text-right">B</span><span className="text-right">4s</span><span className="text-right">6s</span><span className="text-right">S/R</span>
           </div>
-          <div className="divide-y px-3">
+          <div className="divide-y px-3 max-sm:divide-y-0 max-sm:space-y-0.5 max-sm:px-0">
             {batters.sort((a, b) => (battingOrder.indexOf(a.playerId) >= 0 ? battingOrder.indexOf(a.playerId) : 999) - (battingOrder.indexOf(b.playerId) >= 0 ? battingOrder.indexOf(b.playerId) : 999)).map((batter) => {
               const activeLabel = batter.playerId === state.strikerId ? "*" : "";
               return <div key={batter.playerId} className="grid grid-cols-[minmax(0,1fr)_1.75rem_1.5rem_1.5rem_1.5rem_2.75rem] gap-1 py-2 text-sm"><div className="min-w-0"><p className="break-words font-medium text-card-foreground">{playerName(batter.playerId)}{activeLabel}</p><p className="break-words text-xs text-muted-foreground">{batter.dismissal ? organizerDismissalText(batter.dismissal, state.events, playerName) : "not out"}</p></div><p className="self-center text-right font-medium tabular-nums">{batter.runs}</p><p className="self-center text-right tabular-nums text-muted-foreground">{batter.balls}</p><p className="self-center text-right tabular-nums text-muted-foreground">{batter.fours}</p><p className="self-center text-right tabular-nums text-muted-foreground">{batter.sixes}</p><p className="self-center text-right tabular-nums text-muted-foreground">{batter.balls ? ((batter.runs / batter.balls) * 100).toFixed(1) : "0.0"}</p></div>;
@@ -236,18 +236,18 @@ function OrganizerCricketScorecard({ entries, currentIndex, teamName, playerName
             <div className="grid grid-cols-[minmax(0,1fr)_1.75rem_1.5rem_1.5rem_1.5rem_2.75rem] gap-1 py-2 text-sm"><span className="text-muted-foreground">Extras</span><span className="text-right font-medium">{extrasTotal}</span><span className="col-span-4 text-right text-xs text-muted-foreground">W {state.extras.wides}, NB {state.extras.noBalls}, B {state.extras.byes}, LB {state.extras.legByes}</span></div>
           </div>
         </div>
-        <div className="rounded-lg border">
-          <div className="grid grid-cols-[minmax(0,1fr)_1.75rem_1.5rem_1.75rem_1.5rem_2.75rem] gap-1 bg-muted/30 px-3 py-2 text-xs font-semibold text-muted-foreground">
+        <div className="rounded-lg border max-sm:border-0 max-sm:bg-transparent">
+          <div className="grid grid-cols-[minmax(0,1fr)_1.75rem_1.5rem_1.75rem_1.5rem_2.75rem] gap-1 bg-muted/30 px-3 py-2 text-xs font-semibold text-muted-foreground max-sm:bg-transparent max-sm:px-0">
             <span>Bowler</span><span className="text-right">O</span><span className="text-right">M</span><span className="text-right">R</span><span className="text-right">W</span><span className="text-right">Econ</span>
           </div>
-          <div className="divide-y px-3">
+          <div className="divide-y px-3 max-sm:divide-y-0 max-sm:space-y-0.5 max-sm:px-0">
             {bowlers.map((bowler) => <div key={bowler.playerId} className="grid grid-cols-[minmax(0,1fr)_1.75rem_1.5rem_1.75rem_1.5rem_2.75rem] gap-1 py-2 text-sm"><p className="break-words font-medium text-card-foreground">{playerName(bowler.playerId)}{bowler.playerId === state.currentBowlerId ? "*" : ""}</p><p className="text-right tabular-nums">{Math.floor(bowler.legalBalls / 6)}.{bowler.legalBalls % 6}</p><p className="text-right tabular-nums text-muted-foreground">{bowler.maidens}</p><p className="text-right tabular-nums text-muted-foreground">{bowler.runs}</p><p className="text-right font-medium tabular-nums">{bowler.wickets}</p><p className="text-right tabular-nums text-muted-foreground">{bowler.legalBalls ? ((bowler.runs / bowler.legalBalls) * 6).toFixed(2) : "0.00"}</p></div>)}
           </div>
         </div>
-        {fow.length ? <div className="rounded-md border px-4 py-3"><p className="mb-1 text-xs font-semibold text-muted-foreground">Fall of wickets</p><p className="text-sm">{fow.map((w) => `${w.score}/${w.wicket} (${playerName(w.playerOutId)}, ${w.over} ov)`).join(" · ")}</p></div> : null}
+        {fow.length ? <div className="rounded-md border px-4 py-3 max-sm:border-0 max-sm:px-0"><p className="mb-1 text-xs font-semibold text-muted-foreground">Fall of wickets</p><p className="text-sm">{fow.map((w) => `${w.score}/${w.wicket} (${playerName(w.playerOutId)}, ${w.over} ov)`).join(" · ")}</p></div> : null}
         <div>
-          <h2 className="mb-3 text-lg font-semibold">Ball progression</h2>
-          {state.events.length ? <div className="flex flex-col gap-3">{Object.entries(state.events.reduce((acc, event) => { if (!acc[event.over]) acc[event.over] = []; acc[event.over].push(event); return acc; }, {} as Record<number, typeof state.events>)).map(([overNum, overEvents]) => <div key={overNum} className="flex flex-wrap items-center gap-2"><span className="w-10 text-sm font-medium text-muted-foreground">Ov {Number(overNum) + 1}</span>{overEvents.map((event) => <span key={event.id} className="grid min-h-10 min-w-10 place-items-center rounded-md border px-2 text-sm font-semibold" title={event.commentary}>{cricketEventLabel(event)}</span>)}</div>)}</div> : <p className="text-sm text-muted-foreground">No deliveries recorded.</p>}
+          <h2 className="mb-2 text-lg font-semibold sm:mb-3">Ball progression</h2>
+          {state.events.length ? <div className="flex flex-col gap-2 sm:gap-3">{Object.entries(state.events.reduce((acc, event) => { if (!acc[event.over]) acc[event.over] = []; acc[event.over].push(event); return acc; }, {} as Record<number, typeof state.events>)).map(([overNum, overEvents]) => <div key={overNum} className="flex flex-wrap items-center gap-2"><span className="w-10 text-sm font-medium text-muted-foreground">Ov {Number(overNum) + 1}</span>{overEvents.map((event) => <span key={event.id} className="grid min-h-10 min-w-10 place-items-center rounded-md border px-2 text-sm font-semibold" title={event.commentary}>{cricketEventLabel(event)}</span>)}</div>)}</div> : <p className="text-sm text-muted-foreground">No deliveries recorded.</p>}
         </div>
       </CardContent>
     </Card>

@@ -40,7 +40,7 @@ export function HomeView() {
 
   return (
     <div className="flex flex-col gap-8">
-      <section className="grid gap-6 border-b pb-8 lg:grid-cols-[1fr_0.8fr] lg:items-end">
+      <section className="grid gap-6 border-b pb-8 max-sm:border-b-0 lg:grid-cols-[1fr_0.8fr] lg:items-end">
         <div className="flex max-w-3xl flex-col gap-4">
           <Badge variant="secondary" className="w-fit">Tournament hub</Badge>
           <h1 className="text-4xl font-semibold leading-tight text-balance sm:text-5xl">
