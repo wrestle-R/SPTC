@@ -77,7 +77,6 @@ export interface CricketDelivery extends CricketDeliveryInput {
   bowlerId: PlayerId;
   legalDelivery: boolean;
   totalRuns: number;
-  freeHit: boolean;
   timestamp: string;
 }
 
@@ -126,7 +125,6 @@ export interface CricketInningsState {
   nonStrikerId: PlayerId;
   currentBowlerId: PlayerId | null;
   previousOverBowlerId: PlayerId | null;
-  freeHit: boolean;
   completed: boolean;
   batters: Record<PlayerId, BatterInnings>;
   bowlers: Record<PlayerId, BowlerInnings>;

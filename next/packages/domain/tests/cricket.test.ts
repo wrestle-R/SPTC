@@ -52,34 +52,6 @@ describe("five-over cricket scoring", () => {
     expect(next.extras.wides).toBe(1);
   });
 
-  it("sets a free hit after a no-ball and clears it after the next recorded delivery", () => {
-    const noBall = recordCricketDelivery(innings(), {
-      runsOffBat: 4,
-      extraType: "no-ball",
-      extraRuns: 1,
-    });
-    const wide = recordCricketDelivery(noBall, {
-      runsOffBat: 0,
-      extraType: "wide",
-      extraRuns: 1,
-    });
-    const nextNoBall = recordCricketDelivery(noBall, {
-      runsOffBat: 0,
-      extraType: "no-ball",
-      extraRuns: 1,
-    });
-    const deadBall = recordCricketDelivery(noBall, {
-      runsOffBat: 0,
-      extraType: "dead-ball",
-    });
-
-    expect(noBall.score).toBe(5);
-    expect(noBall.freeHit).toBe(true);
-    expect(wide.freeHit).toBe(false);
-    expect(nextNoBall.freeHit).toBe(true);
-    expect(deadBall.freeHit).toBe(false);
-  });
-
   it("does not count a no-ball as a ball faced", () => {
     const next = recordCricketDelivery(innings(), {
       runsOffBat: 4,
@@ -228,39 +200,6 @@ describe("five-over cricket scoring", () => {
       nextStrikerId: "d",
       replacementBatterId: "c",
     })).toThrow(/next striker/i);
-  });
-
-  it("allows only run-out style dismissals on a free hit", () => {
-    const freeHit = recordCricketDelivery(innings(), {
-      runsOffBat: 0,
-      extraType: "no-ball",
-      extraRuns: 1,
-    });
-
-    expect(recordCricketDelivery(freeHit, {
-      runsOffBat: 1,
-      dismissal: { type: "run-out", playerOutId: "b", fielderId: "g2" },
-    }).wickets).toBe(1);
-    expect(() => recordCricketDelivery(freeHit, {
-      runsOffBat: 0,
-      dismissal: { type: "bowled", playerOutId: "a" },
-    })).toThrow(/free hit/i);
-    expect(() => recordCricketDelivery(freeHit, {
-      runsOffBat: 0,
-      dismissal: { type: "caught", playerOutId: "a", fielderId: "g2" },
-    })).toThrow(/free hit/i);
-    expect(() => recordCricketDelivery(freeHit, {
-      runsOffBat: 0,
-      dismissal: { type: "lbw", playerOutId: "a" },
-    })).toThrow(/free hit/i);
-    expect(() => recordCricketDelivery(freeHit, {
-      runsOffBat: 0,
-      dismissal: { type: "stumped", playerOutId: "a", fielderId: "g2" },
-    })).toThrow(/free hit/i);
-    expect(() => recordCricketDelivery(freeHit, {
-      runsOffBat: 0,
-      dismissal: { type: "hit-wicket", playerOutId: "a" },
-    })).toThrow(/free hit/i);
   });
 
   it("derives fall of wickets with the score and over at dismissal time", () => {

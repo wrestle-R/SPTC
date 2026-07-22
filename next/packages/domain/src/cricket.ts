@@ -88,7 +88,6 @@ export function createCricketInnings(input: CreateInningsInput): CricketInningsS
     nonStrikerId: input.nonStrikerId,
     currentBowlerId: input.bowlerId,
     previousOverBowlerId: null,
-    freeHit: false,
     completed: false,
     batters: {
       [input.strikerId]: emptyBatter(input.strikerId),
@@ -168,10 +167,6 @@ function completedRunsForStrike(input: CricketDeliveryInput) {
   return input.runsOffBat;
 }
 
-function dismissalAllowedOnFreeHit(type: string) {
-  return ["run-out", "retired-out", "obstructing-field"].includes(type);
-}
-
 function isAvailableReplacementBatter(state: CricketInningsState, playerId: PlayerId, activeBatters: PlayerId[]) {
   return state.battingLineup.includes(playerId)
     && !activeBatters.includes(playerId)
@@ -187,9 +182,6 @@ export function recordCricketDelivery(
   if (!state.currentBowlerId) throw new Error("Select a bowler for this over.");
   if (!Number.isInteger(input.runsOffBat) || input.runsOffBat < 0 || input.runsOffBat > 6) {
     throw new Error("Runs off the bat must be a whole number from 0 to 6.");
-  }
-  if (state.freeHit && input.dismissal && !dismissalAllowedOnFreeHit(input.dismissal.type)) {
-    throw new Error("That dismissal is not valid on a free hit.");
   }
   if ((input.nextStrikerId || input.replacementBatterId) && input.dismissal?.type !== "run-out") {
     throw new Error("Next striker and replacement batter can only be set for a run-out.");
@@ -213,7 +205,6 @@ export function recordCricketDelivery(
     bowlerId,
     legalDelivery,
     totalRuns,
-    freeHit: state.freeHit,
     commentary: input.commentary?.trim() || defaultCommentary(input),
     timestamp: new Date().toISOString(),
   };
@@ -342,7 +333,6 @@ export function recordCricketDelivery(
     nonStrikerId: nextNonStriker,
     currentBowlerId,
     previousOverBowlerId,
-    freeHit: input.extraType === "no-ball",
     completed,
     batters,
     bowlers,
