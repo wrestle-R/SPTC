@@ -31,12 +31,20 @@ const TEAM_GLOWS: Record<string, string> = {
   "ivory-elites": "shadow-orange-300/30",
 };
 
+const TEAM_TEXT_COLORS: Record<string, string> = {
+  "crimson-warriors": "text-white",
+  "gods-gladiators": "text-white",
+  "karuppu-knights": "text-white",
+  "ivory-elites": "text-zinc-900",
+};
+
 export function TeamDetail({ team }: { team: Team }) {
   const playersState = usePublicCollection<PublicPlayer>("players");
   const jerseys = TEAM_JERSEYS[team.id];
   const roster = playersState.data?.filter(p => p.teamId === team.id && p.active) || [];
   const gradient = TEAM_GRADIENTS[team.id] || "from-zinc-600 to-zinc-400";
   const glow = TEAM_GLOWS[team.id] || "shadow-zinc-500/30";
+  const textColor = TEAM_TEXT_COLORS[team.id] || "text-white";
 
   return (
     <div className="flex flex-col gap-6">
@@ -48,7 +56,7 @@ export function TeamDetail({ team }: { team: Team }) {
         All Teams
       </Link>
 
-      <div className={`relative overflow-hidden rounded-3xl bg-gradient-to-br ${gradient} p-6 sm:p-8 text-white shadow-2xl ${glow}`}>
+      <div className={`relative overflow-hidden rounded-3xl bg-gradient-to-br ${gradient} p-6 sm:p-8 ${textColor} shadow-2xl ${glow}`}>
         <div className="absolute inset-0 opacity-10">
           <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-white/20 blur-3xl" />
           <div className="absolute -left-20 -bottom-20 h-64 w-64 rounded-full bg-black/20 blur-3xl" />
@@ -59,7 +67,7 @@ export function TeamDetail({ team }: { team: Team }) {
             <h1 className="mt-1 text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight">{team.name}</h1>
           </div>
           <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2 rounded-full bg-white/20 px-4 py-2 text-sm font-semibold backdrop-blur-sm">
+            <div className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm font-bold backdrop-blur-md ${team.id === 'ivory-elites' ? 'bg-black/10 text-zinc-900' : 'bg-white/20 text-white'}`}>
               <Users className="h-4 w-4" />
               {roster.length} Players
             </div>
@@ -69,14 +77,14 @@ export function TeamDetail({ team }: { team: Team }) {
 
       <div className="grid gap-6 lg:grid-cols-[1fr_1.2fr]">
         <div className="flex flex-col">
-          <div className="relative flex items-center justify-center rounded-2xl border border-white/10 bg-gradient-to-br from-zinc-900 to-zinc-800 p-8 perspective-1000 min-h-[420px] overflow-hidden">
-            <div className="absolute inset-0 opacity-20">
-              <div className="absolute left-1/2 top-1/2 h-96 w-96 -translate-x-1/2 -translate-y-1/2 rounded-full bg-gradient-to-br from-white/10 to-transparent blur-3xl" />
+          <div className="relative flex items-center justify-center rounded-3xl border bg-gradient-to-br from-muted/50 to-muted/10 p-8 perspective-1000 min-h-[420px] overflow-hidden shadow-inner">
+            <div className="absolute inset-0 opacity-40">
+              <div className="absolute left-1/2 top-1/2 h-96 w-96 -translate-x-1/2 -translate-y-1/2 rounded-full bg-gradient-to-br from-primary/10 to-transparent blur-3xl" />
             </div>
             {jerseys ? (
               <JerseyFlipping front={jerseys.front} back={jerseys.back} alt={team.name} />
             ) : null}
-            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 text-xs text-white/50 font-medium tracking-wide">
+            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 text-xs text-muted-foreground font-semibold tracking-wide bg-background/50 backdrop-blur-sm px-3 py-1 rounded-full border">
               Hover or tap to flip
             </div>
           </div>

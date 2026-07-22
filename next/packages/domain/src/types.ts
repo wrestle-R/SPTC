@@ -187,3 +187,27 @@ export interface OverallStanding extends OverallStandingInput {
   totalPoints: number;
   segments: Record<string, number>;
 }
+
+export interface SeedMatch {
+  id: string;
+  sport: "football" | "handball" | "cricket";
+  stage: "league" | "decider" | "final";
+  status: "scheduled" | "lineup" | "live" | "innings-break" | "super-over" | "completed";
+  homeTeamId: TeamId;
+  awayTeamId: TeamId;
+  matchNumber: string;
+  startsAt?: string;
+  venue?: string;
+  revision: number;
+  lineups: Record<TeamId, { starters: PlayerId[]; substitutes: PlayerId[] }>;
+  scoreSummary: Record<TeamId, number> | {
+    innings: Array<{ battingTeamId: TeamId; score: number; wickets: number; overs: string }>;
+  };
+  fieldState?: FieldMatchState;
+  cricket?: {
+    innings: Array<{ initial: unknown; state: CricketInningsState; superOver?: boolean }>;
+    currentInnings: number;
+  };
+  winnerTeamId?: TeamId | null;
+  resultText?: string;
+}

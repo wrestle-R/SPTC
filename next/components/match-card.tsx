@@ -15,6 +15,7 @@ export function MatchCard({ match, teams, featured = false }: { match: PublicMat
     ? match.scoreSummary?.innings?.find((innings) => innings.battingTeamId === match.awayTeamId)
     : null;
   const href = `/${match.sport}/${match.id}`;
+  const resultText = match.resultText || (match.status === "completed" ? "Result pending - organizer must confirm." : null);
 
   return (
     <Link href={href} className="block rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
@@ -31,6 +32,9 @@ export function MatchCard({ match, teams, featured = false }: { match: PublicMat
             <span className="text-xs font-semibold text-muted-foreground">VS</span>
             <TeamScore team={away} score={isCricket ? cricketScore(awayScore) : match.scoreSummary?.[match.awayTeamId]} align="right" />
           </div>
+          {resultText ? (
+            <p className="mt-4 rounded-md bg-muted px-3 py-2 text-sm font-medium text-card-foreground">{resultText}</p>
+          ) : null}
           <div className="mt-4 flex items-center justify-between gap-3 border-t pt-3 text-sm text-muted-foreground">
             <span className="truncate capitalize">{match.sport} · {match.stage}</span>
             <ChevronRight className="size-4 shrink-0" />
@@ -45,6 +49,11 @@ function cricketScore(innings?: { score: number; wickets: number; overs: string 
   return innings ? `${innings.score}/${innings.wickets} (${innings.overs})` : undefined;
 }
 
+function displayAccentColor(color?: string | null) {
+  if (!color) return "transparent";
+  return ["#22c55e", "#10b981", "#16a34a", "#15803d", "#4ade80"].includes(color.toLowerCase()) ? "#3b82f6" : color;
+}
+
 function TeamScore({
   team,
   score,
@@ -54,10 +63,11 @@ function TeamScore({
   score?: number | string;
   align?: "left" | "right";
 }) {
+  const accentColor = displayAccentColor(team?.accentColor);
   return (
     <div className={align === "right" ? "min-w-0 text-right" : "min-w-0"}>
       <div className={align === "right" ? "mb-2 flex justify-end" : "mb-2 flex"}>
-        <span className="size-3 rounded-sm border" style={{ backgroundColor: team?.accentColor ?? "transparent" }} />
+        <span className="h-2.5 w-8 rounded-full border shadow-sm" style={{ backgroundColor: accentColor }} />
       </div>
       <p className="truncate text-sm font-medium sm:text-base">{team?.name ?? "Team"}</p>
       <p className="mt-1 min-h-8 text-xl font-semibold tabular-nums sm:text-2xl">{score ?? "-"}</p>

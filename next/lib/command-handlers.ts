@@ -1,4 +1,5 @@
 import {
+  cricketResultText,
   createCricketInnings,
   createFieldMatch,
   nextMatchNumber,
@@ -7,6 +8,7 @@ import {
   recordFieldEvent,
   rankFieldStandings,
   S9_PLAYERS,
+  S9_SEEDED_MATCHES,
   S9_SPORTS,
   S9_TEAMS,
   setCricketBowler as applyCricketBowler,
@@ -52,12 +54,35 @@ async function writeMirrored(collection: string, id: string, value: DocumentData
   await batch.commit();
 }
 
+function seededTeamName(teamId: string) {
+  return S9_TEAMS.find((team) => team.id === teamId)?.name ?? "Team";
+}
+
+async function backfillSeedMatches() {
+  const batch = _r().db.batch();
+  const now = FieldValue.serverTimestamp();
+  for (const seededMatch of S9_SEEDED_MATCHES) {
+    const match = {
+      ...seededMatch,
+      createdAt: now,
+      updatedAt: now,
+      createdBy: ACTOR.name,
+      updatedBy: ACTOR.name,
+    };
+    batch.set(_r().privateCollection("matches").doc(match.id), match, { merge: true });
+    batch.set(_r().publicCollection("matches").doc(match.id), publicMatch(match), { merge: true });
+  }
+  await batch.commit();
+  await handleRefreshProjections();
+}
+
 // --- Bootstrap ---
 
 export async function handleBootstrap() {
   const existing = await _r().privateRoot.get();
   if (existing.exists && existing.data()?.bootstrapped === true) {
-    return { bootstrapped: false, reason: "already-exists" };
+    await backfillSeedMatches();
+    return { bootstrapped: false, reason: "already-exists", matches: S9_SEEDED_MATCHES.length };
   }
 
   const batch = _r().db.batch();
@@ -92,15 +117,31 @@ export async function handleBootstrap() {
     batch.set(_r().publicCollection("sports").doc(sport.id), { ...sport, fixturesConfirmed: false });
   }
 
-  const emptyRows = S9_TEAMS.map((team, index) => ({ rank: index + 1, teamId: team.id, football: 0, handball: 0, cricket: 0, total: 0 }));
-  const emptyFieldRows = S9_TEAMS.map((team, index) => ({ rank: index + 1, teamId: team.id, played: 0, wins: 0, draws: 0, losses: 0, goalsFor: 0, goalsAgainst: 0, goalDifference: 0, points: 0 }));
-  const emptyCricketRows = S9_TEAMS.map((team, index) => ({ rank: index + 1, teamId: team.id, played: 0, wins: 0, ties: 0, losses: 0, points: 0, runsFor: 0, runsAgainst: 0, ballsFaced: 0, ballsBowled: 0, netRunRate: 0 }));
+  const now = FieldValue.serverTimestamp();
+  for (const seededMatch of S9_SEEDED_MATCHES) {
+    const match = {
+      ...seededMatch,
+      createdAt: now,
+      updatedAt: now,
+      createdBy: ACTOR.name,
+      updatedBy: ACTOR.name,
+    };
+    batch.set(_r().privateCollection("matches").doc(match.id), match);
+    batch.set(_r().publicCollection("matches").doc(match.id), publicMatch(match));
+  }
 
-  for (const [key, rows] of [["overall", emptyRows], ["football", emptyFieldRows], ["handball", emptyFieldRows], ["cricket", emptyCricketRows]] as const) {
+  const seededMatches = S9_SEEDED_MATCHES as MatchRow[];
+  const emptyRows = S9_TEAMS.map((team, index) => ({ rank: index + 1, teamId: team.id, football: 0, handball: 0, cricket: 0, total: 0 }));
+  for (const [key, rows] of [
+    ["overall", emptyRows],
+    ["football", fieldStandings(seededMatches, "football")],
+    ["handball", fieldStandings(seededMatches, "handball")],
+    ["cricket", cricketStandings(seededMatches)],
+  ] as const) {
     batch.set(_r().publicCollection("standings").doc(key), { rows });
   }
   await batch.commit();
-  return { bootstrapped: true, teams: S9_TEAMS.length, players: S9_PLAYERS.length };
+  return { bootstrapped: true, teams: S9_TEAMS.length, players: S9_PLAYERS.length, matches: S9_SEEDED_MATCHES.length };
 }
 
 // --- CRUD Commands ---
@@ -336,16 +377,29 @@ function cricketStatus(match: DocumentData, state: CricketInningsState) {
   const isChase = index % 2 === 1;
   const target = isChase ? (innings[index - 1]?.state.score ?? first?.score ?? 0) + 1 : null;
   const chaseWon = target !== null && state.score >= target;
-  if (chaseWon) return { status: "completed", winnerTeamId: state.battingTeamId, target };
+  if (chaseWon) {
+    const previous = innings[index - 1]?.state;
+    return {
+      status: "completed",
+      winnerTeamId: state.battingTeamId,
+      resultText: cricketResultText(previous, state, seededTeamName),
+      target,
+    };
+  }
   if (!state.completed) return { status: "live", target };
   if (!isChase) return { status: "innings-break", target: state.score + 1 };
   const previous = innings[index - 1]?.state;
   if (state.score === previous?.score) {
     return state.maxOvers === 1
-      ? { status: "completed", resultText: "Super Over tied - resolution pending", target }
+      ? { status: "super-over", resultText: "Super Over tied - organizer result required", target }
       : { status: "super-over", resultText: "Scores tied - Super Over required", target };
   }
-  return { status: "completed", winnerTeamId: state.score > (previous?.score ?? 0) ? state.battingTeamId : state.bowlingTeamId, target };
+  return {
+    status: "completed",
+    winnerTeamId: state.score > (previous?.score ?? 0) ? state.battingTeamId : state.bowlingTeamId,
+    resultText: cricketResultText(previous, state, seededTeamName),
+    target,
+  };
 }
 
 export async function handleRecordCricketDelivery(data: CallableData) {
@@ -450,14 +504,29 @@ export async function handleEndInnings(data: CallableData) {
     const innings = [...match.cricket.innings];
     const state = { ...innings[index].state, completed: true } as CricketInningsState;
     innings[index] = { ...innings[index], state };
-    return { match: { ...match, cricket: { ...match.cricket, innings }, ...cricketStatus({ ...match, cricket: { ...match.cricket, innings } }, state) } };
+    return {
+      match: {
+        ...match,
+        cricket: { ...match.cricket, innings },
+        scoreSummary: { innings: innings.map((entry) => ({ battingTeamId: entry.state.battingTeamId, score: entry.state.score, wickets: entry.state.wickets, overs: entry.state.overs })) },
+        ...cricketStatus({ ...match, cricket: { ...match.cricket, innings } }, state),
+      },
+    };
   });
 }
 
 export async function handleEndMatch(data: CallableData) {
-  return mutateMatch(data, (match) => ({
-    match: { ...match, status: "completed", winnerTeamId: data.winnerTeamId ? asString(data.winnerTeamId, "Winner") : null, resultText: data.resultText ? asString(data.resultText, "Result", 300) : undefined },
-  }));
+  return mutateMatch(data, (match) => {
+    const resultText = data.resultText ? asString(data.resultText, "Result", 300) : "";
+    if (!resultText) {
+      throw new CommandError(400, "FAILED_PRECONDITION", "Enter the final result before completing this match.");
+    }
+    const winnerTeamId = data.winnerTeamId ? asString(data.winnerTeamId, "Winner") : null;
+    if (winnerTeamId && ![match.homeTeamId, match.awayTeamId].includes(winnerTeamId)) {
+      throw new CommandError(400, "INVALID_ARGUMENT", "Winner must be one of the match teams.");
+    }
+    return { match: { ...match, status: "completed", winnerTeamId, resultText } };
+  });
 }
 
 // --- Awards ---
@@ -496,6 +565,7 @@ interface MatchRow {
   homeTeamId: string;
   awayTeamId: string;
   winnerTeamId?: string | null;
+  resultText?: string;
   scoreSummary?: Record<string, number>;
   fieldState?: { score: Record<string, number>; events: Array<Record<string, unknown>> };
   cricket?: { innings: Array<{ state: CricketInningsState; superOver?: boolean }> };
@@ -508,7 +578,7 @@ function emptyFieldRows() {
 function fieldStandings(matches: MatchRow[], sport: "football" | "handball") {
   const rows = emptyFieldRows();
   const byTeam = new Map(rows.map((row) => [row.teamId, row]));
-  for (const match of matches.filter((row) => row.sport === sport && row.status === "completed" && row.stage === "league")) {
+  for (const match of matches.filter((row) => row.sport === sport && row.status === "completed" && row.resultText && row.stage === "league")) {
     const home = byTeam.get(match.homeTeamId)!;
     const away = byTeam.get(match.awayTeamId)!;
     const homeScore = match.fieldState?.score?.[match.homeTeamId] ?? 0;
@@ -526,7 +596,7 @@ function fieldStandings(matches: MatchRow[], sport: "football" | "handball") {
 function cricketStandings(matches: MatchRow[]) {
   const rows = S9_TEAMS.map((team) => ({ teamId: team.id, played: 0, wins: 0, ties: 0, losses: 0, points: 0, runsFor: 0, runsAgainst: 0, ballsFaced: 0, ballsBowled: 0, netRunRate: 0 }));
   const byTeam = new Map(rows.map((row) => [row.teamId, row]));
-  for (const match of matches.filter((row) => row.sport === "cricket" && row.status === "completed" && row.stage === "league")) {
+  for (const match of matches.filter((row) => row.sport === "cricket" && row.status === "completed" && row.resultText && row.stage === "league")) {
     const innings = (match.cricket?.innings ?? []).filter((entry) => !entry.superOver).slice(0, 2);
     if (innings.length < 2) continue;
     const [first, second] = innings.map((entry) => entry.state);

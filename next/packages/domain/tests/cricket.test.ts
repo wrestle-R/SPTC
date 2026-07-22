@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+  cricketChaseText,
   cricketInningsMetrics,
+  cricketResultText,
   createCricketInnings,
   fallOfWickets,
   recalculateCricketInnings,
@@ -50,7 +52,7 @@ describe("five-over cricket scoring", () => {
     expect(next.extras.wides).toBe(1);
   });
 
-  it("sets and carries a free hit after a no-ball", () => {
+  it("sets a free hit after a no-ball and clears it after the next recorded delivery", () => {
     const noBall = recordCricketDelivery(innings(), {
       runsOffBat: 4,
       extraType: "no-ball",
@@ -61,12 +63,21 @@ describe("five-over cricket scoring", () => {
       extraType: "wide",
       extraRuns: 1,
     });
-    const legal = recordCricketDelivery(wide, { runsOffBat: 0 });
+    const nextNoBall = recordCricketDelivery(noBall, {
+      runsOffBat: 0,
+      extraType: "no-ball",
+      extraRuns: 1,
+    });
+    const deadBall = recordCricketDelivery(noBall, {
+      runsOffBat: 0,
+      extraType: "dead-ball",
+    });
 
     expect(noBall.score).toBe(5);
     expect(noBall.freeHit).toBe(true);
-    expect(wide.freeHit).toBe(true);
-    expect(legal.freeHit).toBe(false);
+    expect(wide.freeHit).toBe(false);
+    expect(nextNoBall.freeHit).toBe(true);
+    expect(deadBall.freeHit).toBe(false);
   });
 
   it("does not count a no-ball as a ball faced", () => {
@@ -112,6 +123,70 @@ describe("five-over cricket scoring", () => {
     expect(wicket.strikerId).toBeNull();
     expect(() => recordCricketDelivery(wicket, { runsOffBat: 1 })).toThrow(/next batter/i);
     expect(setNextBatter(wicket, "c").strikerId).toBe("c");
+  });
+
+  it("records a no-ball run-out without counting a ball", () => {
+    const next = recordCricketDelivery(innings(), {
+      runsOffBat: 1,
+      extraType: "no-ball",
+      extraRuns: 1,
+      dismissal: { type: "run-out", playerOutId: "b", fielderId: "g2" },
+    });
+
+    expect(next.score).toBe(2);
+    expect(next.legalBalls).toBe(0);
+    expect(next.wickets).toBe(1);
+    expect(next.extras.noBalls).toBe(1);
+    expect(next.batters.a).toMatchObject({ runs: 1, balls: 0 });
+    expect(next.batters.b.dismissal).toMatchObject({ type: "run-out", playerOutId: "b" });
+    expect(next.bowlers.g1).toMatchObject({ legalBalls: 0, runs: 2, wickets: 0, noBalls: 1 });
+  });
+
+  it("records completed runs and a run-out on the same legal ball", () => {
+    const next = recordCricketDelivery(innings(), {
+      runsOffBat: 1,
+      dismissal: { type: "run-out", playerOutId: "b", fielderId: "g2" },
+    });
+
+    expect(next.score).toBe(1);
+    expect(next.legalBalls).toBe(1);
+    expect(next.wickets).toBe(1);
+    expect(next.batters.a).toMatchObject({ runs: 1, balls: 1, singles: 1 });
+    expect(next.batters.b.dismissal).toMatchObject({ type: "run-out", playerOutId: "b" });
+    expect(next.bowlers.g1).toMatchObject({ legalBalls: 1, runs: 1, wickets: 0 });
+  });
+
+  it("allows only run-out style dismissals on a free hit", () => {
+    const freeHit = recordCricketDelivery(innings(), {
+      runsOffBat: 0,
+      extraType: "no-ball",
+      extraRuns: 1,
+    });
+
+    expect(recordCricketDelivery(freeHit, {
+      runsOffBat: 1,
+      dismissal: { type: "run-out", playerOutId: "b", fielderId: "g2" },
+    }).wickets).toBe(1);
+    expect(() => recordCricketDelivery(freeHit, {
+      runsOffBat: 0,
+      dismissal: { type: "bowled", playerOutId: "a" },
+    })).toThrow(/free hit/i);
+    expect(() => recordCricketDelivery(freeHit, {
+      runsOffBat: 0,
+      dismissal: { type: "caught", playerOutId: "a", fielderId: "g2" },
+    })).toThrow(/free hit/i);
+    expect(() => recordCricketDelivery(freeHit, {
+      runsOffBat: 0,
+      dismissal: { type: "lbw", playerOutId: "a" },
+    })).toThrow(/free hit/i);
+    expect(() => recordCricketDelivery(freeHit, {
+      runsOffBat: 0,
+      dismissal: { type: "stumped", playerOutId: "a", fielderId: "g2" },
+    })).toThrow(/free hit/i);
+    expect(() => recordCricketDelivery(freeHit, {
+      runsOffBat: 0,
+      dismissal: { type: "hit-wicket", playerOutId: "a" },
+    })).toThrow(/free hit/i);
   });
 
   it("derives fall of wickets with the score and over at dismissal time", () => {
@@ -171,5 +246,16 @@ describe("five-over cricket scoring", () => {
       ballsRemaining: 28,
       requiredRunRate: 5.36,
     });
+    expect(cricketChaseText(state, 31)).toBe("Need 25 to win from 28 balls");
+  });
+
+  it("writes natural cricket result text for chases and defended totals", () => {
+    const first = { ...innings(), battingTeamId: "green", bowlingTeamId: "red", score: 40 };
+    const chase = { ...innings(), battingTeamId: "red", bowlingTeamId: "green", score: 41, wickets: 1, battingLineup: ["a", "b", "c", "d", "e", "f", "h", "i"] };
+    const defended = { ...innings(), battingTeamId: "red", bowlingTeamId: "green", score: 32 };
+    const names = (teamId: string) => teamId === "red" ? "Crimson Warriors" : "God's Gladiators";
+
+    expect(cricketResultText(first, chase, names)).toBe("Crimson Warriors beat God's Gladiators by 6 wickets");
+    expect(cricketResultText(first, defended, names)).toBe("God's Gladiators beat Crimson Warriors by 8 runs");
   });
 });

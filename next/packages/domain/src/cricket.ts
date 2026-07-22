@@ -103,6 +103,7 @@ export function createCricketInnings(input: CreateInningsInput): CricketInningsS
 
 function defaultCommentary(input: CricketDeliveryInput) {
   if (input.extraType === "dead-ball") return "Dead ball.";
+  if (input.dismissal && input.runsOffBat > 0) return `${input.runsOffBat} run${input.runsOffBat === 1 ? "" : "s"} and OUT! ${input.dismissal.type.replaceAll("-", " ")}.`;
   if (input.dismissal) return `OUT! ${input.dismissal.type.replaceAll("-", " ")}.`;
   if (input.extraType === "wide") return "Wide ball.";
   if (input.extraType === "no-ball") return "No ball.";
@@ -189,14 +190,18 @@ export function recordCricketDelivery(
   const legalDelivery = isLegalDelivery(input);
   const totalRuns = runsForDelivery(input);
   const strikerId = state.strikerId;
+  const nonStrikerId = state.nonStrikerId;
   const bowlerId = state.currentBowlerId;
+  if (input.dismissal && ![strikerId, nonStrikerId].includes(input.dismissal.playerOutId)) {
+    throw new Error("The dismissed batter must be the striker or non-striker.");
+  }
   const delivery: CricketDelivery = {
     ...input,
     id: `delivery-${state.events.length + 1}`,
     over: Math.floor(state.legalBalls / 6),
     ball: (state.legalBalls % 6) + (legalDelivery ? 1 : 0),
     strikerId,
-    nonStrikerId: state.nonStrikerId,
+    nonStrikerId,
     bowlerId,
     legalDelivery,
     totalRuns,
@@ -214,8 +219,13 @@ export function recordCricketDelivery(
   if (input.runsOffBat === 0 && legalDelivery) batter.dots += 1;
   if (input.runsOffBat === 1) batter.singles += 1;
   if (input.runsOffBat === 2) batter.twos += 1;
-  if (input.dismissal) batter.dismissal = input.dismissal;
+  if (input.dismissal?.playerOutId === strikerId) batter.dismissal = input.dismissal;
   batters[strikerId] = batter;
+  if (input.dismissal && input.dismissal.playerOutId !== strikerId) {
+    const dismissedBatter = { ...(batters[input.dismissal.playerOutId] ?? emptyBatter(input.dismissal.playerOutId)) };
+    dismissedBatter.dismissal = input.dismissal;
+    batters[input.dismissal.playerOutId] = dismissedBatter;
+  }
 
   const bowlers = { ...state.bowlers };
   const bowler = { ...(bowlers[bowlerId] ?? emptyBowler(bowlerId)) };
@@ -238,7 +248,7 @@ export function recordCricketDelivery(
   if (input.extraType === "penalty") extras.penalty += Math.max(0, input.extraRuns ?? 0);
 
   let nextStriker: PlayerId | null = strikerId;
-  let nextNonStriker = state.nonStrikerId;
+  let nextNonStriker = nonStrikerId;
   if (completedRunsForStrike(input) % 2 === 1) {
     [nextStriker, nextNonStriker] = [nextNonStriker, nextStriker];
   }
@@ -283,7 +293,7 @@ export function recordCricketDelivery(
     nonStrikerId: nextNonStriker,
     currentBowlerId,
     previousOverBowlerId,
-    freeHit: input.extraType === "no-ball" ? true : state.freeHit && !legalDelivery,
+    freeHit: input.extraType === "no-ball",
     completed,
     batters,
     bowlers,
@@ -350,6 +360,30 @@ export function cricketInningsMetrics(state: CricketInningsState, target: number
       ? 0
       : ballsRemaining === 0 ? Number.POSITIVE_INFINITY : rounded(runsRequired / (ballsRemaining / 6)),
   };
+}
+
+function plural(value: number, label: string) {
+  return `${value} ${label}${value === 1 ? "" : "s"}`;
+}
+
+export function cricketChaseText(state: CricketInningsState, target: number | null) {
+  const metrics = cricketInningsMetrics(state, target);
+  if (metrics.runsRequired === null || metrics.runsRequired <= 0) return null;
+  return `Need ${metrics.runsRequired} to win from ${plural(metrics.ballsRemaining, "ball")}`;
+}
+
+export function cricketResultText(
+  first: CricketInningsState | null | undefined,
+  second: CricketInningsState | null | undefined,
+  teamName: (teamId: string) => string,
+) {
+  if (!first || !second || first.score === second.score) return null;
+  if (second.score > first.score) {
+    const wicketsToLose = Math.max(0, second.battingLineup.length - 1);
+    const wicketsRemaining = Math.max(0, wicketsToLose - second.wickets);
+    return `${teamName(second.battingTeamId)} beat ${teamName(second.bowlingTeamId)} by ${plural(wicketsRemaining, "wicket")}`;
+  }
+  return `${teamName(first.battingTeamId)} beat ${teamName(first.bowlingTeamId)} by ${plural(first.score - second.score, "run")}`;
 }
 
 export function recalculateCricketInnings(

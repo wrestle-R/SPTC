@@ -77,25 +77,26 @@ export function TeamStandings() {
                   transition={{ delay: i * 0.1, duration: 0.4 }}
                 >
                   <Link href={`/teams/${row.teamId}`}>
-                    <div className={`group relative overflow-hidden rounded-2xl border bg-card p-4 transition-all hover:shadow-lg hover:-translate-y-1 cursor-pointer ${i === 0 ? 'ring-2 ring-amber-500/50' : ''}`}>
+                    <div className={`group relative overflow-hidden rounded-2xl border bg-card/40 backdrop-blur-sm p-5 transition-all duration-300 hover:shadow-2xl hover:-translate-y-1.5 cursor-pointer ${i === 0 ? 'ring-2 ring-amber-500/80 bg-amber-500/10' : 'hover:bg-card/80'}`}>
                       {i === 0 && (
-                        <div className="absolute -right-2 -top-2 flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-amber-400 to-orange-500 shadow-lg">
-                          <Trophy className="h-5 w-5 text-white" />
+                        <div className="absolute -right-3 -top-3 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-amber-300 via-amber-500 to-orange-600 shadow-[0_0_20px_rgba(245,158,11,0.6)] border-[3px] border-background z-10">
+                          <Trophy className="h-6 w-6 text-white drop-shadow-md" strokeWidth={2.5} />
+                          <div className="absolute inset-0 rounded-full animate-ping bg-amber-400/40" style={{ animationDuration: '3s' }} />
                         </div>
                       )}
-                      <div className={`h-1.5 w-full rounded-full bg-gradient-to-r ${gradient} mb-3 opacity-60 group-hover:opacity-100 transition-opacity`} />
-                      <div className="flex items-center gap-3">
+                      <div className={`absolute bottom-0 left-0 h-1.5 w-full bg-gradient-to-r ${gradient} opacity-70 group-hover:opacity-100 group-hover:h-2 transition-all duration-300`} />
+                      <div className="flex items-center gap-4">
                         {jersey && (
-                          <div className="relative h-16 w-16 shrink-0">
-                            <Image src={jersey.front} alt={row.name} fill className="object-contain drop-shadow-md" />
+                          <div className="relative h-20 w-20 shrink-0 transition-transform duration-500 group-hover:scale-110 group-hover:rotate-2">
+                            <Image src={jersey.front} alt={row.name} fill className="object-contain drop-shadow-xl" />
                           </div>
                         )}
                         <div className="min-w-0 flex-1">
-                          <p className={`text-2xl font-black tabular-nums ${textColor}`}>{row.total}</p>
-                          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">points</p>
+                          <p className={`text-4xl font-black tabular-nums tracking-tighter ${textColor} drop-shadow-sm`}>{row.total}</p>
+                          <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mt-0.5">points</p>
                         </div>
                       </div>
-                      <p className="mt-2 text-sm font-bold truncate">{row.name}</p>
+                      <p className="mt-4 text-base font-extrabold truncate tracking-tight text-foreground/90 group-hover:text-foreground transition-colors">{row.name}</p>
                     </div>
                   </Link>
                 </motion.div>

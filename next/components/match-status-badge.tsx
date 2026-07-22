@@ -13,7 +13,7 @@ export function MatchStatusBadge({ status }: { status: string }) {
       variant={completed ? "outline" : "secondary"}
       className={cn(
         "h-6 px-2.5 font-semibold",
-        live && "border border-emerald-500/30 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
+        live && "border border-blue-500/30 bg-blue-500/15 text-blue-700 dark:text-blue-300",
         !live && !completed && "border border-blue-500/25 bg-blue-500/15 text-blue-700 dark:text-blue-300",
         completed && "text-muted-foreground",
       )}

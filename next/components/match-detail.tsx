@@ -1,6 +1,6 @@
 "use client";
 
-import { cricketInningsMetrics, fallOfWickets, S9_TEAMS, type CricketDelivery } from "@sports-fiesta/domain";
+import { cricketChaseText, cricketInningsMetrics, fallOfWickets, S9_PLAYERS, S9_SEEDED_MATCHES, S9_TEAMS, type CricketDelivery } from "@sports-fiesta/domain";
 import { ArrowLeft, CircleDashed } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
@@ -17,8 +17,9 @@ export function MatchDetail({ sport, matchId }: { sport: Sport; matchId: string 
   const matchState = usePublicDocument<PublicMatch>("matches", matchId);
   const teamsState = usePublicCollection<PublicTeam>("teams");
   const playersState = usePublicCollection<PublicPlayer>("players");
-  const match = matchState.data;
+  const match = matchState.data ?? S9_SEEDED_MATCHES.find((seededMatch) => seededMatch.id === matchId) as PublicMatch | undefined;
   const teams = teamsState.data.length ? teamsState.data : S9_TEAMS;
+  const players = playersState.data.length ? playersState.data : S9_PLAYERS;
 
   if (matchState.loading || teamsState.loading || playersState.loading) return <ContentSkeleton rows={3} />;
   if (matchState.error) return <DataError message={matchState.error} retry={matchState.retry} />;
@@ -39,8 +40,9 @@ export function MatchDetail({ sport, matchId }: { sport: Sport; matchId: string 
 
   const home = teams.find((team) => team.id === match.homeTeamId);
   const away = teams.find((team) => team.id === match.awayTeamId);
-  const playerName = (id: string | null | undefined) => playersState.data.find((player) => player.id === id)?.name ?? "Player";
+  const playerName = (id: string | null | undefined) => players.find((player) => player.id === id)?.name ?? fallbackPlayerName(id, teams);
   const teamName = (id: string) => teams.find((team) => team.id === id)?.name ?? "Team";
+  const resultText = match.resultText || (match.status === "completed" ? "Result pending - organizer must confirm." : null);
 
   return (
     <div className="flex flex-col gap-6">
@@ -63,11 +65,23 @@ export function MatchDetail({ sport, matchId }: { sport: Sport; matchId: string 
           ) : (
             <FieldScore match={match} homeName={home?.name ?? "Team"} awayName={away?.name ?? "Team"} playerName={playerName} teamName={teamName} />
           )}
-          {match.resultText ? <p className="rounded-md bg-muted p-3 font-medium">{match.resultText}</p> : null}
+          {resultText ? <p className="rounded-md bg-muted p-3 font-medium">{resultText}</p> : null}
         </CardContent>
       </Card>
     </div>
   );
+}
+
+function fallbackPlayerName(id: string | null | undefined, teams: PublicTeam[]) {
+  if (!id) return "Player";
+  const team = teams.find((candidate) => id.startsWith(`${candidate.id}-`));
+  const withoutTeam = team ? id.slice(team.id.length + 1) : id;
+  const withoutIndex = withoutTeam.replace(/-\d+$/, "");
+  return withoutIndex
+    .split("-")
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ") || "Player";
 }
 
 function FieldScore({ match, homeName, awayName, playerName, teamName }: {
@@ -90,9 +104,19 @@ function FieldScore({ match, homeName, awayName, playerName, teamName }: {
         {events.length ? (
           <div className="flex flex-col gap-2">
             {[...events].reverse().map((event, index) => (
-              <div key={String(event.id ?? index)} className="flex items-center justify-between gap-4 rounded-md border p-3 text-sm">
-                <div><p className="font-medium capitalize">{String(event.type).replace("-", " ")}</p><p className="text-muted-foreground">{playerName(String(event.playerId ?? ""))}</p></div>
-                <span className="text-right text-muted-foreground">{teamName(String(event.teamId))}</span>
+              <div key={String(event.id ?? index)} className="flex items-start justify-between gap-4 rounded-xl border bg-card/60 p-3 text-sm">
+                <div className="flex min-w-0 gap-3">
+                  {typeof event.minute === "number" ? (
+                    <span className="mt-0.5 shrink-0 rounded-full bg-blue-500/10 px-2 py-0.5 text-xs font-semibold text-blue-700 dark:text-blue-300">
+                      {event.minute}&apos;
+                    </span>
+                  ) : null}
+                  <div className="min-w-0">
+                    <p className="font-semibold capitalize">{String(event.type).replace("-", " ")}</p>
+                    <p className="break-words text-muted-foreground">{playerName(String(event.playerId ?? ""))}</p>
+                  </div>
+                </div>
+                <span className="max-w-32 shrink-0 text-right text-muted-foreground sm:max-w-none">{teamName(String(event.teamId))}</span>
               </div>
             ))}
           </div>
@@ -120,6 +144,21 @@ function dismissalText(dismissal: NonNullable<import("@sports-fiesta/domain").Ba
   }
 }
 
+function cricketEventLabel(event: CricketDelivery) {
+  const parts: string[] = [];
+  if (event.extraType === "no-ball") parts.push("Nb");
+  else if (event.extraType === "wide") parts.push("Wd");
+  else if (event.extraType === "dead-ball") parts.push("Dead");
+  else if (event.extraType === "bye") parts.push(`${event.extraRuns ?? 0}B`);
+  else if (event.extraType === "leg-bye") parts.push(`${event.extraRuns ?? 0}LB`);
+  else if (event.extraType === "penalty") parts.push(`${event.extraRuns ?? 0}P`);
+  if (!["wide", "bye", "leg-bye", "penalty", "dead-ball"].includes(event.extraType ?? "") && event.runsOffBat > 0) {
+    parts.push(String(event.runsOffBat));
+  }
+  if (event.dismissal) parts.push("W");
+  return parts.length ? parts.join(" + ") : String(event.totalRuns);
+}
+
 function CricketScore({ match, teamName, playerName }: {
   match: PublicMatch;
   teamName: (id: string) => string;
@@ -131,6 +170,7 @@ function CricketScore({ match, teamName, playerName }: {
   const state = entries[safeIndex]?.state;
   const target = safeIndex % 2 === 1 ? (entries[safeIndex - 1]?.state.score ?? 0) + 1 : null;
   const metrics = state ? cricketInningsMetrics(state, target) : null;
+  const chaseText = state ? cricketChaseText(state, target) : null;
 
   if (!state) return <p className="text-center text-muted-foreground">The scorecard will appear when the innings starts.</p>;
 
@@ -165,7 +205,6 @@ function CricketScore({ match, teamName, playerName }: {
       {entries.length > 1 ? (
         <div className="flex overflow-hidden rounded-md border">
           {entries.map((_, i) => {
-            const s = entries[i]?.state;
             const active = i === safeIndex;
             return (
               <button
@@ -178,7 +217,7 @@ function CricketScore({ match, teamName, playerName }: {
                     : "bg-muted/50 text-muted-foreground hover:bg-muted"
                 }`}
               >
-                {s ? teamName(s.battingTeamId) : `Innings ${i + 1}`}
+                {inningsLabel(i)}
               </button>
             );
           })}
@@ -186,20 +225,21 @@ function CricketScore({ match, teamName, playerName }: {
       ) : null}
 
       <div className="rounded-lg border">
-        <div className="flex items-center gap-3 border-b bg-muted/30 px-4 py-3">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b bg-muted/30 px-4 py-3">
           <p className="text-2xl font-bold tabular-nums">{state.score}/{state.wickets}</p>
           <p className="text-sm text-muted-foreground">
             {state.overs} ov{target ? ` · Target ${target}` : ""} · RR {metrics?.runRate.toFixed(2)}
           </p>
-          {metrics?.runsRequired != null && metrics.runsRequired > 0 ? (
-            <p className="text-sm font-medium text-muted-foreground">
-              Need {metrics.runsRequired} from {metrics.ballsRemaining} balls · RRR {metrics.requiredRunRate === Infinity ? "-" : metrics.requiredRunRate.toFixed(2)}
+          {chaseText ? (
+            <p className="basis-full text-sm font-medium text-muted-foreground sm:basis-auto">
+              {chaseText} · RRR {metrics?.requiredRunRate === Infinity ? "-" : metrics?.requiredRunRate.toFixed(2)}
             </p>
           ) : null}
         </div>
 
-        <div className="p-4">
-          <div className="mb-1 grid grid-cols-[1fr_48px_40px_36px_36px_60px] gap-1 px-3 py-2 text-xs font-semibold text-muted-foreground">
+        <div className="overflow-x-auto p-3 sm:p-4">
+          <div className="w-full min-w-0">
+          <div className="mb-1 grid grid-cols-[minmax(0,1fr)_1.75rem_1.5rem_1.5rem_1.5rem_2.75rem] gap-1 px-1 py-2 text-xs font-semibold text-muted-foreground sm:px-3">
             <span>Batter</span>
             <span className="text-right">R</span>
             <span className="text-right">B</span>
@@ -217,13 +257,15 @@ function CricketScore({ match, teamName, playerName }: {
               .map((batter) => {
                 const dismissed = Boolean(batter.dismissal);
                 const dismissInfo = batter.dismissal ? dismissalText(batter.dismissal, state.events, playerName) : "not out";
+                const activeLabel = batter.playerId === state.strikerId ? "*" : "";
+                const roleText = batter.playerId === state.nonStrikerId ? "non-striker" : batter.playerId === state.strikerId ? "striker" : "";
                 return (
-                  <div key={batter.playerId} className={`grid grid-cols-[1fr_48px_40px_36px_36px_60px] gap-1 px-3 py-2 ${dismissed ? "text-muted-foreground/70" : ""}`}>
+                  <div key={batter.playerId} className={`grid grid-cols-[minmax(0,1fr)_1.75rem_1.5rem_1.5rem_1.5rem_2.75rem] gap-1 px-1 py-2 sm:px-3 ${dismissed ? "text-muted-foreground/70" : ""}`}>
                     <div className="min-w-0">
-                      <p className={`truncate text-sm font-medium ${dismissed ? "text-destructive" : "text-card-foreground"}`}>
-                        {playerName(batter.playerId)}
+                      <p className={`break-words text-sm font-medium leading-snug ${dismissed ? "text-destructive" : "text-card-foreground"}`}>
+                        {playerName(batter.playerId)}{activeLabel}
                       </p>
-                      <p className="truncate text-xs text-muted-foreground">{dismissInfo}</p>
+                      <p className="break-words text-xs text-muted-foreground">{roleText ? `${dismissInfo} · ${roleText}` : dismissInfo}</p>
                     </div>
                     <p className="self-center text-right text-sm tabular-nums font-medium">{batter.runs}</p>
                     <p className="self-center text-right text-sm tabular-nums text-muted-foreground">{batter.balls}</p>
@@ -237,16 +279,17 @@ function CricketScore({ match, teamName, playerName }: {
               })}
           </div>
 
-          <div className="mt-2 grid grid-cols-[1fr_48px_40px_36px_36px_60px] gap-1 border-t px-3 py-2 text-sm text-muted-foreground">
+          <div className="mt-2 grid grid-cols-[minmax(0,1fr)_1.75rem_1.5rem_1.5rem_1.5rem_2.75rem] gap-1 border-t px-1 py-2 text-sm text-muted-foreground sm:px-3">
             <span>Extras</span>
             <span className="text-right font-medium text-card-foreground">{extrasTotal}</span>
             <span className="col-span-4 text-right text-xs">{extrasParts.length ? `(${extrasParts.join(", ")})` : ""}</span>
           </div>
 
-          <div className="grid grid-cols-[1fr_48px_40px_36px_36px_60px] gap-1 border-t px-3 py-2 text-sm font-semibold">
+          <div className="grid grid-cols-[minmax(0,1fr)_1.75rem_1.5rem_1.5rem_1.5rem_2.75rem] gap-1 border-t px-1 py-2 text-sm font-semibold sm:px-3">
             <span className="text-muted-foreground">Total</span>
             <span className="text-right text-card-foreground">{state.score}/{state.wickets}</span>
             <span className="col-span-4 text-right text-xs text-muted-foreground">({state.overs} ov)</span>
+          </div>
           </div>
         </div>
 
@@ -270,27 +313,34 @@ function CricketScore({ match, teamName, playerName }: {
       </div>
 
       <div className="rounded-lg border">
-        <div className="grid grid-cols-[1fr_48px_40px_36px_36px_60px] gap-1 bg-muted/30 px-5 py-3 text-xs font-semibold text-muted-foreground">
-          <span>Bowler</span>
-          <span className="text-right">O</span>
-          <span className="text-right">M</span>
-          <span className="text-right">R</span>
-          <span className="text-right">W</span>
-          <span className="text-right">Econ</span>
-        </div>
-        <div className="divide-y px-5">
-          {bowlers.map((bowler) => (
-            <div key={bowler.playerId} className="grid grid-cols-[1fr_48px_40px_36px_36px_60px] gap-1 py-2">
-              <p className="truncate text-sm font-medium text-card-foreground">{playerName(bowler.playerId)}</p>
-              <p className="self-center text-right text-sm tabular-nums text-card-foreground">{`${Math.floor(bowler.legalBalls / 6)}.${bowler.legalBalls % 6}`}</p>
-              <p className="self-center text-right text-sm tabular-nums text-muted-foreground">{bowler.maidens}</p>
-              <p className="self-center text-right text-sm tabular-nums text-muted-foreground">{bowler.runs}</p>
-              <p className="self-center text-right text-sm tabular-nums font-medium">{bowler.wickets}</p>
-              <p className="self-center text-right text-sm tabular-nums text-muted-foreground">
-                {bowler.legalBalls ? ((bowler.runs / bowler.legalBalls) * 6).toFixed(2) : "0.00"}
-              </p>
+        <div className="overflow-x-auto">
+          <div className="w-full min-w-0">
+            <div className="grid grid-cols-[minmax(0,1fr)_1.75rem_1.5rem_1.75rem_1.5rem_2.75rem] gap-1 bg-muted/30 px-3 py-3 text-xs font-semibold text-muted-foreground sm:px-5">
+              <span>Bowler</span>
+              <span className="text-right">O</span>
+              <span className="text-right">M</span>
+              <span className="text-right">R</span>
+              <span className="text-right">W</span>
+              <span className="text-right">Econ</span>
             </div>
-          ))}
+            <div className="divide-y px-3 sm:px-5">
+              {bowlers.map((bowler) => {
+                const activeLabel = bowler.playerId === state.currentBowlerId ? "*" : "";
+                return (
+                  <div key={bowler.playerId} className="grid grid-cols-[minmax(0,1fr)_1.75rem_1.5rem_1.75rem_1.5rem_2.75rem] gap-1 py-2">
+                    <p className="break-words text-sm font-medium leading-snug text-card-foreground">{playerName(bowler.playerId)}{activeLabel}</p>
+                    <p className="self-center text-right text-sm tabular-nums text-card-foreground">{`${Math.floor(bowler.legalBalls / 6)}.${bowler.legalBalls % 6}`}</p>
+                    <p className="self-center text-right text-sm tabular-nums text-muted-foreground">{bowler.maidens}</p>
+                    <p className="self-center text-right text-sm tabular-nums text-muted-foreground">{bowler.runs}</p>
+                    <p className="self-center text-right text-sm tabular-nums font-medium">{bowler.wickets}</p>
+                    <p className="self-center text-right text-sm tabular-nums text-muted-foreground">
+                      {bowler.legalBalls ? ((bowler.runs / bowler.legalBalls) * 6).toFixed(2) : "0.00"}
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
         </div>
       </div>
 
@@ -309,7 +359,7 @@ function CricketScore({ match, teamName, playerName }: {
                 <span className="w-10 text-sm font-medium text-muted-foreground">Ov {Number(overNum) + 1}</span>
                 {overEvents.map((event) => (
                   <span key={event.id} className="grid min-h-10 min-w-10 place-items-center rounded-md border px-2 text-sm font-semibold" title={event.commentary}>
-                    {event.dismissal ? "W" : event.extraType === "wide" ? "Wd" : event.extraType === "no-ball" ? "Nb" : event.totalRuns}
+                    {cricketEventLabel(event)}
                   </span>
                 ))}
               </div>

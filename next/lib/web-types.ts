@@ -44,3 +44,32 @@ export interface OverallStandingDocument {
   id: string;
   rows: OverallStandingRow[];
 }
+
+export interface FieldSportStandingRow {
+  rank: number;
+  teamId: string;
+  played: number;
+  wins: number;
+  draws: number;
+  losses: number;
+  goalsFor: number;
+  goalsAgainst: number;
+  goalDifference: number;
+  points: number;
+}
+
+export interface CricketStandingRow {
+  rank: number;
+  teamId: string;
+  played: number;
+  wins: number;
+  ties: number;
+  losses: number;
+  points: number;
+  netRunRate: number;
+}
+
+export interface SportStandingDocument {
+  id: string;
+  rows: Array<FieldSportStandingRow | CricketStandingRow>;
+}
