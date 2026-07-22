@@ -194,7 +194,7 @@ export interface OverallStanding extends OverallStandingInput {
 export interface SeedMatch {
   id: string;
   sport: "football" | "handball" | "cricket";
-  stage: "league" | "decider" | "final";
+  stage: "league" | "third-place" | "final";
   status: "scheduled" | "live" | "innings-break" | "super-over" | "completed";
   homeTeamId: TeamId;
   awayTeamId: TeamId;

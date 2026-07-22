@@ -237,6 +237,8 @@ function SportStandings({
   const teamName = (teamId: string) => teams.find((team) => team.id === teamId)?.name ?? teamId;
   const gridClass = sport === "cricket"
     ? "grid grid-cols-[1.25rem_minmax(5.75rem,1fr)_1.25rem_1.25rem_1.25rem_1.25rem_2.5rem_1.75rem] gap-1"
+    : sport === "handball"
+    ? "grid grid-cols-[1.25rem_minmax(4.75rem,1fr)_1.25rem_1.25rem_1.25rem_1.5rem_1.5rem_1.5rem_1.75rem] gap-1"
     : "grid grid-cols-[1.25rem_minmax(4.75rem,1fr)_1.25rem_1.25rem_1.25rem_1.25rem_1.5rem_1.5rem_1.5rem_1.75rem] gap-1";
   return (
     <section className="flex flex-col gap-3" aria-labelledby={`${sport}-standings-heading`}>
@@ -248,7 +250,9 @@ function SportStandings({
             <span>Team</span>
             <span className="text-right">P</span>
             <span className="text-right">W</span>
-            <span className="text-right">{sport === "cricket" ? "T" : "D"}</span>
+            {sport === "handball" ? null : (
+              <span className="text-right">{sport === "cricket" ? "T" : "D"}</span>
+            )}
             <span className="text-right">L</span>
             {sport === "cricket" ? (
               <span className="text-right">NRR</span>
@@ -271,7 +275,7 @@ function SportStandings({
                 {"ties" in row ? (
                   <CricketStandingCells row={row} />
                 ) : (
-                  <FieldStandingCells row={row} />
+                  <FieldStandingCells row={row} showDraws={sport === "football"} />
                 )}
               </div>
             ))}
@@ -282,10 +286,12 @@ function SportStandings({
   );
 }
 
-function FieldStandingCells({ row }: { row: FieldSportStandingRow }) {
+function FieldStandingCells({ row, showDraws }: { row: FieldSportStandingRow; showDraws?: boolean }) {
   return (
     <>
-      <span className="text-right tabular-nums">{row.draws}</span>
+      {showDraws ? (
+        <span className="text-right tabular-nums">{row.draws}</span>
+      ) : null}
       <span className="text-right tabular-nums">{row.losses}</span>
       <span className="text-right tabular-nums">{row.goalsFor}</span>
       <span className="text-right tabular-nums">{row.goalsAgainst}</span>

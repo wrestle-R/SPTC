@@ -117,6 +117,9 @@ function FieldScore({ match, homeName, awayName, playerName, playerJersey, teamN
   const events = match.fieldState?.events ?? [];
   const homeScore = match.fieldState?.score?.[match.homeTeamId] ?? 0;
   const awayScore = match.fieldState?.score?.[match.awayTeamId] ?? 0;
+  const hasShootout = events.some((e) => e.type === "shootout-goal" || e.type === "shootout-miss");
+  const homeShootout = match.fieldState?.shootout?.[match.homeTeamId] ?? 0;
+  const awayShootout = match.fieldState?.shootout?.[match.awayTeamId] ?? 0;
 
   const getEventMeta = (type: string) => {
     switch (type) {
@@ -138,13 +141,22 @@ function FieldScore({ match, homeName, awayName, playerName, playerJersey, teamN
           <div className="flex flex-1 flex-col items-center gap-3">
             <p className="line-clamp-2 text-sm font-semibold uppercase tracking-wider text-muted-foreground sm:text-base">{homeName}</p>
             <p className="text-6xl font-black tracking-tighter sm:text-8xl">{homeScore}</p>
+            {hasShootout ? (
+              <p className="text-lg font-bold tabular-nums text-emerald-500">({homeShootout})</p>
+            ) : null}
           </div>
           <div className="flex flex-col items-center gap-2">
             <span className="rounded-full bg-background px-3 py-1.5 text-xs font-bold tracking-widest text-muted-foreground shadow-sm">VS</span>
+            {hasShootout ? (
+              <span className="text-xs font-semibold text-muted-foreground">Pens</span>
+            ) : null}
           </div>
           <div className="flex flex-1 flex-col items-center gap-3">
             <p className="line-clamp-2 text-sm font-semibold uppercase tracking-wider text-muted-foreground sm:text-base">{awayName}</p>
             <p className="text-6xl font-black tracking-tighter sm:text-8xl">{awayScore}</p>
+            {hasShootout ? (
+              <p className="text-lg font-bold tabular-nums text-emerald-500">({awayShootout})</p>
+            ) : null}
           </div>
         </div>
       </div>

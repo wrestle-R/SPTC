@@ -1,6 +1,6 @@
 "use client";
 
-import { cricketChaseText, cricketInningsMetrics, fallOfWickets, type BatterInnings, type CricketDelivery, type CricketExtraType, type DismissalType, type FieldEventType, type Player, type Team } from "@sports-fiesta/domain";
+import { cricketChaseText, cricketInningsMetrics, fallOfWickets, getShootoutStatus, type BatterInnings, type CricketDelivery, type CricketExtraType, type DismissalType, type FieldEventType, type FieldMatchEvent, type Player, type Team } from "@sports-fiesta/domain";
 import { ArrowLeft, LoaderCircle, RotateCcw, Square, Trophy, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -38,6 +38,7 @@ export function OrganizerMatchScorer({ matchId }: { matchId: string }) {
       matchState.mutate((prev) => {
         if (!prev) return prev;
         const fieldState = prev.fieldState ?? {
+          teamIds: [prev.homeTeamId, prev.awayTeamId] as [string, string],
           score: { [prev.homeTeamId]: 0, [prev.awayTeamId]: 0 },
           shootout: { [prev.homeTeamId]: 0, [prev.awayTeamId]: 0 },
           events: [],
@@ -54,7 +55,7 @@ export function OrganizerMatchScorer({ matchId }: { matchId: string }) {
           fieldState: {
             ...fieldState,
             score: newScore,
-            events: [...fieldState.events, { id: `optimistic-${Date.now()}`, ...eventData } as Record<string, string | number>],
+            events: [...fieldState.events, { id: `optimistic-${Date.now()}`, teamId: eventData.teamId ?? "", type: (eventData.type ?? "goal") as FieldMatchEvent["type"], timestamp: new Date().toISOString(), ...eventData } as FieldMatchEvent],
           }
         };
       });
@@ -430,9 +431,16 @@ function FieldConsole({ match, players, teams, pending, run, completeMatch, conf
   if (match.status === "scheduled") return null;
   const eligible = players.filter((player) => player.teamId === teamId);
   const score = match.fieldState?.score ?? { [match.homeTeamId]: 0, [match.awayTeamId]: 0 };
+  const shootoutScore = match.fieldState?.shootout ?? { [match.homeTeamId]: 0, [match.awayTeamId]: 0 };
   const homeScore = score[match.homeTeamId] ?? 0;
   const awayScore = score[match.awayTeamId] ?? 0;
   const jerseyFor = (id: string) => players.find((player) => player.id === id)?.jerseyNumber ?? null;
+
+  const scoresLevel = homeScore === awayScore;
+  const shootoutAvailable = match.sport === "handball" || match.stage === "third-place" || match.stage === "final";
+  const hasShootoutEvents = (match.fieldState?.events ?? []).some((e) => e.type === "shootout-goal" || e.type === "shootout-miss");
+  const showShootout = shootoutAvailable && (scoresLevel || hasShootoutEvents);
+  const shootoutStatus = showShootout && match.fieldState ? getShootoutStatus(match.fieldState) : null;
 
   const getEventMeta = (type: string) => {
     switch (type) {
@@ -456,6 +464,9 @@ function FieldConsole({ match, players, teams, pending, run, completeMatch, conf
               <div className="flex flex-1 flex-col items-center gap-2">
                 <p className="line-clamp-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">{teamName(match.homeTeamId)}</p>
                 <p className="text-5xl font-black tracking-tighter">{homeScore}</p>
+                {showShootout && hasShootoutEvents ? (
+                  <p className="text-lg font-bold tabular-nums text-emerald-500">({shootoutScore[match.homeTeamId] ?? 0})</p>
+                ) : null}
               </div>
               <div className="flex flex-col items-center">
                 <span className="rounded-full bg-background px-2 py-1 text-[10px] font-bold tracking-widest text-muted-foreground shadow-sm">VS</span>
@@ -463,6 +474,9 @@ function FieldConsole({ match, players, teams, pending, run, completeMatch, conf
               <div className="flex flex-1 flex-col items-center gap-2">
                 <p className="line-clamp-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">{teamName(match.awayTeamId)}</p>
                 <p className="text-5xl font-black tracking-tighter">{awayScore}</p>
+                {showShootout && hasShootoutEvents ? (
+                  <p className="text-lg font-bold tabular-nums text-emerald-500">({shootoutScore[match.awayTeamId] ?? 0})</p>
+                ) : null}
               </div>
             </div>
           </div>
@@ -508,7 +522,7 @@ function FieldConsole({ match, players, teams, pending, run, completeMatch, conf
                   { id: "own-goal", icon: match.sport === "handball" ? "🤾" : "⚽", label: "Own Goal" },
                   { id: "yellow-card", icon: "🟨", label: "Yellow Card" },
                   { id: "red-card", icon: "🟥", label: "Red Card" },
-                  ...(match.stage === "decider" || match.stage === "final" ? [
+                  ...(showShootout ? [
                     { id: "shootout-goal", icon: "✅", label: "Shootout Goal" },
                     { id: "shootout-miss", icon: "❌", label: "Shootout Miss" },
                   ] : [])
@@ -532,6 +546,36 @@ function FieldConsole({ match, players, teams, pending, run, completeMatch, conf
                 })}
               </div>
             </div>
+
+            {showShootout ? (
+              <div className="rounded-md border bg-muted/20 p-4">
+                <p className="mb-2 flex items-center gap-2 text-sm font-semibold">
+                  {hasShootoutEvents ? "🔴 Shootout in progress" : "⚪ Shootout mode"}
+                </p>
+                {shootoutStatus ? (
+                  <div className="mb-3 space-y-1 text-sm">
+                    <p className="font-medium">
+                      {teamName(match.homeTeamId)}: {shootoutScore[match.homeTeamId] ?? 0}/{shootoutStatus.attempts[match.homeTeamId]}
+                      {" "}· {teamName(match.awayTeamId)}: {shootoutScore[match.awayTeamId] ?? 0}/{shootoutStatus.attempts[match.awayTeamId]}
+                    </p>
+                    <p className="text-muted-foreground">
+                      Phase: {shootoutStatus.phase === "sudden-death" ? "Sudden Death" : "Best of 5"}
+                      {hasShootoutEvents && !shootoutStatus.complete ? (
+                        <span className="ml-2 font-semibold text-foreground">
+                          Next: {teamName(shootoutStatus.nextTeamId)}
+                        </span>
+                      ) : null}
+                      {shootoutStatus.complete && shootoutStatus.winnerTeamId ? (
+                        <span className="ml-2 font-semibold text-emerald-500">
+                          Winner: {teamName(shootoutStatus.winnerTeamId)}
+                        </span>
+                      ) : null}
+                    </p>
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+
             <SimpleSelect label="Team" value={teamId} setValue={(value) => { setTeamId(value); setPlayerId(""); }} items={teams.filter((team) => [match.homeTeamId, match.awayTeamId].includes(team.id)).map((team) => ({ value: team.id, label: team.name }))} />
             <SimpleSelect label="Player" value={playerId} setValue={setPlayerId} items={eligible.map((player) => ({ value: player.id, label: playerLabel(player) }))} />
             <Button size="lg" disabled={pending || !teamId || (!playerId && !type.startsWith("shootout"))} onClick={() => run("recordFieldEvent", { event: { type, teamId, playerId: playerId || undefined } })}>Record event</Button>

@@ -1,4 +1,4 @@
-import type { CricketInningsState, Player, Team } from "@sports-fiesta/domain";
+import type { CricketInningsState, FieldMatchState, Player, Team } from "@sports-fiesta/domain";
 
 export type PublicTeam = Team;
 export type PublicPlayer = Player;
@@ -6,7 +6,7 @@ export type PublicPlayer = Player;
 export interface PublicMatch {
   id: string;
   sport: "football" | "handball" | "cricket";
-  stage: "league" | "decider" | "final";
+  stage: "league" | "third-place" | "final";
   status: "scheduled" | "live" | "innings-break" | "super-over" | "completed";
   homeTeamId: string;
   awayTeamId: string;
@@ -17,11 +17,7 @@ export interface PublicMatch {
   scoreSummary: Record<string, number> & {
     innings?: Array<{ battingTeamId: string; score: number; wickets: number; overs: string }>;
   };
-  fieldState?: {
-    score: Record<string, number>;
-    shootout: Record<string, number>;
-    events: Array<Record<string, string | number>>;
-  };
+  fieldState?: FieldMatchState;
   cricket?: {
     innings: Array<{ state: CricketInningsState; superOver?: boolean }>;
     currentInnings: number;

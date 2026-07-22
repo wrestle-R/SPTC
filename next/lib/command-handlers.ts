@@ -110,17 +110,42 @@ function fieldResultText(match: MatchDocument) {
   const score = match.fieldState?.score ?? {};
   const homeScore = Number(score[match.homeTeamId] ?? 0);
   const awayScore = Number(score[match.awayTeamId] ?? 0);
-  if (homeScore === awayScore) {
+
+  if (homeScore !== awayScore) {
+    const winnerTeamId = homeScore > awayScore ? match.homeTeamId : match.awayTeamId;
+    const loserTeamId = winnerTeamId === match.homeTeamId ? match.awayTeamId : match.homeTeamId;
     return {
-      winnerTeamId: null,
-      resultText: `${teamName(match.homeTeamId)} and ${teamName(match.awayTeamId)} drew ${homeScore}-${awayScore}`,
+      winnerTeamId,
+      resultText: `${teamName(winnerTeamId)} beat ${teamName(loserTeamId)} ${Math.max(homeScore, awayScore)}-${Math.min(homeScore, awayScore)}`,
     };
   }
-  const winnerTeamId = homeScore > awayScore ? match.homeTeamId : match.awayTeamId;
-  const loserTeamId = winnerTeamId === match.homeTeamId ? match.awayTeamId : match.homeTeamId;
+
+  const shootout = match.fieldState?.shootout ?? {};
+  const homeShootout = Number(shootout[match.homeTeamId] ?? 0);
+  const awayShootout = Number(shootout[match.awayTeamId] ?? 0);
+  const shootoutAttempts = (match.fieldState?.events ?? []).filter(
+    (e) => e.type === "shootout-goal" || e.type === "shootout-miss",
+  ).length;
+
+  if (shootoutAttempts > 0 && homeShootout !== awayShootout) {
+    const winnerTeamId = homeShootout > awayShootout ? match.homeTeamId : match.awayTeamId;
+    const loserTeamId = winnerTeamId === match.homeTeamId ? match.awayTeamId : match.homeTeamId;
+    return {
+      winnerTeamId,
+      resultText: `${teamName(winnerTeamId)} beat ${teamName(loserTeamId)} ${homeScore}-${awayScore} (${homeShootout}-${awayShootout} pens)`,
+    };
+  }
+
+  const isKnockout = match.stage === "third-place" || match.stage === "final";
+  if (match.sport === "handball") {
+    return { winnerTeamId: null, resultText: "Shootout required — handball match cannot end in a draw." };
+  }
+  if (match.sport === "football" && isKnockout) {
+    return { winnerTeamId: null, resultText: "Penalty shootout required — knockout match cannot end in a draw." };
+  }
   return {
-    winnerTeamId,
-    resultText: `${teamName(winnerTeamId)} beat ${teamName(loserTeamId)} ${Math.max(homeScore, awayScore)}-${Math.min(homeScore, awayScore)}`,
+    winnerTeamId: null,
+    resultText: `${teamName(match.homeTeamId)} and ${teamName(match.awayTeamId)} drew ${homeScore}-${awayScore}`,
   };
 }
 
@@ -523,8 +548,20 @@ export async function handleEndMatch(data: CallableData) {
       throw new CommandError(400, "FAILED_PRECONDITION", "Only an active match can be completed.");
     }
     let completed = { ...match };
-    if (["football", "handball"].includes(match.sport)) completed = { ...completed, ...fieldResultText(match) };
-    else if (match.sport === "cricket" && !match.resultText) throw new CommandError(400, "FAILED_PRECONDITION", "Cricket result is not ready yet.");
+    if (["football", "handball"].includes(match.sport)) {
+      completed = { ...completed, ...fieldResultText(match) };
+      const homeScore = Number(match.fieldState?.score?.[match.homeTeamId] ?? 0);
+      const awayScore = Number(match.fieldState?.score?.[match.awayTeamId] ?? 0);
+      const isKnockout = match.stage === "third-place" || match.stage === "final";
+      if (homeScore === awayScore && !completed.winnerTeamId) {
+        if (match.sport === "handball") {
+          throw new CommandError(400, "FAILED_PRECONDITION", "Shootout required — handball match cannot end in a draw.");
+        }
+        if (match.sport === "football" && isKnockout) {
+          throw new CommandError(400, "FAILED_PRECONDITION", "Penalty shootout required — knockout match cannot end in a draw.");
+        }
+      }
+    } else if (match.sport === "cricket" && !match.resultText) throw new CommandError(400, "FAILED_PRECONDITION", "Cricket result is not ready yet.");
     const suggestions = await suggestManOfTheMatch(completed);
     const manOfTheMatchPlayerId = data.manOfTheMatchPlayerId ? asString(data.manOfTheMatchPlayerId, "Man of the match") : "";
     if (!manOfTheMatchPlayerId) {
@@ -601,7 +638,7 @@ function fieldStandings(matches: MatchRow[], sport: "football" | "handball") {
     away.goalsFor += awayScore; away.goalsAgainst += homeScore;
     if (match.winnerTeamId === match.homeTeamId || homeScore > awayScore) { home.wins += 1; home.points += 3; away.losses += 1; }
     else if (match.winnerTeamId === match.awayTeamId || awayScore > homeScore) { away.wins += 1; away.points += 3; home.losses += 1; }
-    else { home.draws += 1; away.draws += 1; home.points += 1; away.points += 1; }
+    else if (sport === "football") { home.draws += 1; away.draws += 1; home.points += 1; away.points += 1; }
   }
   return rankFieldStandings(rows);
 }

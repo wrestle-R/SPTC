@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils";
 
 const links = [
   { href: "/teams", label: "Teams" },
+  { href: "/hall-of-fame", label: "Hall of Fame" },
 ];
 
 const subscribeToHydration = () => () => undefined;
