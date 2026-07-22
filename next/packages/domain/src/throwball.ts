@@ -75,16 +75,7 @@ export function checkThrowballSetComplete(
 }
 
 export function getMatchWinner(state: ThrowballMatchState): TeamId | null {
-  const wins = state.sets.reduce<Record<TeamId, number>>((acc, set) => {
-    if (set.winnerTeamId) acc[set.winnerTeamId] = (acc[set.winnerTeamId] ?? 0) + 1;
-    return acc;
-  }, {
-    [state.teamIds[0]]: 0,
-    [state.teamIds[1]]: 0,
-  });
-  if (wins[state.teamIds[0]] >= 2) return state.teamIds[0];
-  if (wins[state.teamIds[1]] >= 2) return state.teamIds[1];
-  return null;
+  return state.sets[0]?.winnerTeamId ?? null;
 }
 
 function applyRallyToState(
@@ -146,14 +137,7 @@ function applyRallyToState(
     playerStats: { ...current.playerStats },
   };
 
-  const winnerTeamId = getMatchWinner(nextState);
-  if (!completion.completed || winnerTeamId) return nextState;
-
-  return {
-    ...nextState,
-    sets: [...nextState.sets, createEmptySet()],
-    currentSet: nextState.currentSet + 1,
-  };
+  return nextState;
 }
 
 export function recordThrowballRally(
@@ -192,11 +176,6 @@ export function throwballResultText(
   const winnerTeamId = getMatchWinner(state);
   if (!winnerTeamId) return null;
   const loserTeamId = state.teamIds.find((teamId) => teamId !== winnerTeamId) ?? state.teamIds[1];
-  const winnerSets = state.sets.filter((set) => set.winnerTeamId === winnerTeamId).length;
-  const loserSets = state.sets.filter((set) => set.winnerTeamId === loserTeamId).length;
-  const setScores = state.sets
-    .filter((set) => set.completed)
-    .map((set) => getSetScoreString(set))
-    .join(", ");
-  return `${teamName(winnerTeamId)} beat ${teamName(loserTeamId)} ${winnerSets}-${loserSets}${setScores ? ` (${setScores})` : ""}`;
+  const finalSet = state.sets[0];
+  return `${teamName(winnerTeamId)} beat ${teamName(loserTeamId)} ${getSetScoreString(finalSet)}`;
 }

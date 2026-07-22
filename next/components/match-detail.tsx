@@ -217,9 +217,7 @@ function ThrowballScore({ match, teamName, playerName }: {
     return <p className="text-center text-muted-foreground">The throwball score will appear when the match starts.</p>;
   }
 
-  const homeSetsWon = state.sets.filter((set) => set.winnerTeamId === match.homeTeamId).length;
-  const awaySetsWon = state.sets.filter((set) => set.winnerTeamId === match.awayTeamId).length;
-  const currentSet = state.sets[state.currentSet];
+  const currentSet = state.sets[0];
   const playerStats = Object.entries(state.playerStats)
     .sort(([, a], [, b]) => b.playerScore - a.playerScore || a.playerId.localeCompare(b.playerId));
 
@@ -230,42 +228,17 @@ function ThrowballScore({ match, teamName, playerName }: {
           <div className="flex flex-1 flex-col items-center gap-3">
             <p className="line-clamp-2 text-sm font-semibold uppercase tracking-wider text-muted-foreground sm:text-base">{teamName(match.homeTeamId)}</p>
             <p className="text-6xl font-black tracking-tighter sm:text-8xl">{currentSet?.homeScore ?? 0}</p>
-            <p className="text-sm font-semibold text-emerald-500 sm:text-base">Sets: {homeSetsWon}</p>
           </div>
           <div className="flex flex-col items-center gap-2">
             <span className="rounded-full bg-background px-3 py-1.5 text-xs font-bold tracking-widest text-muted-foreground shadow-sm">
-              Set {state.currentSet + 1}
+              THROWBALL
             </span>
-            <span className="text-xs font-medium text-muted-foreground">Best of 3</span>
+            {currentSet?.winnerTeamId ? <span className="text-xs font-medium text-emerald-500">Final score</span> : <span className="text-xs font-medium text-muted-foreground">Single set</span>}
           </div>
           <div className="flex flex-1 flex-col items-center gap-3">
             <p className="line-clamp-2 text-sm font-semibold uppercase tracking-wider text-muted-foreground sm:text-base">{teamName(match.awayTeamId)}</p>
             <p className="text-6xl font-black tracking-tighter sm:text-8xl">{currentSet?.awayScore ?? 0}</p>
-            <p className="text-sm font-semibold text-emerald-500 sm:text-base">Sets: {awaySetsWon}</p>
           </div>
-        </div>
-      </div>
-
-      <div className="rounded-lg border max-sm:border-0 max-sm:bg-transparent">
-        <div className="flex flex-wrap items-center gap-2 border-b bg-muted/30 px-4 py-3 max-sm:border-b-0 max-sm:bg-transparent max-sm:px-0">
-          <h2 className="text-lg font-semibold">Set details</h2>
-        </div>
-        <div className="divide-y px-4 py-1 max-sm:divide-y-0 max-sm:space-y-2 max-sm:px-0">
-          {state.sets.map((set, index) => (
-            <div key={`${match.id}-set-${index}`} className="flex flex-wrap items-center justify-between gap-3 py-3">
-              <div className="min-w-0">
-                <p className="font-medium">Set {index + 1}</p>
-                <p className="text-sm text-muted-foreground">{set.homeScore} - {set.awayScore}</p>
-              </div>
-              {set.winnerTeamId ? (
-                <Badge variant="outline">{teamName(set.winnerTeamId)} won</Badge>
-              ) : set.completed ? (
-                <Badge variant="outline">Completed</Badge>
-              ) : (
-                <Badge variant="secondary">In progress</Badge>
-              )}
-            </div>
-          ))}
         </div>
       </div>
 

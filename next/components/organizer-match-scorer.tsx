@@ -437,15 +437,13 @@ function ThrowballConsole({ match, players, teams, pending, run, completeMatch, 
   const [opponentPlayerId, setOpponentPlayerId] = useState("");
   const [droppedByPlayerId, setDroppedByPlayerId] = useState("");
   if (match.status === "scheduled") return null;
-  const currentSet = state?.sets[state.currentSet];
-  const homeSetsWon = state?.sets.filter((set) => set.winnerTeamId === match.homeTeamId).length ?? 0;
-  const awaySetsWon = state?.sets.filter((set) => set.winnerTeamId === match.awayTeamId).length ?? 0;
+  const currentSet = state?.sets[0];
   const homePlayers = players.filter((player) => player.teamId === match.homeTeamId);
   const awayPlayers = players.filter((player) => player.teamId === match.awayTeamId);
   const scoringTeamPlayers = teamId === match.homeTeamId ? homePlayers : awayPlayers;
   const opponentPlayers = teamId === match.homeTeamId ? awayPlayers : homePlayers;
   const statsRows = Object.entries(state?.playerStats ?? {}).sort(([, a], [, b]) => b.playerScore - a.playerScore || a.playerId.localeCompare(b.playerId));
-  const canComplete = Math.max(homeSetsWon, awaySetsWon) >= 2;
+  const canComplete = Boolean(state?.sets[0]?.completed);
 
   const resetSelections = () => {
     setAttackingPlayerId("");
@@ -477,36 +475,24 @@ function ThrowballConsole({ match, players, teams, pending, run, completeMatch, 
   return (
     <div className="grid gap-3 xl:grid-cols-[1.05fr_0.95fr] sm:gap-4">
       <Card className="shadow-none max-sm:border-0 max-sm:bg-transparent">
-        <CardHeader><CardTitle>Live score</CardTitle><CardDescription>Set score, rally log, and player impact update together.</CardDescription></CardHeader>
+        <CardHeader><CardTitle>Live score</CardTitle><CardDescription>Single-set score, rally log, and player impact update together.</CardDescription></CardHeader>
         <CardContent className="flex flex-col gap-4 max-sm:px-0 sm:gap-5">
           <div className="relative overflow-hidden rounded-2xl border bg-gradient-to-b from-muted/50 to-muted/10 p-6">
             <div className="flex items-center justify-between gap-3 text-center">
               <div className="flex flex-1 flex-col items-center gap-2">
                 <p className="line-clamp-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">{teamName(match.homeTeamId)}</p>
                 <p className="text-5xl font-black tracking-tighter">{currentSet?.homeScore ?? 0}</p>
-                <p className="text-sm font-semibold text-emerald-500">Sets: {homeSetsWon}</p>
               </div>
               <div className="flex flex-col items-center gap-2">
-                <span className="rounded-full bg-background px-3 py-1 text-[10px] font-bold tracking-widest text-muted-foreground shadow-sm">SET {state ? state.currentSet + 1 : 1}</span>
-                <span className="text-xs text-muted-foreground">Best of 3</span>
+                <span className="rounded-full bg-background px-3 py-1 text-[10px] font-bold tracking-widest text-muted-foreground shadow-sm">THROWBALL</span>
+                <span className="text-xs text-muted-foreground">Single set</span>
               </div>
               <div className="flex flex-1 flex-col items-center gap-2">
                 <p className="line-clamp-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">{teamName(match.awayTeamId)}</p>
                 <p className="text-5xl font-black tracking-tighter">{currentSet?.awayScore ?? 0}</p>
-                <p className="text-sm font-semibold text-emerald-500">Sets: {awaySetsWon}</p>
               </div>
             </div>
           </div>
-
-          {state?.sets.length ? (
-            <div className="flex flex-wrap gap-2">
-              {state.sets.map((set, index) => (
-                <Badge key={`${match.id}-throwball-set-${index}`} variant={index === state.currentSet && !set.completed ? "default" : "outline"}>
-                  Set {index + 1}: {set.homeScore}-{set.awayScore}
-                </Badge>
-              ))}
-            </div>
-          ) : null}
 
           <div>
             <h2 className="mb-2 text-lg font-semibold sm:mb-3">Rally log</h2>
@@ -567,6 +553,26 @@ function ThrowballConsole({ match, players, teams, pending, run, completeMatch, 
         <CardContent className="max-sm:px-0">
           <FieldGroup>
             <div>
+              <p className="mb-2 text-sm font-medium">Scoring team</p>
+              <div className="flex flex-wrap gap-2">
+                {[match.homeTeamId, match.awayTeamId].map((candidateTeamId) => {
+                  const active = teamId === candidateTeamId;
+                  return (
+                    <button
+                      key={candidateTeamId}
+                      type="button"
+                      onClick={() => { setTeamId(candidateTeamId); resetSelections(); }}
+                      className={`rounded-md border px-4 py-2 text-sm font-medium transition-colors ${
+                        active ? "border-primary bg-primary/10 text-primary" : "bg-background hover:bg-muted"
+                      }`}
+                    >
+                      {teamName(candidateTeamId)}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            <div>
               <p className="mb-2 text-sm font-medium">Point type</p>
               <div className="flex flex-wrap gap-2">
                 <button
@@ -585,7 +591,6 @@ function ThrowballConsole({ match, players, teams, pending, run, completeMatch, 
                 </button>
               </div>
             </div>
-            <SimpleSelect label="Scoring team" value={teamId} setValue={(value) => { setTeamId(value); resetSelections(); }} items={teams.filter((team) => [match.homeTeamId, match.awayTeamId].includes(team.id)).map((team) => ({ value: team.id, label: team.name }))} />
             {pointType === "successful-attack" ? (
               <>
                 <SimpleSelect label="Attacking player" value={attackingPlayerId} setValue={setAttackingPlayerId} items={scoringTeamPlayers.map((player) => ({ value: player.id, label: playerLabel(player) }))} />

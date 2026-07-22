@@ -58,9 +58,7 @@ function cricketScore(innings?: { score: number; wickets: number; overs: string 
 }
 
 function throwballScore(match: PublicMatch, teamId: string) {
-  const setsWon = Number(match.scoreSummary?.[teamId] ?? 0);
-  const current = Number(match.scoreSummary?.[`${teamId}-current`] ?? 0);
-  return `${setsWon} (${current})`;
+  return Number(match.scoreSummary?.[teamId] ?? 0);
 }
 
 function displayAccentColor(color?: string | null) {

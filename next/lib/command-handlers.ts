@@ -192,14 +192,10 @@ function inningsSummary(innings: NonNullable<MatchDocument["cricket"]>["innings"
 }
 
 function throwballScoreSummary(match: Pick<MatchDocument, "homeTeamId" | "awayTeamId">, state: ThrowballMatchState) {
-  const homeSetsWon = state.sets.filter((set) => set.winnerTeamId === match.homeTeamId).length;
-  const awaySetsWon = state.sets.filter((set) => set.winnerTeamId === match.awayTeamId).length;
-  const currentSet = state.sets[state.currentSet];
+  const currentSet = state.sets[0];
   return {
-    [match.homeTeamId]: homeSetsWon,
-    [match.awayTeamId]: awaySetsWon,
-    [`${match.homeTeamId}-current`]: currentSet?.homeScore ?? 0,
-    [`${match.awayTeamId}-current`]: currentSet?.awayScore ?? 0,
+    [match.homeTeamId]: currentSet?.homeScore ?? 0,
+    [match.awayTeamId]: currentSet?.awayScore ?? 0,
   };
 }
 

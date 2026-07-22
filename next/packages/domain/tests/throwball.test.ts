@@ -8,7 +8,7 @@ import {
 } from "../src/throwball";
 
 describe("throwball scoring", () => {
-  it("creates an empty best-of-three match state", () => {
+  it("creates an empty single-set match state", () => {
     const state = createThrowballMatch("red", "green");
 
     expect(state.teamIds).toEqual(["red", "green"]);
@@ -40,32 +40,24 @@ describe("throwball scoring", () => {
     expect(state.playerStats.r2).toMatchObject({ ballsThrownOut: 1, playerScore: -1 });
   });
 
-  it("completes sets at 11 with a two-point lead and opens the deciding set when needed", () => {
+  it("completes the single set at 11 with a two-point lead", () => {
     let state = createThrowballMatch("red", "green");
     for (let index = 0; index < 11; index += 1) {
       state = recordThrowballRally(state, { type: "successful-attack", teamId: "red", attackingPlayerId: `r${index}` });
     }
-    for (let index = 0; index < 11; index += 1) {
-      state = recordThrowballRally(state, { type: "successful-attack", teamId: "green", attackingPlayerId: `g${index}` });
-    }
-
-    expect(state.currentSet).toBe(2);
+    expect(state.currentSet).toBe(0);
     expect(state.sets[0]).toMatchObject({ completed: true, winnerTeamId: "red", homeScore: 11, awayScore: 0 });
-    expect(state.sets[1]).toMatchObject({ completed: true, winnerTeamId: "green", homeScore: 0, awayScore: 11 });
-    expect(state.sets[2]).toMatchObject({ completed: false, homeScore: 0, awayScore: 0 });
+    expect(state.sets).toHaveLength(1);
   });
 
-  it("derives winner and natural result text after two set wins", () => {
+  it("derives winner and natural result text after the set is won", () => {
     let state = createThrowballMatch("red", "green");
     for (let index = 0; index < 11; index += 1) {
       state = recordThrowballRally(state, { type: "successful-attack", teamId: "red", attackingPlayerId: `r${index}` });
-    }
-    for (let index = 0; index < 11; index += 1) {
-      state = recordThrowballRally(state, { type: "successful-attack", teamId: "red", attackingPlayerId: `r${index + 11}` });
     }
 
     expect(getMatchWinner(state)).toBe("red");
-    expect(throwballResultText(state, (id) => (id === "red" ? "Red" : "Green"))).toBe("Red beat Green 2-0 (11-0, 11-0)");
+    expect(throwballResultText(state, (id) => (id === "red" ? "Red" : "Green"))).toBe("Red beat Green 11-0");
   });
 
   it("replays saved rally history back into the same scoreboard state", () => {
