@@ -9,6 +9,7 @@ interface LiveData<T> {
   loading: boolean;
   error: string | null;
   retry: () => void;
+  mutate: (updateFn: (prev: T) => T) => void;
 }
 
 function fromRow<T>(row: { id: string; data: unknown }) {
@@ -24,6 +25,9 @@ export function usePublicCollection<T>(collectionName: CollectionName): LiveData
     setLoading(true);
     setError(null);
     setVersion((value) => value + 1);
+  }, []);
+  const mutate = useCallback((updateFn: (prev: T[]) => T[]) => {
+    setData((prev) => updateFn(prev));
   }, []);
 
   useEffect(() => {
@@ -52,7 +56,7 @@ export function usePublicCollection<T>(collectionName: CollectionName): LiveData
     };
   }, [collectionName, version]);
 
-  return { data, loading, error, retry };
+  return { data, loading, error, retry, mutate };
 }
 
 export function usePublicDocument<T>(collectionName: CollectionName, documentId: string): LiveData<T | null> {
@@ -64,6 +68,9 @@ export function usePublicDocument<T>(collectionName: CollectionName, documentId:
     setLoading(true);
     setError(null);
     setVersion((value) => value + 1);
+  }, []);
+  const mutate = useCallback((updateFn: (prev: T | null) => T | null) => {
+    setData((prev) => updateFn(prev));
   }, []);
 
   useEffect(() => {
@@ -92,5 +99,5 @@ export function usePublicDocument<T>(collectionName: CollectionName, documentId:
     };
   }, [collectionName, documentId, version]);
 
-  return { data, loading, error, retry };
+  return { data, loading, error, retry, mutate };
 }

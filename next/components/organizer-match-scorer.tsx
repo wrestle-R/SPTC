@@ -22,15 +22,63 @@ export function OrganizerMatchScorer({ matchId }: { matchId: string }) {
   const teams = usePrivateCollection<Team>("teams");
   const players = usePrivateCollection<Player>("players");
   const [pending, setPending] = useState(false);
-  const [motmSuggestions, setMotmSuggestions] = useState<Array<{ playerId: string; total: number; reason: string }>>([]);
   const match = matchState.data;
 
   async function run(name: string, data: Record<string, unknown> = {}) {
     if (!match) return;
+    
+    const previousMatch = { ...match };
+    
+    if (name === "recordFieldEvent") {
+      const eventData = data.event as any;
+      matchState.mutate((prev) => {
+        if (!prev) return prev;
+        const newScore = { ...(prev.fieldState?.score || {}) };
+        if (eventData.type === "goal" || eventData.type === "shootout-goal") {
+           newScore[eventData.teamId] = (newScore[eventData.teamId] || 0) + 1;
+        } else if (eventData.type === "own-goal") {
+           const otherTeamId = eventData.teamId === prev.homeTeamId ? prev.awayTeamId : prev.homeTeamId;
+           newScore[otherTeamId] = (newScore[otherTeamId] || 0) + 1;
+        }
+        return {
+          ...prev,
+          fieldState: {
+            ...prev.fieldState,
+            score: newScore,
+            events: [...(prev.fieldState?.events || []), { id: `optimistic-${Date.now()}`, ...eventData }],
+          }
+        } as any;
+      });
+    } else if (name === "undoLastEvent" && match.sport !== "cricket") {
+      matchState.mutate((prev) => {
+        if (!prev || !prev.fieldState?.events?.length) return prev;
+        const events = [...prev.fieldState.events];
+        const lastEvent = events.pop() as any;
+        const newScore = { ...(prev.fieldState.score || {}) };
+        if (lastEvent) {
+          if (lastEvent.type === "goal" || lastEvent.type === "shootout-goal") {
+             newScore[lastEvent.teamId] = Math.max(0, (newScore[lastEvent.teamId] || 0) - 1);
+          } else if (lastEvent.type === "own-goal") {
+             const otherTeamId = lastEvent.teamId === prev.homeTeamId ? prev.awayTeamId : prev.homeTeamId;
+             newScore[otherTeamId] = Math.max(0, (newScore[otherTeamId] || 0) - 1);
+          }
+        }
+        return {
+          ...prev,
+          fieldState: {
+            ...prev.fieldState,
+            score: newScore,
+            events,
+          }
+        } as any;
+      });
+    }
+
     setPending(true);
     try {
-      await callOrganizerCommand(name, revisionCommand(match.id, match.revision, data));
+      await callOrganizerCommand(name, revisionCommand(previousMatch.id, previousMatch.revision, data));
     } catch (cause) {
+      matchState.mutate(() => previousMatch);
       const msg = cause instanceof Error ? cause.message : "Score update failed.";
       if (msg.includes("out of sync")) {
         toast.loading("Syncing latest match data...");
@@ -50,9 +98,8 @@ export function OrganizerMatchScorer({ matchId }: { matchId: string }) {
     } catch (cause) {
       const msg = cause instanceof Error ? cause.message : "Match completion failed.";
       try {
-        const parsed = JSON.parse(msg) as { reason?: string; message?: string; suggestions?: Array<{ playerId: string; total: number; reason: string }> };
+        const parsed = JSON.parse(msg) as { reason?: string; message?: string };
         if (parsed.reason === "MOTM_REQUIRED") {
-          setMotmSuggestions(parsed.suggestions ?? []);
           toast.error(parsed.message ?? "Select Man of the Match.");
         } else toast.error(msg);
       } catch {
@@ -76,7 +123,7 @@ export function OrganizerMatchScorer({ matchId }: { matchId: string }) {
 
     {match.status === "scheduled" && match.sport !== "cricket" ? <Card className="shadow-none"><CardHeader><CardTitle>Start match</CardTitle><CardDescription>Start scoring when the match is ready.</CardDescription></CardHeader><CardContent><Button size="lg" onClick={() => run("startMatch")} disabled={pending}>{pending ? <LoaderCircle data-icon="inline-start" className="animate-spin" /> : null}Start match</Button></CardContent></Card> : null}
 
-    {match.sport === "cricket" ? <CricketConsole key={`${match.id}-${match.status}-${match.revision}`} match={match} players={players.data} teams={teams.data} pending={pending} run={run} completeMatch={completeMatch} motmSuggestions={motmSuggestions} confirmedPlayers={confirmedPlayers} teamName={teamName} playerName={playerName} /> : <FieldConsole match={match} players={players.data} teams={teams.data} pending={pending} run={run} completeMatch={completeMatch} motmSuggestions={motmSuggestions} confirmedPlayers={confirmedPlayers} teamName={teamName} playerName={playerName} />}
+    {match.sport === "cricket" ? <CricketConsole key={`${match.id}-${match.status}-${match.revision}`} match={match} players={players.data} teams={teams.data} pending={pending} run={run} completeMatch={completeMatch} confirmedPlayers={confirmedPlayers} teamName={teamName} playerName={playerName} /> : <FieldConsole match={match} players={players.data} teams={teams.data} pending={pending} run={run} completeMatch={completeMatch} confirmedPlayers={confirmedPlayers} teamName={teamName} playerName={playerName} />}
   </div>;
 }
 
@@ -86,7 +133,7 @@ function playerLabel(player: Player) {
   return player.jerseyNumber === null ? player.name : `#${player.jerseyNumber} · ${player.name}`;
 }
 
-function CricketConsole({ match, players, teams, pending, run, completeMatch, motmSuggestions, confirmedPlayers, teamName, playerName }: { match: PublicMatch; players: Player[]; teams: Team[]; pending: boolean; run: RunCommand; completeMatch: (playerId?: string) => void; motmSuggestions: Array<{ playerId: string; total: number; reason: string }>; confirmedPlayers: Player[]; teamName: (id: string) => string; playerName: (id?: string | null) => string }) {
+function CricketConsole({ match, players, teams, pending, run, completeMatch, confirmedPlayers, teamName, playerName }: { match: PublicMatch; players: Player[]; teams: Team[]; pending: boolean; run: RunCommand; completeMatch: (playerId?: string) => void; confirmedPlayers: Player[]; teamName: (id: string) => string; playerName: (id?: string | null) => string }) {
   const entries = match.cricket?.innings ?? [];
   const currentIndex = match.cricket?.currentInnings ?? -1;
   const current = entries[currentIndex]?.state;
@@ -102,7 +149,7 @@ function CricketConsole({ match, players, teams, pending, run, completeMatch, mo
       {!current.currentBowlerId ? <ParticipantSelect label="Bowler for this over" players={bowlingPlayers.filter((player) => player.id !== current.previousOverBowlerId)} pending={pending} onSelect={(playerId) => run("selectCricketBowler", { playerId })} /> : null}
       {current.strikerId && current.currentBowlerId && !current.completed ? <DeliveryControls current={current} pending={pending} run={run} bowlingPlayers={bowlingPlayers} playerName={playerName} /> : null}
       <div className="mt-5 flex flex-wrap gap-2"><Button variant="outline" onClick={() => run("undoLastEvent")} disabled={pending || current.events.length === 0}><RotateCcw data-icon="inline-start" /> Undo last ball</Button><Button variant="destructive" onClick={() => run("endInnings")} disabled={pending || current.completed}><Square data-icon="inline-start" /> End innings</Button></div>
-      {match.resultText || current.completed ? <MotmPicker players={confirmedPlayers} suggestions={motmSuggestions} pending={pending} onComplete={completeMatch} /> : null}
+      {match.resultText || current.completed ? <MotmPicker players={confirmedPlayers} pending={pending} onComplete={completeMatch} /> : null}
     </CardContent></Card>
   </div>;
 }
@@ -285,7 +332,7 @@ function DeliveryControls({ current, pending, run, bowlingPlayers, playerName }:
 
 function ParticipantSelect({ label, players, pending, onSelect }: { label: string; players: Player[]; pending: boolean; onSelect: (id: string) => void }) { const [value, setValue] = useState(""); return <div className="mb-5 rounded-md border p-4"><FieldGroup><SimpleSelect label={label} value={value} setValue={setValue} items={players.map((player) => ({ value: player.id, label: playerLabel(player) }))} /><Button disabled={pending || !value} onClick={() => onSelect(value)}>Confirm {label.toLowerCase()}</Button></FieldGroup></div>; }
 
-function FieldConsole({ match, players, teams, pending, run, completeMatch, motmSuggestions, confirmedPlayers, teamName, playerName }: { match: PublicMatch; players: Player[]; teams: Team[]; pending: boolean; run: RunCommand; completeMatch: (playerId?: string) => void; motmSuggestions: Array<{ playerId: string; total: number; reason: string }>; confirmedPlayers: Player[]; teamName: (id: string) => string; playerName: (id?: string | null) => string }) {
+function FieldConsole({ match, players, teams, pending, run, completeMatch, confirmedPlayers, teamName, playerName }: { match: PublicMatch; players: Player[]; teams: Team[]; pending: boolean; run: RunCommand; completeMatch: (playerId?: string) => void; confirmedPlayers: Player[]; teamName: (id: string) => string; playerName: (id?: string | null) => string }) {
   const [teamId, setTeamId] = useState(match.homeTeamId);
   const [playerId, setPlayerId] = useState("");
   const [type, setType] = useState<FieldEventType>("goal");
@@ -296,38 +343,111 @@ function FieldConsole({ match, players, teams, pending, run, completeMatch, motm
   const awayScore = score[match.awayTeamId] ?? 0;
   const jerseyFor = (id: string) => players.find((player) => player.id === id)?.jerseyNumber ?? null;
 
+  const getEventMeta = (type: string) => {
+    switch (type) {
+      case "goal": return { icon: match.sport === "handball" ? "🤾" : "⚽", bg: "bg-emerald-500/10 border-emerald-500/20 text-emerald-500", label: "" };
+      case "own-goal": return { icon: match.sport === "handball" ? "🤾" : "⚽", bg: "bg-orange-500/10 border-orange-500/20 text-orange-500", label: "Own Goal" };
+      case "yellow-card": return { icon: "🟨", bg: "bg-yellow-500/10 border-yellow-500/20", label: "" };
+      case "red-card": return { icon: "🟥", bg: "bg-red-500/10 border-red-500/20", label: "" };
+      case "shootout-goal": return { icon: "✅", bg: "bg-emerald-500/10 border-emerald-500/20 text-emerald-500", label: "" };
+      case "shootout-miss": return { icon: "❌", bg: "bg-destructive/10 border-destructive/20 text-destructive", label: "" };
+      default: return { icon: "⏱", bg: "bg-primary/10 border-primary/20 text-primary", label: "" };
+    }
+  };
+
   return (
     <div className="grid gap-4 xl:grid-cols-[0.8fr_1.2fr]">
       <Card className="shadow-none">
         <CardHeader><CardTitle>Live score</CardTitle></CardHeader>
         <CardContent>
-          <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 text-center">
-            <div><p className="text-sm text-muted-foreground">{teamName(match.homeTeamId)}</p><p className="mt-2 text-5xl font-semibold">{homeScore}</p></div>
-            <span>VS</span>
-            <div><p className="text-sm text-muted-foreground">{teamName(match.awayTeamId)}</p><p className="mt-2 text-5xl font-semibold">{awayScore}</p></div>
-          </div>
-          <div className="mt-6 flex flex-col gap-2">
-            {[...(match.fieldState?.events ?? [])].reverse().map((event, index) => (
-              <div key={String(event.id ?? index)} className="flex justify-between gap-3 rounded-md border p-3 text-sm">
-                <span className="font-medium capitalize">{String(event.type).replace("-", " ")} · {jerseyFor(String(event.playerId ?? "")) !== null ? `#${jerseyFor(String(event.playerId ?? ""))} · ` : ""}{playerName(String(event.playerId ?? ""))}</span>
-                <span className="text-muted-foreground">{teamName(String(event.teamId))}</span>
+          <div className="relative overflow-hidden rounded-2xl border bg-gradient-to-b from-muted/50 to-muted/10 p-6">
+            <div className="flex items-center justify-between gap-2 text-center">
+              <div className="flex flex-1 flex-col items-center gap-2">
+                <p className="line-clamp-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">{teamName(match.homeTeamId)}</p>
+                <p className="text-5xl font-black tracking-tighter">{homeScore}</p>
               </div>
-            ))}
+              <div className="flex flex-col items-center">
+                <span className="rounded-full bg-background px-2 py-1 text-[10px] font-bold tracking-widest text-muted-foreground shadow-sm">VS</span>
+              </div>
+              <div className="flex flex-1 flex-col items-center gap-2">
+                <p className="line-clamp-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">{teamName(match.awayTeamId)}</p>
+                <p className="text-5xl font-black tracking-tighter">{awayScore}</p>
+              </div>
+            </div>
+          </div>
+          <div className="mt-6 flex flex-col gap-3">
+            {[...(match.fieldState?.events ?? [])].reverse().map((event, index) => {
+              const meta = getEventMeta(String(event.type));
+              return (
+                <div key={String(event.id ?? index)} className="flex items-center justify-between gap-3 rounded-xl border bg-card p-3 text-sm shadow-sm transition-all hover:bg-muted/50">
+                  <div className="flex min-w-0 items-center gap-3">
+                    <div className={`flex size-10 shrink-0 items-center justify-center rounded-full border text-base ${meta.bg}`}>
+                      {meta.icon}
+                    </div>
+                    <div className="flex min-w-0 flex-col">
+                      <span className="font-bold capitalize">{meta.label || String(event.type).replace("-", " ")}</span>
+                      {event.playerId ? (
+                        <div className="flex items-center gap-1.5 text-muted-foreground">
+                          {jerseyFor(String(event.playerId)) !== null ? (
+                            <span className="font-semibold">#{jerseyFor(String(event.playerId))}</span>
+                          ) : null}
+                          <span className="truncate">{playerName(String(event.playerId))}</span>
+                        </div>
+                      ) : (
+                        <span className="text-xs font-medium text-muted-foreground">Team event</span>
+                      )}
+                    </div>
+                  </div>
+                  <span className="max-w-24 shrink-0 truncate text-right text-xs font-medium text-muted-foreground">{teamName(String(event.teamId))}</span>
+                </div>
+              );
+            })}
           </div>
         </CardContent>
       </Card>
       <Card className="shadow-none">
-        <CardHeader><CardTitle>Record event</CardTitle><CardDescription>No match clock is used.</CardDescription></CardHeader>
+        <CardHeader><CardTitle>Record event</CardTitle></CardHeader>
         <CardContent>
           <FieldGroup>
-            <SimpleSelect label="Event" value={type} setValue={(value) => setType(value as FieldEventType)} items={["goal", "own-goal", "yellow-card", "red-card", "shootout-goal", "shootout-miss"].map((value) => ({ value, label: value.replaceAll("-", " ") }))} />
+            <div>
+              <p className="mb-2 text-sm font-medium">Event Type</p>
+              <div className="flex flex-wrap gap-2">
+                {[
+                  { id: "goal", icon: match.sport === "handball" ? "🤾" : "⚽", label: "Goal" },
+                  { id: "own-goal", icon: match.sport === "handball" ? "🤾" : "⚽", label: "Own Goal" },
+                  { id: "yellow-card", icon: "🟨", label: "Yellow Card" },
+                  { id: "red-card", icon: "🟥", label: "Red Card" },
+                  ...(match.stage === "decider" || match.stage === "final" ? [
+                    { id: "shootout-goal", icon: "✅", label: "Shootout Goal" },
+                    { id: "shootout-miss", icon: "❌", label: "Shootout Miss" },
+                  ] : [])
+                ].map((item) => {
+                  const isActive = type === item.id;
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => setType(item.id as FieldEventType)}
+                      className={`flex items-center gap-2 rounded-md border px-4 py-2 text-sm font-medium transition-colors ${
+                        isActive 
+                          ? "border-primary bg-primary/10 text-primary"
+                          : "bg-background hover:bg-muted"
+                      }`}
+                    >
+                      <span className="text-base">{item.icon}</span>
+                      <span>{item.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
             <SimpleSelect label="Team" value={teamId} setValue={(value) => { setTeamId(value); setPlayerId(""); }} items={teams.filter((team) => [match.homeTeamId, match.awayTeamId].includes(team.id)).map((team) => ({ value: team.id, label: team.name }))} />
             <SimpleSelect label="Player" value={playerId} setValue={setPlayerId} items={eligible.map((player) => ({ value: player.id, label: playerLabel(player) }))} />
             <Button size="lg" disabled={pending || !teamId || (!playerId && !type.startsWith("shootout"))} onClick={() => run("recordFieldEvent", { event: { type, teamId, playerId: playerId || undefined } })}>Record event</Button>
             <div className="flex flex-wrap gap-2">
               <Button variant="outline" onClick={() => run("undoLastEvent")} disabled={pending || !(match.fieldState?.events.length)}><RotateCcw data-icon="inline-start" /> Undo</Button>
             </div>
-            <MotmPicker players={confirmedPlayers} suggestions={motmSuggestions} pending={pending} onComplete={completeMatch} />
+            <MotmPicker players={confirmedPlayers} pending={pending} onComplete={completeMatch} />
           </FieldGroup>
         </CardContent>
       </Card>
@@ -335,21 +455,15 @@ function FieldConsole({ match, players, teams, pending, run, completeMatch, motm
   );
 }
 
-function MotmPicker({ players, suggestions, pending, onComplete }: { players: Player[]; suggestions: Array<{ playerId: string; total: number; reason: string }>; pending: boolean; onComplete: (playerId?: string) => void }) {
+function MotmPicker({ players, pending, onComplete }: { players: Player[]; pending: boolean; onComplete: (playerId?: string) => void }) {
   const [value, setValue] = useState("");
-  const suggestedIds = suggestions.map((row) => row.playerId);
-  const ordered = [...players].sort((a, b) => {
-    const ai = suggestedIds.indexOf(a.id);
-    const bi = suggestedIds.indexOf(b.id);
-    return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi) || a.name.localeCompare(b.name);
-  });
+  const ordered = [...players].sort((a, b) => a.name.localeCompare(b.name));
   return (
     <div className="rounded-md border p-4">
       <FieldGroup>
-        <div><p className="font-semibold">Man of the Match</p><p className="text-sm text-muted-foreground">Get suggestions, then select the award winner before completing.</p></div>
-        {suggestions.length ? <div className="grid gap-2">{suggestions.map((row) => <button key={row.playerId} type="button" onClick={() => setValue(row.playerId)} className="rounded-md border px-3 py-2 text-left text-sm hover:bg-muted"><span className="font-medium">{players.find((player) => player.id === row.playerId)?.name ?? "Player"}</span><span className="block text-xs text-muted-foreground">{row.reason} · score {row.total}</span></button>)}</div> : null}
+        <div><p className="font-semibold">Man of the Match</p><p className="text-sm text-muted-foreground">Select the award winner before completing.</p></div>
         <SimpleSelect label="Award winner" value={value} setValue={setValue} items={ordered.map((player) => ({ value: player.id, label: playerLabel(player) }))} />
-        <div className="flex flex-wrap gap-2"><Button variant="outline" onClick={() => onComplete()} disabled={pending}>Suggest names</Button><Button variant="destructive" onClick={() => onComplete(value)} disabled={pending || !value}><Trophy data-icon="inline-start" /> End match</Button></div>
+        <Button variant="destructive" onClick={() => onComplete(value)} disabled={pending || !value}><Trophy data-icon="inline-start" /> End match</Button>
       </FieldGroup>
     </div>
   );

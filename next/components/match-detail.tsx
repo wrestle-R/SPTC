@@ -72,7 +72,7 @@ export function MatchDetail({ sport, matchId }: { sport: Sport; matchId: string 
           {sport === "cricket" ? (
             <CricketScore match={match} teamName={teamName} playerName={playerName} />
           ) : (
-            <FieldScore match={match} homeName={home?.name ?? "Team"} awayName={away?.name ?? "Team"} playerName={playerName} playerJersey={playerJersey} teamName={teamName} />
+            <FieldScore match={match} homeName={home?.name ?? "Team"} awayName={away?.name ?? "Team"} playerName={playerName} playerJersey={playerJersey} teamName={teamName} sport={sport} />
           )}
           {resultText ? <p className="rounded-md bg-muted p-3 font-medium">{resultText}</p> : null}
           {match.manOfTheMatchPlayerId ? (
@@ -100,42 +100,88 @@ function fallbackPlayerName(id: string | null | undefined, teams: PublicTeam[]) 
     .join(" ") || "Player";
 }
 
-function FieldScore({ match, homeName, awayName, playerName, playerJersey, teamName }: {
+function FieldScore({ match, homeName, awayName, playerName, playerJersey, teamName, sport }: {
   match: PublicMatch;
   homeName: string;
   awayName: string;
   playerName: (id?: string) => string;
   playerJersey: (id?: string) => number | null;
   teamName: (id: string) => string;
+  sport: string;
 }) {
   const events = match.fieldState?.events ?? [];
+  const homeScore = match.fieldState?.score?.[match.homeTeamId] ?? 0;
+  const awayScore = match.fieldState?.score?.[match.awayTeamId] ?? 0;
+
+  const getEventMeta = (type: string) => {
+    switch (type) {
+      case "goal": return { icon: sport === "handball" ? "🤾" : "⚽", color: "text-emerald-500", bg: "bg-emerald-500/10 border-emerald-500/20", label: "" };
+      case "own-goal": return { icon: sport === "handball" ? "🤾" : "⚽", color: "text-orange-500", bg: "bg-orange-500/10 border-orange-500/20", label: "Own Goal" };
+      case "yellow-card": return { icon: "🟨", color: "text-yellow-500", bg: "bg-yellow-500/10 border-yellow-500/20", label: "" };
+      case "red-card": return { icon: "🟥", color: "text-red-500", bg: "bg-red-500/10 border-red-500/20", label: "" };
+      case "shootout-goal": return { icon: "✅", color: "text-emerald-500", bg: "bg-emerald-500/10 border-emerald-500/20", label: "" };
+      case "shootout-miss": return { icon: "❌", color: "text-destructive", bg: "bg-destructive/10 border-destructive/20", label: "" };
+      default: return { icon: "⏱", color: "text-primary", bg: "bg-primary/10 border-primary/20", label: "" };
+    }
+  };
+
   return (
-    <div className="flex flex-col gap-6">
-      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-4 text-center">
-        <div><p className="text-sm text-muted-foreground">{homeName}</p><p className="mt-2 text-5xl font-semibold tabular-nums">{match.fieldState?.score?.[match.homeTeamId] ?? 0}</p></div>
-        <span className="text-sm font-medium text-muted-foreground">VS</span>
-        <div><p className="text-sm text-muted-foreground">{awayName}</p><p className="mt-2 text-5xl font-semibold tabular-nums">{match.fieldState?.score?.[match.awayTeamId] ?? 0}</p></div>
+    <div className="flex flex-col gap-8">
+      {/* Scoreboard */}
+      <div className="relative overflow-hidden rounded-2xl border bg-gradient-to-b from-muted/50 to-muted/10 p-6 sm:p-10">
+        <div className="flex items-center justify-between gap-4 text-center sm:gap-8">
+          <div className="flex flex-1 flex-col items-center gap-3">
+            <p className="line-clamp-2 text-sm font-semibold uppercase tracking-wider text-muted-foreground sm:text-base">{homeName}</p>
+            <p className="text-6xl font-black tracking-tighter sm:text-8xl">{homeScore}</p>
+          </div>
+          <div className="flex flex-col items-center gap-2">
+            <span className="rounded-full bg-background px-3 py-1.5 text-xs font-bold tracking-widest text-muted-foreground shadow-sm">VS</span>
+          </div>
+          <div className="flex flex-1 flex-col items-center gap-3">
+            <p className="line-clamp-2 text-sm font-semibold uppercase tracking-wider text-muted-foreground sm:text-base">{awayName}</p>
+            <p className="text-6xl font-black tracking-tighter sm:text-8xl">{awayScore}</p>
+          </div>
+        </div>
       </div>
+
+      {/* Events */}
       <div>
-        <h2 className="mb-3 text-lg font-semibold">Match events</h2>
+        <h2 className="mb-4 text-lg font-semibold">Match events</h2>
         {events.length ? (
-          <div className="flex flex-col gap-2">
-            {[...events].reverse().map((event, index) => (
-              <div key={String(event.id ?? index)} className="flex items-start justify-between gap-4 rounded-xl border bg-card/60 p-3 text-sm">
-                <div className="flex min-w-0 items-center gap-3">
-                  <span className="grid size-10 shrink-0 place-items-center rounded-xl border border-primary/20 bg-primary/10 font-black tabular-nums text-primary">
-                    {playerJersey(String(event.playerId ?? "")) !== null ? `#${playerJersey(String(event.playerId ?? ""))}` : "—"}
-                  </span>
-                  <div className="min-w-0">
-                    <p className="font-semibold capitalize">{String(event.type).replace("-", " ")}</p>
-                    <p className="break-words text-muted-foreground">{playerName(String(event.playerId ?? ""))}</p>
+          <div className="flex flex-col gap-3">
+            {[...events].reverse().map((event, index) => {
+              const meta = getEventMeta(String(event.type));
+              
+              return (
+                <div key={String(event.id ?? index)} className="flex items-center gap-4 rounded-xl border bg-card p-3 shadow-sm transition-all hover:bg-muted/50 sm:p-4">
+                  <div className={`flex size-12 shrink-0 items-center justify-center rounded-full border text-lg ${meta.bg}`}>
+                    {meta.icon}
+                  </div>
+                  <div className="flex min-w-0 flex-1 flex-col">
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold capitalize">{meta.label || String(event.type).replace("-", " ")}</span>
+                      <span className="text-xs font-medium text-muted-foreground">• {teamName(String(event.teamId))}</span>
+                    </div>
+                    {event.playerId ? (
+                      <div className="mt-1 flex items-center gap-1.5 text-sm">
+                        {playerJersey(String(event.playerId)) !== null ? (
+                          <span className="font-semibold text-muted-foreground">#{playerJersey(String(event.playerId))}</span>
+                        ) : null}
+                        <span className="truncate font-medium">{playerName(String(event.playerId))}</span>
+                      </div>
+                    ) : (
+                      <span className="mt-1 text-sm font-medium text-muted-foreground">Team event</span>
+                    )}
                   </div>
                 </div>
-                <span className="max-w-32 shrink-0 text-right text-muted-foreground sm:max-w-none">{teamName(String(event.teamId))}</span>
-              </div>
-            ))}
+              );
+            })}
           </div>
-        ) : <p className="text-sm text-muted-foreground">No match events have been recorded.</p>}
+        ) : (
+          <div className="flex flex-col items-center justify-center rounded-xl border border-dashed py-12 text-center text-muted-foreground">
+            <p>No match events have been recorded yet.</p>
+          </div>
+        )}
       </div>
     </div>
   );
