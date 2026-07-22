@@ -156,6 +156,80 @@ describe("five-over cricket scoring", () => {
     expect(next.bowlers.g1).toMatchObject({ legalBalls: 1, runs: 1, wickets: 0 });
   });
 
+  it("lets the surviving non-striker face next ball after the striker is run out short", () => {
+    const next = recordCricketDelivery(innings(), {
+      runsOffBat: 0,
+      dismissal: { type: "run-out", playerOutId: "a", fielderId: "g2" },
+      nextStrikerId: "b",
+      replacementBatterId: "c",
+    });
+
+    expect(next.legalBalls).toBe(1);
+    expect(next.score).toBe(0);
+    expect(next.strikerId).toBe("b");
+    expect(next.nonStrikerId).toBe("c");
+    expect(next.batters.c).toMatchObject({ runs: 0, balls: 0 });
+  });
+
+  it("lets the incoming batter face next ball after an odd-run striker run-out", () => {
+    const next = recordCricketDelivery(innings(), {
+      runsOffBat: 1,
+      dismissal: { type: "run-out", playerOutId: "a", fielderId: "g2" },
+      nextStrikerId: "c",
+      replacementBatterId: "c",
+    });
+
+    expect(next.score).toBe(1);
+    expect(next.legalBalls).toBe(1);
+    expect(next.strikerId).toBe("c");
+    expect(next.nonStrikerId).toBe("b");
+  });
+
+  it("resolves a non-striker run-out with the replacement batter in the same delivery", () => {
+    const next = recordCricketDelivery(innings(), {
+      runsOffBat: 2,
+      dismissal: { type: "run-out", playerOutId: "b", fielderId: "g2" },
+      nextStrikerId: "c",
+      replacementBatterId: "c",
+    });
+
+    expect(next.score).toBe(2);
+    expect(next.legalBalls).toBe(1);
+    expect(next.strikerId).toBe("c");
+    expect(next.nonStrikerId).toBe("a");
+  });
+
+  it("records a no-ball run-out with an explicit next striker without counting a ball", () => {
+    const next = recordCricketDelivery(innings(), {
+      runsOffBat: 1,
+      extraType: "no-ball",
+      extraRuns: 1,
+      dismissal: { type: "run-out", playerOutId: "a", fielderId: "g2" },
+      nextStrikerId: "c",
+      replacementBatterId: "c",
+    });
+
+    expect(next.score).toBe(2);
+    expect(next.legalBalls).toBe(0);
+    expect(next.strikerId).toBe("c");
+    expect(next.nonStrikerId).toBe("b");
+  });
+
+  it("rejects inconsistent explicit run-out resolution data", () => {
+    expect(() => recordCricketDelivery(innings(), {
+      runsOffBat: 0,
+      dismissal: { type: "run-out", playerOutId: "a", fielderId: "g2" },
+      nextStrikerId: "c",
+    })).toThrow(/incoming batter/i);
+
+    expect(() => recordCricketDelivery(innings(), {
+      runsOffBat: 0,
+      dismissal: { type: "run-out", playerOutId: "a", fielderId: "g2" },
+      nextStrikerId: "d",
+      replacementBatterId: "c",
+    })).toThrow(/next striker/i);
+  });
+
   it("allows only run-out style dismissals on a free hit", () => {
     const freeHit = recordCricketDelivery(innings(), {
       runsOffBat: 0,

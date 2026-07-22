@@ -172,6 +172,12 @@ function dismissalAllowedOnFreeHit(type: string) {
   return ["run-out", "retired-out", "obstructing-field"].includes(type);
 }
 
+function isAvailableReplacementBatter(state: CricketInningsState, playerId: PlayerId, activeBatters: PlayerId[]) {
+  return state.battingLineup.includes(playerId)
+    && !activeBatters.includes(playerId)
+    && !state.batters[playerId]?.dismissal;
+}
+
 export function recordCricketDelivery(
   state: CricketInningsState,
   input: CricketDeliveryInput,
@@ -184,6 +190,9 @@ export function recordCricketDelivery(
   }
   if (state.freeHit && input.dismissal && !dismissalAllowedOnFreeHit(input.dismissal.type)) {
     throw new Error("That dismissal is not valid on a free hit.");
+  }
+  if ((input.nextStrikerId || input.replacementBatterId) && input.dismissal?.type !== "run-out") {
+    throw new Error("Next striker and replacement batter can only be set for a run-out.");
   }
 
   const legalDelivery = isLegalDelivery(input);
@@ -246,20 +255,61 @@ export function recordCricketDelivery(
   if (input.extraType === "leg-bye") extras.legByes += Math.max(0, input.extraRuns ?? 0);
   if (input.extraType === "penalty") extras.penalty += Math.max(0, input.extraRuns ?? 0);
 
-  let nextStriker: PlayerId | null = strikerId;
-  let nextNonStriker = nonStrikerId;
-  if (completedRunsForStrike(input) % 2 === 1) {
-    [nextStriker, nextNonStriker] = [nextNonStriker, nextStriker];
-  }
-
   let wickets = state.wickets;
   if (input.dismissal && input.dismissal.type !== "retired-hurt") {
     wickets += 1;
   }
-  if (input.dismissal?.playerOutId === nextStriker) nextStriker = null;
-  if (input.dismissal?.playerOutId === nextNonStriker) {
-    nextNonStriker = nextStriker ?? strikerId;
-    nextStriker = null;
+
+  let nextStriker: PlayerId | null = strikerId;
+  let nextNonStriker = nonStrikerId;
+
+  const runOutDismissal = input.dismissal?.type === "run-out" ? input.dismissal : null;
+  const explicitRunOutResolution = Boolean(runOutDismissal && (input.nextStrikerId || input.replacementBatterId));
+  if (runOutDismissal && explicitRunOutResolution) {
+    const dismissedBatterId = runOutDismissal.playerOutId;
+    const survivingBatterId = dismissedBatterId === strikerId ? nonStrikerId : strikerId;
+    const inningsContinues = wickets < state.battingLineup.length - 1;
+
+    if (!inningsContinues) {
+      if (input.replacementBatterId) {
+        throw new Error("No replacement batter is allowed because the innings is complete.");
+      }
+      nextStriker = null;
+      nextNonStriker = survivingBatterId;
+    } else {
+      const replacementBatterId = input.replacementBatterId;
+      if (!replacementBatterId) {
+        throw new Error("Choose the incoming batter for this run-out.");
+      }
+      if (!isAvailableReplacementBatter(state, replacementBatterId, [strikerId, nonStrikerId])) {
+        throw new Error("That replacement batter is not available.");
+      }
+      const nextStrikerId = input.nextStrikerId;
+      if (!nextStrikerId) {
+        throw new Error("Choose who faces the next ball after the run-out.");
+      }
+      if (![survivingBatterId, replacementBatterId].includes(nextStrikerId)) {
+        throw new Error("Next striker must be the surviving batter or the incoming batter.");
+      }
+      batters[replacementBatterId] = batters[replacementBatterId] ?? emptyBatter(replacementBatterId);
+      nextStriker = nextStrikerId;
+      nextNonStriker = nextStrikerId === survivingBatterId ? replacementBatterId : survivingBatterId;
+    }
+  } else {
+    let crosses = completedRunsForStrike(input);
+    if (input.dismissal?.crossedOnIncompleteRun) {
+      crosses += 1;
+    }
+
+    if (crosses % 2 === 1) {
+      [nextStriker, nextNonStriker] = [nextNonStriker, nextStriker];
+    }
+
+    if (input.dismissal?.playerOutId === nextStriker) nextStriker = null;
+    if (input.dismissal?.playerOutId === nextNonStriker) {
+      nextNonStriker = nextStriker ?? strikerId;
+      nextStriker = null;
+    }
   }
 
   const legalBalls = state.legalBalls + (legalDelivery ? 1 : 0);
@@ -273,7 +323,7 @@ export function recordCricketDelivery(
   }
   let currentBowlerId: PlayerId | null = bowlerId;
   let previousOverBowlerId = state.previousOverBowlerId;
-  if (overEnded && nextStriker) {
+  if (overEnded && nextStriker && !explicitRunOutResolution) {
     [nextStriker, nextNonStriker] = [nextNonStriker, nextStriker];
   }
   if (overEnded) {

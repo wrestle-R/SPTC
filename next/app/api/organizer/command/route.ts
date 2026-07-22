@@ -5,7 +5,7 @@ import {
   handleEditMatchEvent, handleEndInnings, handleEndMatch, handleRecordCricketDelivery, handleRecordFieldSportEvent,
   handleRefreshProjections, handleSavePlayer, handleSaveTeam, handleSaveTournamentSettings, handleSelectCricketBowler,
   handleSelectNextBatter, handleSetPlacementPoints, handleSetToss, handleStartInnings, handleStartMatch,
-  handleUndoLastEvent, handleUpdateMatch,
+  handleUndoLastEvent, handleUpdateMatch, handleDeleteMatch,
 } from "@/lib/command-handlers";
 
 export async function POST(request: Request) {
@@ -32,6 +32,7 @@ async function dispatch(command: string, data: Record<string, unknown>): Promise
     case "savePlayer": return handleSavePlayer(data);
     case "createMatch": return handleCreateMatch(data);
     case "updateMatch": return handleUpdateMatch(data);
+    case "deleteMatch": return handleDeleteMatch(data);
     case "confirmFixtures": return handleConfirmFixtures(data);
     case "setToss": return handleSetToss(data);
     case "startMatch": return handleStartMatch(data);

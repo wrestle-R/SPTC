@@ -25,6 +25,7 @@ import {
   SidebarProvider,
   SidebarRail,
   SidebarTrigger,
+  useSidebar,
 } from "@/components/ui/sidebar";
 import { getPageTitle, navigation } from "@/lib/navigation";
 
@@ -34,48 +35,9 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
 
   return (
     <SidebarProvider>
-      <Sidebar collapsible="icon">
-        <SidebarHeader className="p-3">
-          <SidebarMenu>
-            <SidebarMenuItem>
-              <SidebarMenuButton size="lg" render={<Link href="/organizer" />} tooltip="Sports Fiesta">
-                <BrandLogo className="group-data-[collapsible=icon]:[&>span:last-child]:hidden" />
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          </SidebarMenu>
-        </SidebarHeader>
-        <Separator />
-        <SidebarContent>
-          {navigation.map((group) => (
-            <SidebarGroup key={group.label}>
-              <SidebarGroupLabel>{group.label}</SidebarGroupLabel>
-              <SidebarGroupContent>
-                <SidebarMenu>
-                  {group.items.map((item) => {
-                    const Icon = item.icon;
-                    return (
-                      <SidebarMenuItem key={item.href}>
-                        <SidebarMenuButton
-                          isActive={pathname === item.href || (item.href !== "/organizer" && pathname.startsWith(`${item.href}/`))}
-                          tooltip={item.title}
-                          render={<Link href={item.href} />}
-                        >
-                          <Icon />
-                          <span>{item.title}</span>
-                        </SidebarMenuButton>
-                      </SidebarMenuItem>
-                    );
-                  })}
-                </SidebarMenu>
-              </SidebarGroupContent>
-            </SidebarGroup>
-          ))}
-        </SidebarContent>
-        <SidebarRail />
-      </Sidebar>
-
+      <DashboardSidebar />
       <SidebarInset>
-        <header className="sticky top-0 z-20 flex h-16 shrink-0 items-center justify-between gap-4 border-b bg-background/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/80 sm:px-6">
+        <header className="sticky top-0 z-20 flex h-16 shrink-0 items-center justify-between gap-4 border-b bg-background/95 px-3 backdrop-blur supports-[backdrop-filter]:bg-background/80 sm:px-6">
           <div className="flex min-w-0 items-center gap-3">
             <SidebarTrigger />
             <Separator orientation="vertical" className="h-4" />
@@ -92,8 +54,55 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
             </Breadcrumb>
           </div>
         </header>
-        <div className="flex flex-1 flex-col gap-6 p-4 sm:p-6 lg:p-8">{children}</div>
+        <div className="flex flex-1 flex-col gap-6 px-3 pb-6 pt-4 sm:px-6 sm:pb-6 lg:px-8 lg:pb-8">{children}</div>
       </SidebarInset>
     </SidebarProvider>
+  );
+}
+
+function DashboardSidebar() {
+  const pathname = usePathname();
+  const { setOpenMobile } = useSidebar();
+
+  return (
+    <Sidebar collapsible="icon">
+      <SidebarHeader className="p-3">
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton size="lg" render={<Link href="/organizer" onClick={() => setOpenMobile(false)} />} tooltip="Sports Fiesta">
+              <BrandLogo className="group-data-[collapsible=icon]:[&>span:last-child]:hidden" />
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarHeader>
+      <Separator />
+      <SidebarContent>
+        {navigation.map((group) => (
+          <SidebarGroup key={group.label}>
+            <SidebarGroupLabel>{group.label}</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {group.items.map((item) => {
+                  const Icon = item.icon;
+                  return (
+                    <SidebarMenuItem key={item.href}>
+                      <SidebarMenuButton
+                        isActive={pathname === item.href || (item.href !== "/organizer" && pathname.startsWith(`${item.href}/`))}
+                        tooltip={item.title}
+                        render={<Link href={item.href} onClick={() => setOpenMobile(false)} />}
+                      >
+                        <Icon />
+                        <span>{item.title}</span>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  );
+                })}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        ))}
+      </SidebarContent>
+      <SidebarRail />
+    </Sidebar>
   );
 }

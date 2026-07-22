@@ -1,7 +1,7 @@
 "use client";
 
 import { cricketChaseText, cricketInningsMetrics, fallOfWickets, type BatterInnings, type CricketDelivery, type CricketExtraType, type DismissalType, type FieldEventType, type Player, type Team } from "@sports-fiesta/domain";
-import { ArrowLeft, LoaderCircle, RotateCcw, Square, Trophy } from "lucide-react";
+import { ArrowLeft, LoaderCircle, RotateCcw, Square, Trophy, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { callOrganizerCommand, revisionCommand, usePrivateCollection, usePrivateDocument } from "@/lib/organizer-data";
 import type { PublicMatch } from "@/lib/web-types";
@@ -30,31 +31,40 @@ export function OrganizerMatchScorer({ matchId }: { matchId: string }) {
     const previousMatch = { ...match };
     
     if (name === "recordFieldEvent") {
-      const eventData = data.event as any;
+      const eventData = (data.event ?? {}) as {
+        type?: string;
+        teamId?: string;
+      } & Record<string, string | number | undefined>;
       matchState.mutate((prev) => {
         if (!prev) return prev;
-        const newScore = { ...(prev.fieldState?.score || {}) };
-        if (eventData.type === "goal" || eventData.type === "shootout-goal") {
+        const fieldState = prev.fieldState ?? {
+          score: { [prev.homeTeamId]: 0, [prev.awayTeamId]: 0 },
+          shootout: { [prev.homeTeamId]: 0, [prev.awayTeamId]: 0 },
+          events: [],
+        };
+        const newScore = { ...fieldState.score };
+        if ((eventData.type === "goal" || eventData.type === "shootout-goal") && eventData.teamId) {
            newScore[eventData.teamId] = (newScore[eventData.teamId] || 0) + 1;
-        } else if (eventData.type === "own-goal") {
+        } else if (eventData.type === "own-goal" && eventData.teamId) {
            const otherTeamId = eventData.teamId === prev.homeTeamId ? prev.awayTeamId : prev.homeTeamId;
            newScore[otherTeamId] = (newScore[otherTeamId] || 0) + 1;
         }
         return {
           ...prev,
           fieldState: {
-            ...prev.fieldState,
+            ...fieldState,
             score: newScore,
-            events: [...(prev.fieldState?.events || []), { id: `optimistic-${Date.now()}`, ...eventData }],
+            events: [...fieldState.events, { id: `optimistic-${Date.now()}`, ...eventData } as Record<string, string | number>],
           }
-        } as any;
+        };
       });
     } else if (name === "undoLastEvent" && match.sport !== "cricket") {
       matchState.mutate((prev) => {
         if (!prev || !prev.fieldState?.events?.length) return prev;
+        const fieldState = prev.fieldState;
         const events = [...prev.fieldState.events];
-        const lastEvent = events.pop() as any;
-        const newScore = { ...(prev.fieldState.score || {}) };
+        const lastEvent = events.pop() as Record<string, string | number> | undefined;
+        const newScore = { ...fieldState.score };
         if (lastEvent) {
           if (lastEvent.type === "goal" || lastEvent.type === "shootout-goal") {
              newScore[lastEvent.teamId] = Math.max(0, (newScore[lastEvent.teamId] || 0) - 1);
@@ -66,11 +76,11 @@ export function OrganizerMatchScorer({ matchId }: { matchId: string }) {
         return {
           ...prev,
           fieldState: {
-            ...prev.fieldState,
+            ...fieldState,
             score: newScore,
             events,
           }
-        } as any;
+        };
       });
     }
 
@@ -87,6 +97,19 @@ export function OrganizerMatchScorer({ matchId }: { matchId: string }) {
         toast.error(msg);
       }
     } finally { setPending(false); }
+  }
+
+  async function deleteMatch() {
+    if (!match) return;
+    setPending(true);
+    try {
+      await callOrganizerCommand("deleteMatch", { matchId });
+      toast.success("Match deleted.");
+      router.push("/organizer/matches");
+    } catch (cause) {
+      toast.error(cause instanceof Error ? cause.message : "Failed to delete match.");
+      setPending(false);
+    }
   }
 
   async function completeMatch(manOfTheMatchPlayerId?: string) {
@@ -119,7 +142,7 @@ export function OrganizerMatchScorer({ matchId }: { matchId: string }) {
   const confirmedPlayers = players.data.filter((player) => [match.homeTeamId, match.awayTeamId].includes(player.teamId));
 
   return <div className="flex flex-col gap-6">
-    <div className="flex flex-wrap items-start justify-between gap-4"><div><Button nativeButton={false} variant="ghost" className="mb-3" render={<Link href="/organizer/matches" />}><ArrowLeft data-icon="inline-start" /> Matches</Button><h1 className="text-2xl font-semibold">{home?.name ?? "Home"} vs {away?.name ?? "Away"}</h1><p className="mt-1 text-sm capitalize text-muted-foreground">{match.sport} · {match.stage} · revision {match.revision}</p></div><Badge variant={match.status === "live" ? "destructive" : "secondary"}>{match.status.replace("-", " ")}</Badge></div>
+    <div className="flex flex-wrap items-start justify-between gap-4"><div><Button nativeButton={false} variant="ghost" className="mb-3" render={<Link href="/organizer/matches" />}><ArrowLeft data-icon="inline-start" /> Matches</Button><h1 className="text-2xl font-semibold">{home?.name ?? "Home"} vs {away?.name ?? "Away"}</h1><p className="mt-1 text-sm capitalize text-muted-foreground">{match.sport} · {match.stage} · revision {match.revision}</p></div><div className="flex items-center gap-2"><Badge variant={match.status === "live" ? "destructive" : "secondary"}>{match.status.replace("-", " ")}</Badge><Dialog><DialogTrigger render={<Button variant="outline" size="icon" />}><Trash2 className="size-4 text-destructive" /></DialogTrigger><DialogContent><DialogHeader><DialogTitle>Delete match</DialogTitle><DialogDescription>Are you sure you want to delete this match? This action cannot be undone. All recorded events and scores for this match will be lost.</DialogDescription></DialogHeader><DialogFooter className="mt-4"><DialogClose render={<Button variant="outline" />}>Cancel</DialogClose><Button variant="destructive" disabled={pending} onClick={deleteMatch}>{pending ? <LoaderCircle className="mr-2 size-4 animate-spin" /> : null}Delete</Button></DialogFooter></DialogContent></Dialog></div></div>
 
     {match.status === "scheduled" && match.sport !== "cricket" ? <Card className="shadow-none"><CardHeader><CardTitle>Start match</CardTitle><CardDescription>Start scoring when the match is ready.</CardDescription></CardHeader><CardContent><Button size="lg" onClick={() => run("startMatch")} disabled={pending}>{pending ? <LoaderCircle data-icon="inline-start" className="animate-spin" /> : null}Start match</Button></CardContent></Card> : null}
 
@@ -139,15 +162,15 @@ function CricketConsole({ match, players, teams, pending, run, completeMatch, co
   const current = entries[currentIndex]?.state;
   if (["scheduled", "innings-break", "super-over"].includes(match.status)) return <CricketInningsSetup match={match} players={players} teams={teams} pending={pending} run={run} superOver={match.status === "super-over"} />;
   if (!current && match.status === "scheduled") return null;
-  if (!current) return <Card className="shadow-none"><CardContent className="py-12 text-center text-muted-foreground">Start the first innings to open scoring.</CardContent></Card>;
+  if (!current) return <Card className="shadow-none max-sm:border-0 max-sm:bg-transparent"><CardContent className="py-12 text-center text-muted-foreground">Start the first innings to open scoring.</CardContent></Card>;
   const battingPlayers = players.filter((player) => current.battingLineup.includes(player.id));
   const bowlingPlayers = players.filter((player) => current.bowlingLineup.includes(player.id));
   return <div className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
     <OrganizerCricketScorecard entries={entries} currentIndex={currentIndex} teamName={teamName} playerName={playerName} />
-    <Card className="shadow-none"><CardHeader><CardTitle>Ball-by-ball scoring</CardTitle><CardDescription>Score controls stay synced with the full scorecard.</CardDescription></CardHeader><CardContent>
+    <Card className="shadow-none max-sm:border-0 max-sm:bg-transparent"><CardHeader><CardTitle>Ball-by-ball scoring</CardTitle><CardDescription>Score controls stay synced with the full scorecard.</CardDescription></CardHeader><CardContent className="max-sm:px-0">
       {!current.strikerId ? <ParticipantSelect label="Next batter" players={battingPlayers.filter((player) => player.id !== current.nonStrikerId && !current.batters[player.id]?.dismissal)} pending={pending} onSelect={(playerId) => run("selectNextBatter", { playerId })} /> : null}
       {!current.currentBowlerId ? <ParticipantSelect label="Bowler for this over" players={bowlingPlayers.filter((player) => player.id !== current.previousOverBowlerId)} pending={pending} onSelect={(playerId) => run("selectCricketBowler", { playerId })} /> : null}
-      {current.strikerId && current.currentBowlerId && !current.completed ? <DeliveryControls current={current} pending={pending} run={run} bowlingPlayers={bowlingPlayers} playerName={playerName} /> : null}
+      {current.strikerId && current.currentBowlerId && !current.completed ? <DeliveryControls current={current} pending={pending} run={run} battingPlayers={battingPlayers} bowlingPlayers={bowlingPlayers} playerName={playerName} /> : null}
       <div className="mt-5 flex flex-wrap gap-2"><Button variant="outline" onClick={() => run("undoLastEvent")} disabled={pending || current.events.length === 0}><RotateCcw data-icon="inline-start" /> Undo last ball</Button><Button variant="destructive" onClick={() => run("endInnings")} disabled={pending || current.completed}><Square data-icon="inline-start" /> End innings</Button></div>
       {match.resultText || current.completed ? <MotmPicker players={confirmedPlayers} pending={pending} onComplete={completeMatch} /> : null}
     </CardContent></Card>
@@ -184,7 +207,7 @@ function OrganizerCricketScorecard({ entries, currentIndex, teamName, playerName
   };
 
   return (
-    <Card className="overflow-hidden shadow-none">
+    <Card className="overflow-hidden shadow-none max-sm:border-0 max-sm:bg-transparent">
       <CardHeader className="border-b bg-muted/30">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
@@ -201,11 +224,6 @@ function OrganizerCricketScorecard({ entries, currentIndex, teamName, playerName
             {entries.map((_, index) => <button key={index} type="button" onClick={() => setActiveInnings(index)} className={`flex-1 px-4 py-2.5 text-center text-sm font-semibold transition-colors ${index === safeIndex ? "bg-card text-card-foreground shadow-sm" : "bg-muted/50 text-muted-foreground hover:bg-muted"}`}>{inningsLabel(index)}</button>)}
           </div>
         ) : null}
-        <div className="grid gap-3 rounded-md bg-muted p-3 text-sm sm:grid-cols-3">
-          <div><p className="text-muted-foreground">Striker</p><p className="font-medium">{playerName(state.strikerId)}{state.strikerId ? "*" : ""}</p></div>
-          <div><p className="text-muted-foreground">Non-striker</p><p className="font-medium">{playerName(state.nonStrikerId)}</p></div>
-          <div><p className="text-muted-foreground">Bowler</p><p className="font-medium">{playerName(state.currentBowlerId)}{state.currentBowlerId ? "*" : ""}</p></div>
-        </div>
         <div className="rounded-lg border">
           <div className="grid grid-cols-[minmax(0,1fr)_1.75rem_1.5rem_1.5rem_1.5rem_2.75rem] gap-1 bg-muted/30 px-3 py-2 text-xs font-semibold text-muted-foreground">
             <span>Batter</span><span className="text-right">R</span><span className="text-right">B</span><span className="text-right">4s</span><span className="text-right">6s</span><span className="text-right">S/R</span>
@@ -256,7 +274,7 @@ function CricketInningsSetup({ match, players, teams, pending, run, superOver }:
   const bowlingLineup = players.filter((player) => player.teamId === bowling).map((player) => player.id);
   const [striker, setStriker] = useState(""); const [nonStriker, setNonStriker] = useState(""); const [bowler, setBowler] = useState("");
   const options = (ids: string[]) => players.filter((player) => ids.includes(player.id)).map((player) => ({ value: player.id, label: playerLabel(player) }));
-  return <Card className="shadow-none"><CardHeader><CardTitle>{superOver ? "Start Super Over" : previous ? "Start next innings" : "Start first innings"}</CardTitle><CardDescription>Select the opening participants from the team rosters.</CardDescription></CardHeader><CardContent><FieldGroup className="grid md:grid-cols-2"><SimpleSelect label="Batting team" value={batting} setValue={setBatting} items={match.homeTeamId === match.awayTeamId ? [] : [{ value: match.homeTeamId, label: teams.find((team) => team.id === match.homeTeamId)?.name ?? "Home team" }, { value: match.awayTeamId, label: teams.find((team) => team.id === match.awayTeamId)?.name ?? "Away team" }]} /><SimpleSelect label="Striker" value={striker} setValue={setStriker} items={options(battingLineup)} /><SimpleSelect label="Non-striker" value={nonStriker} setValue={setNonStriker} items={options(battingLineup).filter((item) => item.value !== striker)} /><SimpleSelect label="Opening bowler" value={bowler} setValue={setBowler} items={options(bowlingLineup)} /><Button className="md:col-span-2" size="lg" disabled={pending || !striker || !nonStriker || !bowler || striker === nonStriker} onClick={() => run("startInnings", { battingTeamId: batting, bowlingTeamId: bowling, strikerId: striker, nonStrikerId: nonStriker, bowlerId: bowler, superOver })}>Start innings</Button></FieldGroup></CardContent></Card>;
+  return <Card className="shadow-none max-sm:border-0 max-sm:bg-transparent"><CardHeader><CardTitle>{superOver ? "Start Super Over" : previous ? "Start next innings" : "Start first innings"}</CardTitle><CardDescription>Select the opening participants from the team rosters.</CardDescription></CardHeader><CardContent className="max-sm:px-0"><FieldGroup className="grid md:grid-cols-2"><SimpleSelect label="Batting team" value={batting} setValue={setBatting} items={match.homeTeamId === match.awayTeamId ? [] : [{ value: match.homeTeamId, label: teams.find((team) => team.id === match.homeTeamId)?.name ?? "Home team" }, { value: match.awayTeamId, label: teams.find((team) => team.id === match.awayTeamId)?.name ?? "Away team" }]} /><SimpleSelect label="Striker" value={striker} setValue={setStriker} items={options(battingLineup)} /><SimpleSelect label="Non-striker" value={nonStriker} setValue={setNonStriker} items={options(battingLineup).filter((item) => item.value !== striker)} /><SimpleSelect label="Opening bowler" value={bowler} setValue={setBowler} items={options(bowlingLineup)} /><Button className="md:col-span-2" size="lg" disabled={pending || !striker || !nonStriker || !bowler || striker === nonStriker} onClick={() => run("startInnings", { battingTeamId: batting, bowlingTeamId: bowling, strikerId: striker, nonStrikerId: nonStriker, bowlerId: bowler, superOver })}>Start innings</Button></FieldGroup></CardContent></Card>;
 }
 
 function cricketEventLabel(event: CricketDelivery) {
@@ -272,32 +290,77 @@ function cricketEventLabel(event: CricketDelivery) {
   return parts.length ? parts.join(" + ") : String(event.totalRuns);
 }
 
-function DeliveryControls({ current, pending, run, bowlingPlayers, playerName }: { current: NonNullable<NonNullable<PublicMatch["cricket"]>["innings"][number]["state"]>; pending: boolean; run: RunCommand; bowlingPlayers: Player[]; playerName: (id?: string | null) => string }) {
+function DeliveryControls({ current, pending, run, battingPlayers, bowlingPlayers, playerName }: { current: NonNullable<NonNullable<PublicMatch["cricket"]>["innings"][number]["state"]>; pending: boolean; run: RunCommand; battingPlayers: Player[]; bowlingPlayers: Player[]; playerName: (id?: string | null) => string }) {
   const [extraRuns, setExtraRuns] = useState(1);
-  const [dismissal, setDismissal] = useState<DismissalType>("bowled");
+  const [dismissal, setDismissal] = useState<DismissalType | "">("");
   const [fielderId, setFielderId] = useState("");
   const [runOutRuns, setRunOutRuns] = useState(0);
   const [runOutNoBall, setRunOutNoBall] = useState(false);
   const [runOutPlayerId, setRunOutPlayerId] = useState(current.strikerId ?? "");
   const [runOutFielderId, setRunOutFielderId] = useState("");
-  const needsFielder = dismissal === "caught" || dismissal === "stumped" || dismissal === "run-out";
+  const [runOutIncomingBatterId, setRunOutIncomingBatterId] = useState("");
+  const [runOutNextStrikerId, setRunOutNextStrikerId] = useState("");
+  const [runOutOpen, setRunOutOpen] = useState(false);
+  const needsFielder = dismissal === "caught" || dismissal === "stumped";
   const delivery = (data: Record<string, unknown>) => run("recordCricketDelivery", { delivery: data });
+  const activeBatters = [
+    current.strikerId ? { value: current.strikerId, label: `Striker · ${playerName(current.strikerId)}` } : null,
+    current.nonStrikerId ? { value: current.nonStrikerId, label: `Non-striker · ${playerName(current.nonStrikerId)}` } : null,
+  ].filter((item): item is { value: string; label: string } => Boolean(item));
+  const runOutNeedsReplacement = current.wickets + 1 < current.battingLineup.length - 1;
+  const eligibleIncomingBatters = battingPlayers.filter((player) => player.id !== current.strikerId && player.id !== current.nonStrikerId && !current.batters[player.id]?.dismissal);
+  const survivingBatterId = runOutPlayerId === current.strikerId ? current.nonStrikerId : current.strikerId ?? current.nonStrikerId;
+  const selectedIncomingBatterId = eligibleIncomingBatters.some((player) => player.id === runOutIncomingBatterId)
+    ? runOutIncomingBatterId
+    : eligibleIncomingBatters[0]?.id ?? "";
+  const selectedNextStrikerId = [
+    survivingBatterId,
+    ...(runOutNeedsReplacement && selectedIncomingBatterId ? [selectedIncomingBatterId] : []),
+  ].includes(runOutNextStrikerId)
+    ? runOutNextStrikerId
+    : survivingBatterId;
+
+  const openRunOutModal = () => {
+    const defaultOutBatterId = current.strikerId ?? current.nonStrikerId;
+    const nextSurvivingBatterId = defaultOutBatterId === current.strikerId ? current.nonStrikerId : current.strikerId ?? current.nonStrikerId;
+    setRunOutRuns(0);
+    setRunOutNoBall(false);
+    setRunOutPlayerId(defaultOutBatterId);
+    setRunOutFielderId("");
+    setRunOutIncomingBatterId(eligibleIncomingBatters[0]?.id ?? "");
+    setRunOutNextStrikerId(nextSurvivingBatterId);
+    setRunOutOpen(true);
+  };
+
   const recordWicket = () => {
+    if (dismissal === "run-out") {
+      openRunOutModal();
+      return;
+    }
     const dismissData: Record<string, unknown> = { type: dismissal, playerOutId: current.strikerId };
     if (needsFielder && fielderId) dismissData.fielderId = fielderId;
     delivery({ runsOffBat: 0, dismissal: dismissData });
+    setDismissal("");
+    setFielderId("");
   };
   const recordRunOut = () => {
     delivery({
       runsOffBat: runOutRuns,
       ...(runOutNoBall ? { extraType: "no-ball" satisfies CricketExtraType, extraRuns: 1 } : {}),
       dismissal: { type: "run-out", playerOutId: runOutPlayerId, fielderId: runOutFielderId },
+      ...(runOutNeedsReplacement ? { nextStrikerId: selectedNextStrikerId, replacementBatterId: selectedIncomingBatterId } : {}),
     });
+    setRunOutOpen(false);
+    setDismissal("");
+    setRunOutIncomingBatterId("");
+    setRunOutNextStrikerId("");
   };
-  const activeBatters = [
-    current.strikerId ? { value: current.strikerId, label: `Striker · ${playerName(current.strikerId)}` } : null,
-    current.nonStrikerId ? { value: current.nonStrikerId, label: `Non-striker · ${playerName(current.nonStrikerId)}` } : null,
-  ].filter((item): item is { value: string; label: string } => Boolean(item));
+  const nextStrikerItems = [
+    { value: survivingBatterId, label: `Surviving batter · ${playerName(survivingBatterId)}` },
+    ...(runOutNeedsReplacement && selectedIncomingBatterId
+      ? [{ value: selectedIncomingBatterId, label: `Incoming batter · ${playerName(selectedIncomingBatterId)}` }]
+      : []),
+  ];
   return (
     <div className="flex flex-col gap-5">
       <div>
@@ -307,25 +370,53 @@ function DeliveryControls({ current, pending, run, bowlingPlayers, playerName }:
       <div>
         <p className="mb-2 text-sm font-medium">Extras</p>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3"><Button variant="outline" disabled={pending} onClick={() => delivery({ runsOffBat: 0, extraType: "wide", extraRuns: 1 })}>Wide +1</Button><Button variant="outline" disabled={pending} onClick={() => delivery({ runsOffBat: 0, extraType: "no-ball", extraRuns: 1 })}>No ball +1</Button><Button variant="outline" disabled={pending} onClick={() => delivery({ runsOffBat: 0, extraType: "dead-ball" })}>Dead ball</Button></div>
+        <div className="mt-2">
+          <p className="mb-2 text-xs font-medium text-muted-foreground">No ball + bat runs</p>
+          <div className="grid grid-cols-4 gap-2 sm:grid-cols-7">
+            {[0, 1, 2, 3, 4, 5, 6].map((runs) => (
+              <Button
+                key={`no-ball-${runs}`}
+                variant={runs === 4 || runs === 6 ? "default" : "outline"}
+                className="h-11 text-sm"
+                disabled={pending}
+                onClick={() => delivery({ runsOffBat: runs, extraType: "no-ball", extraRuns: 1 })}
+              >
+                Nb + {runs}
+              </Button>
+            ))}
+          </div>
+        </div>
         <div className="mt-2 grid grid-cols-[90px_1fr_1fr] gap-2"><Input type="number" min="1" max="6" value={extraRuns} onChange={(event) => setExtraRuns(Number(event.target.value))} aria-label="Extra runs" /><Button variant="outline" onClick={() => delivery({ runsOffBat: 0, extraType: "bye" satisfies CricketExtraType, extraRuns })}>Bye</Button><Button variant="outline" onClick={() => delivery({ runsOffBat: 0, extraType: "leg-bye" satisfies CricketExtraType, extraRuns })}>Leg bye</Button></div>
       </div>
-      <div className="rounded-xl border p-3">
-        <p className="mb-2 text-sm font-medium">Run out on this ball</p>
-        <div className="grid gap-2 sm:grid-cols-2">
-          <SimpleSelect label="Completed runs" value={String(runOutRuns)} setValue={(value) => setRunOutRuns(Number(value))} items={[0, 1, 2, 3].map((runs) => ({ value: String(runs), label: `${runs} run${runs === 1 ? "" : "s"}` }))} />
-          <SimpleSelect label="Out batter" value={runOutPlayerId} setValue={setRunOutPlayerId} items={activeBatters} />
-          <SimpleSelect label="Fielder" value={runOutFielderId} setValue={setRunOutFielderId} items={bowlingPlayers.map((player) => ({ value: player.id, label: playerLabel(player) }))} />
-          <Button type="button" variant={runOutNoBall ? "default" : "outline"} onClick={() => setRunOutNoBall((value) => !value)} disabled={pending}>
-            {runOutNoBall ? "No ball included" : "Add no ball"}
-          </Button>
-          <Button className="sm:col-span-2" variant="destructive" disabled={pending || !runOutPlayerId || !runOutFielderId} onClick={recordRunOut}>Record run out</Button>
-        </div>
-      </div>
       <div>
-        <p className="mb-2 text-sm font-medium">Other wicket</p>
-        <div className="grid gap-2 sm:grid-cols-[1fr_auto]"><SimpleSelect label="Dismissal" hideLabel value={dismissal} setValue={(value) => { setDismissal(value as DismissalType); setFielderId(""); }} items={["bowled", "caught", "lbw", "stumped", "hit-wicket", "retired-hurt", "retired-out", "obstructing-field"].map((value) => ({ value, label: value.replaceAll("-", " ") }))} /><Button variant="destructive" disabled={pending || (needsFielder && !fielderId)} onClick={recordWicket}>Record wicket</Button></div>
-        {needsFielder ? <SimpleSelect label={dismissal === "caught" ? "Catcher" : dismissal === "stumped" ? "Keeper" : "Fielder"} value={fielderId} setValue={setFielderId} items={bowlingPlayers.map((player) => ({ value: player.id, label: playerLabel(player) }))} /> : null}
+        <p className="mb-2 text-sm font-medium">Record wicket</p>
+        <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
+          <SimpleSelect label="Dismissal" hideLabel value={dismissal} setValue={(value) => { setDismissal(value as DismissalType); setFielderId(""); }} items={["bowled", "caught", "lbw", "stumped", "run-out", "hit-wicket", "retired-hurt", "retired-out", "obstructing-field"].map((value) => ({ value, label: value.replaceAll("-", " ") }))} />
+          <Button variant="destructive" disabled={pending || !dismissal || (needsFielder && !fielderId)} onClick={recordWicket}>Record wicket</Button>
+        </div>
+        {needsFielder ? <div className="mt-2"><SimpleSelect label={dismissal === "caught" ? "Catcher" : "Keeper"} value={fielderId} setValue={setFielderId} items={bowlingPlayers.map((player) => ({ value: player.id, label: playerLabel(player) }))} /></div> : null}
       </div>
+      <Dialog open={runOutOpen} onOpenChange={setRunOutOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Run out details</DialogTitle><DialogDescription>Provide details about the run out to accurately reflect the score and next strike.</DialogDescription></DialogHeader>
+          <div className="grid gap-4 py-2">
+            <SimpleSelect label="Completed runs" value={String(runOutRuns)} setValue={(value) => setRunOutRuns(Number(value))} items={[0, 1, 2, 3, 4, 5, 6].map((runs) => ({ value: String(runs), label: `${runs} run${runs === 1 ? "" : "s"}` }))} />
+            <SimpleSelect label="Out batter" value={runOutPlayerId} setValue={setRunOutPlayerId} items={activeBatters} />
+            <SimpleSelect label="Fielder" value={runOutFielderId} setValue={setRunOutFielderId} items={bowlingPlayers.map((player) => ({ value: player.id, label: playerLabel(player) }))} />
+            {runOutNeedsReplacement ? <SimpleSelect label="Incoming batter" value={selectedIncomingBatterId} setValue={setRunOutIncomingBatterId} items={eligibleIncomingBatters.map((player) => ({ value: player.id, label: playerLabel(player) }))} /> : null}
+            {runOutNeedsReplacement ? <SimpleSelect label="Next striker" value={selectedNextStrikerId} setValue={setRunOutNextStrikerId} items={nextStrikerItems} /> : null}
+            <div className="grid grid-cols-2 gap-2">
+              <Button type="button" variant={runOutNoBall ? "default" : "outline"} onClick={() => setRunOutNoBall((value) => !value)} disabled={pending}>
+                {runOutNoBall ? "No ball included" : "Add no ball"}
+              </Button>
+            </div>
+          </div>
+          <DialogFooter>
+            <DialogClose render={<Button variant="outline" />}>Cancel</DialogClose>
+            <Button variant="destructive" disabled={pending || !runOutPlayerId || !runOutFielderId || (runOutNeedsReplacement && (!selectedIncomingBatterId || !selectedNextStrikerId))} onClick={recordRunOut}>Confirm run out</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

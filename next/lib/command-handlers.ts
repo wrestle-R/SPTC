@@ -349,6 +349,21 @@ export async function handleUpdateMatch(data: CallableData) {
   return { id };
 }
 
+export async function handleDeleteMatch(data: CallableData) {
+  const id = asString(data.matchId, "Match");
+  const match = await getDocument<MatchDocument>("matches", id);
+  if (!match) throw new CommandError(404, "NOT_FOUND", "Match not found.");
+  
+  const { error } = await supabaseAdmin.from("matches").delete().eq("id", id);
+  if (error) throw new CommandError(500, "INTERNAL", error.message);
+  
+  if (match.status === "completed") {
+    await handleRefreshProjections();
+  }
+  
+  return { id, deleted: true };
+}
+
 export async function handleConfirmFixtures(data: CallableData) {
   const sport = asString(data.sport, "Sport");
   const current = await getDocument<JsonDocument>("sports", sport);

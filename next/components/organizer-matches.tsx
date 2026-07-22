@@ -72,11 +72,11 @@ export function OrganizerMatches() {
       <section className="flex flex-col gap-3">
         <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-lg font-semibold">Tournament fixtures</h2><p className="text-sm text-muted-foreground">Open any fixture to manage scoring.</p></div><Badge variant="outline">{matches.data.length} total</Badge></div>
         {!matches.data.length ? <Card className="border-dashed shadow-none"><CardContent className="flex min-h-44 flex-col items-center justify-center gap-3 text-center"><p className="font-semibold">No fixtures yet</p><p className="mt-1 max-w-md text-sm text-muted-foreground">Create a fixture above. Nothing will be restored automatically.</p></CardContent></Card> : (
-          <Tabs defaultValue="live" className="gap-4">
-            <TabsList className="grid h-auto w-full grid-cols-3 bg-muted/60 p-1 sm:w-fit sm:min-w-lg">
-              <TabsTrigger value="live" className="min-h-10 px-3"><Activity /> Live <Badge variant="secondary">{groups.live.length}</Badge></TabsTrigger>
-              <TabsTrigger value="scheduled" className="min-h-10 px-3"><Clock3 /> Scheduled <Badge variant="secondary">{groups.scheduled.length}</Badge></TabsTrigger>
-              <TabsTrigger value="completed" className="min-h-10 px-3"><CheckCircle2 /> Completed <Badge variant="secondary">{groups.completed.length}</Badge></TabsTrigger>
+          <Tabs defaultValue="live">
+            <TabsList className="mb-4 inline-flex h-auto w-full flex-wrap items-center justify-start rounded-lg bg-muted p-1 text-muted-foreground sm:w-fit">
+              <TabsTrigger value="live" className="min-h-10 flex-1 px-3 sm:flex-none"><Activity /> Live <Badge variant="secondary">{groups.live.length}</Badge></TabsTrigger>
+              <TabsTrigger value="scheduled" className="min-h-10 flex-1 px-3 sm:flex-none"><Clock3 /> Scheduled <Badge variant="secondary">{groups.scheduled.length}</Badge></TabsTrigger>
+              <TabsTrigger value="completed" className="min-h-10 flex-1 px-3 sm:flex-none"><CheckCircle2 /> Completed <Badge variant="secondary">{groups.completed.length}</Badge></TabsTrigger>
             </TabsList>
             <TabsContent value="live"><FixtureGrid matches={groups.live} teams={teams.data} empty="No match is live right now." /></TabsContent>
             <TabsContent value="scheduled"><FixtureGrid matches={groups.scheduled} teams={teams.data} empty="No scheduled fixtures." /></TabsContent>

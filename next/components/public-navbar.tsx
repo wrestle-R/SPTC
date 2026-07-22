@@ -26,12 +26,12 @@ export function PublicNavbar() {
   useMotionValueEvent(scrollY, "change", (latest) => setScrolled(latest > 24));
 
   return (
-    <header className="fixed inset-x-0 top-0 z-50 px-3 pt-3 sm:px-5">
+    <header className="fixed inset-x-0 top-0 z-50 px-0 pt-0 sm:px-5 sm:pt-3">
       <motion.div
         animate={{ y: scrolled ? 4 : 0 }}
         className={cn(
-          "mx-auto flex h-14 max-w-6xl items-center justify-between border border-transparent px-3 transition-colors sm:px-4",
-          scrolled && "rounded-full border-border/70 bg-background/85 shadow-sm backdrop-blur-xl",
+          "flex h-14 w-full items-center justify-between border border-transparent px-3 transition-colors sm:mx-auto sm:max-w-6xl sm:px-4",
+          scrolled && "bg-background/92 shadow-sm backdrop-blur-xl sm:rounded-full sm:border-border/70",
         )}
       >
         <Link href="/" aria-label="Sports Fiesta home" onClick={() => setOpen(false)}>
@@ -78,7 +78,7 @@ export function PublicNavbar() {
             initial={{ opacity: 0, y: -8 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -8 }}
-            className="mx-auto mt-2 grid max-w-6xl gap-1 rounded-lg border bg-background/95 p-2 shadow-lg backdrop-blur-xl md:hidden"
+            className="mt-1 grid w-full gap-1 border-t bg-background/95 p-2 shadow-lg backdrop-blur-xl sm:mx-auto sm:mt-2 sm:max-w-6xl sm:rounded-lg sm:border"
           >
             {links.map((link) => (
               <Link

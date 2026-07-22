@@ -51,6 +51,7 @@ export interface CricketDismissal {
   playerOutId: PlayerId;
   fielderId?: PlayerId;
   assistFielderId?: PlayerId;
+  crossedOnIncompleteRun?: boolean;
 }
 
 export interface CricketDeliveryInput {
@@ -58,6 +59,8 @@ export interface CricketDeliveryInput {
   extraType?: CricketExtraType;
   extraRuns?: number;
   dismissal?: CricketDismissal;
+  nextStrikerId?: PlayerId;
+  replacementBatterId?: PlayerId;
   commentary?: string;
   pitchX?: number;
   pitchY?: number;

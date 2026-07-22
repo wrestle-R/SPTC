@@ -31,7 +31,7 @@ export function MatchDetail({ sport, matchId }: { sport: Sport; matchId: string 
   if (matchState.error) return <DataError message={matchState.error} retry={matchState.retry} />;
   if (!match || match.sport !== sport) {
     return (
-      <Card className="shadow-none">
+      <Card className="shadow-none max-sm:border-0 max-sm:bg-transparent">
         <CardContent className="flex min-h-64 flex-col items-center justify-center gap-3 text-center">
           <CircleDashed />
           <div>
@@ -58,7 +58,7 @@ export function MatchDetail({ sport, matchId }: { sport: Sport; matchId: string 
       <Button nativeButton={false} className="w-fit" variant="ghost" render={<Link href={`/${sport}`} />}>
         <ArrowLeft data-icon="inline-start" /> Fixtures
       </Button>
-      <Card className="overflow-hidden shadow-none">
+      <Card className="overflow-hidden shadow-none max-sm:border-0 max-sm:bg-transparent">
         <CardHeader className="border-b bg-muted/30">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
