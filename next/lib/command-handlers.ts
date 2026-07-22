@@ -59,8 +59,38 @@ function seededTeamName(teamId: string) {
 }
 
 async function backfillSeedMatches() {
+  const storedPlayers = await _r().privateCollection("players").get();
   const batch = _r().db.batch();
   const now = FieldValue.serverTimestamp();
+  const teamIds = new Set(S9_TEAMS.map((team) => team.id));
+  const rosterKey = (teamId: unknown, name: unknown) => `${String(teamId)}:${String(name).trim().toLocaleLowerCase()}`;
+  const storedByRosterKey = new Map<string, Array<{ id: string; data: DocumentData }>>();
+  for (const snapshot of storedPlayers.docs) {
+    const data = snapshot.data();
+    const key = rosterKey(data.teamId, data.name);
+    storedByRosterKey.set(key, [...(storedByRosterKey.get(key) ?? []), { id: snapshot.id, data }]);
+  }
+  for (const player of S9_PLAYERS) {
+    const candidates = storedByRosterKey.get(rosterKey(player.teamId, player.name)) ?? [];
+    const source = candidates.find((candidate) => candidate.id === player.id) ?? candidates[0];
+    const canonicalPlayer = {
+      ...player,
+      ...(source?.data ?? {}),
+      id: player.id,
+      teamId: player.teamId,
+      name: player.name,
+      jerseyNumber: player.jerseyNumber,
+      updatedAt: now,
+    };
+    batch.set(_r().privateCollection("players").doc(player.id), canonicalPlayer, { merge: true });
+    batch.set(_r().publicCollection("players").doc(player.id), canonicalPlayer, { merge: true });
+  }
+  for (const snapshot of storedPlayers.docs) {
+    const data = snapshot.data();
+    if (!teamIds.has(String(data.teamId)) || S9_PLAYERS.some((player) => player.id === snapshot.id)) continue;
+    batch.delete(_r().privateCollection("players").doc(snapshot.id));
+    batch.delete(_r().publicCollection("players").doc(snapshot.id));
+  }
   for (const seededMatch of S9_SEEDED_MATCHES) {
     const match = {
       ...seededMatch,
@@ -82,7 +112,7 @@ export async function handleBootstrap() {
   const existing = await _r().privateRoot.get();
   if (existing.exists && existing.data()?.bootstrapped === true) {
     await backfillSeedMatches();
-    return { bootstrapped: false, reason: "already-exists", matches: S9_SEEDED_MATCHES.length };
+    return { bootstrapped: false, synchronized: true, reason: "already-exists", matches: S9_SEEDED_MATCHES.length };
   }
 
   const batch = _r().db.batch();
@@ -141,7 +171,7 @@ export async function handleBootstrap() {
     batch.set(_r().publicCollection("standings").doc(key), { rows });
   }
   await batch.commit();
-  return { bootstrapped: true, teams: S9_TEAMS.length, players: S9_PLAYERS.length, matches: S9_SEEDED_MATCHES.length };
+  return { bootstrapped: true, synchronized: true, teams: S9_TEAMS.length, players: S9_PLAYERS.length, matches: S9_SEEDED_MATCHES.length };
 }
 
 // --- CRUD Commands ---

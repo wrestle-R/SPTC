@@ -1,8 +1,8 @@
 "use client";
 
 import { S9_SEEDED_MATCHES, S9_TEAMS } from "@sports-fiesta/domain";
-import { ArrowRight, CheckCircle2, Clock, Radio, Users } from "lucide-react";
-import { MdSportsSoccer, MdSportsHandball, MdSportsCricket } from "react-icons/md";
+import { ArrowRight, ArrowUpRight, CheckCircle2, Clock, Radio, Users } from "lucide-react";
+import { TbPlayFootball, TbPlayHandball, TbCricket } from "react-icons/tb";
 import Link from "next/link";
 import { DataError, ContentSkeleton } from "@/components/data-state";
 import { MatchCard } from "@/components/match-card";
@@ -13,9 +13,9 @@ import { usePublicCollection } from "@/lib/public-data";
 import type { PublicMatch, PublicTeam } from "@/lib/web-types";
 
 const sportLinks = [
-  { href: "/football", label: "Football", icon: MdSportsSoccer, color: "text-orange-500", bg: "bg-orange-500/10" },
-  { href: "/handball", label: "Handball", icon: MdSportsHandball, color: "text-teal-500", bg: "bg-teal-500/10" },
-  { href: "/cricket", label: "Cricket", icon: MdSportsCricket, color: "text-yellow-500", bg: "bg-yellow-500/10" },
+  { href: "/football", label: "Football", icon: TbPlayFootball, color: "text-orange-400", bg: "bg-orange-500/15", glow: "from-orange-500/15", line: "stroke-orange-400/25" },
+  { href: "/handball", label: "Handball", icon: TbPlayHandball, color: "text-teal-400", bg: "bg-teal-500/15", glow: "from-teal-500/15", line: "stroke-teal-400/25" },
+  { href: "/cricket", label: "Cricket", icon: TbCricket, color: "text-amber-400", bg: "bg-amber-500/15", glow: "from-amber-500/15", line: "stroke-amber-400/25" },
 ] as const;
 
 export function HomeView() {
@@ -78,15 +78,22 @@ export function HomeView() {
 
       <section className="flex flex-col gap-3" aria-label="Events">
         <p className="text-sm font-semibold uppercase tracking-wider text-primary">Events</p>
-        <div className="grid grid-cols-3 gap-3">
-          {sportLinks.map(({ href, label, icon: Icon, color, bg }) => (
+        <div className="grid gap-3 sm:grid-cols-3">
+          {sportLinks.map(({ href, label, icon: Icon, color, bg, glow, line }) => (
             <Link key={href} href={href} className="group rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-              <Card className="shadow-sm transition-all hover:shadow-md hover:border-primary/30 hover:-translate-y-0.5">
-                <CardContent className="flex flex-col items-center gap-2 p-3 sm:flex-row sm:p-4">
-                  <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${bg} ${color}`}>
-                    <Icon className="h-5 w-5" />
+              <Card className="relative min-h-24 overflow-hidden border-white/10 bg-card/80 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-primary/35 hover:shadow-lg">
+                <div className={`pointer-events-none absolute inset-0 bg-gradient-to-r ${glow} via-transparent to-transparent opacity-80`} />
+                <svg aria-hidden="true" viewBox="0 0 180 80" className={`pointer-events-none absolute inset-y-0 right-0 h-full w-1/2 fill-none ${line}`}>
+                  <circle cx="145" cy="40" r="27" strokeWidth="1.2" />
+                  <circle cx="145" cy="40" r="17" strokeWidth="1" />
+                  <path d="M86 8 126 40 86 72M111 8l40 32-40 32M136 8l40 32-40 32" strokeWidth="1" />
+                </svg>
+                <CardContent className="relative flex min-h-24 items-center gap-4 p-4">
+                  <div className={`grid size-12 shrink-0 place-items-center rounded-2xl border border-white/10 ${bg} ${color} shadow-inner transition-transform duration-300 group-hover:scale-110 group-hover:-rotate-3`}>
+                    <Icon className="size-7" strokeWidth={1.8} />
                   </div>
-                  <span className="text-sm font-bold sm:text-base">{label}</span>
+                  <span className="text-base font-bold tracking-tight">{label}</span>
+                  <ArrowUpRight className={`ml-auto size-5 ${color} opacity-60 transition-all group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:opacity-100`} />
                 </CardContent>
               </Card>
             </Link>

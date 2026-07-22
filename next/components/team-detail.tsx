@@ -1,20 +1,20 @@
 "use client";
 
-import type { Team } from "@sports-fiesta/domain";
+import { S9_PLAYERS, type Team } from "@sports-fiesta/domain";
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import { ArrowLeft, Crown, Star, Users } from "lucide-react";
+import { useState } from "react";
+import { ArrowLeft, Crown, Rotate3D, Sparkles, Star, Users } from "lucide-react";
 import { usePublicCollection } from "@/lib/public-data";
 import type { PublicPlayer } from "@/lib/web-types";
 import { ContentSkeleton } from "@/components/data-state";
 import { motion } from "framer-motion";
 
 const TEAM_JERSEYS: Record<string, { front: string; back: string }> = {
-  "crimson-warriors": { front: "/Jersey/red-front.png", back: "/Jersey/red-back.png" },
-  "gods-gladiators": { front: "/Jersey/blue-front.png", back: "/Jersey/blue-back.png" },
-  "karuppu-knights": { front: "/Jersey/black-front.png", back: "/Jersey/black-back.png" },
-  "ivory-elites": { front: "/Jersey/ivory-front.png", back: "/Jersey/ivory-back.png" },
+  "crimson-warriors": { front: "/Jersey/red-front-v2.png", back: "/Jersey/red-back-v2.png" },
+  "gods-gladiators": { front: "/Jersey/blue-front-v2.png", back: "/Jersey/blue-back-v2.png" },
+  "karuppu-knights": { front: "/Jersey/black-front-v2.png", back: "/Jersey/black-back-v2.png" },
+  "ivory-elites": { front: "/Jersey/ivory-front-v2.png", back: "/Jersey/ivory-back-v2.png" },
 };
 
 const TEAM_GRADIENTS: Record<string, string> = {
@@ -41,7 +41,13 @@ const TEAM_TEXT_COLORS: Record<string, string> = {
 export function TeamDetail({ team }: { team: Team }) {
   const playersState = usePublicCollection<PublicPlayer>("players");
   const jerseys = TEAM_JERSEYS[team.id];
-  const roster = playersState.data?.filter(p => p.teamId === team.id && p.active) || [];
+  const roster = S9_PLAYERS
+    .filter((player) => player.teamId === team.id)
+    .map((seededPlayer) => {
+      const storedPlayer = playersState.data.find((player) => player.id === seededPlayer.id);
+      return { ...seededPlayer, ...storedPlayer, jerseyNumber: seededPlayer.jerseyNumber };
+    })
+    .filter((player) => player.active);
   const gradient = TEAM_GRADIENTS[team.id] || "from-zinc-600 to-zinc-400";
   const glow = TEAM_GLOWS[team.id] || "shadow-zinc-500/30";
   const textColor = TEAM_TEXT_COLORS[team.id] || "text-white";
@@ -75,18 +81,16 @@ export function TeamDetail({ team }: { team: Team }) {
         </div>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[1fr_1.2fr]">
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.25fr)]">
         <div className="flex flex-col">
-          <div className="relative flex items-center justify-center rounded-3xl border bg-gradient-to-br from-muted/50 to-muted/10 p-8 perspective-1000 min-h-[420px] overflow-hidden shadow-inner">
-            <div className="absolute inset-0 opacity-40">
-              <div className="absolute left-1/2 top-1/2 h-96 w-96 -translate-x-1/2 -translate-y-1/2 rounded-full bg-gradient-to-br from-primary/10 to-transparent blur-3xl" />
+          <div className="perspective-1000 relative flex min-h-[480px] items-center justify-center overflow-hidden rounded-3xl border border-white/10 bg-[radial-gradient(circle_at_50%_35%,color-mix(in_oklab,var(--color-primary)_18%,transparent),transparent_48%),linear-gradient(145deg,var(--color-card),var(--color-muted))] p-5 shadow-xl sm:p-8">
+            <div className="pointer-events-none absolute inset-0 opacity-35 [background-image:linear-gradient(rgba(255,255,255,.08)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.08)_1px,transparent_1px)] [background-size:28px_28px] [mask-image:linear-gradient(to_bottom,black,transparent_80%)]" />
+            <div className="absolute left-4 top-4 z-20 flex items-center gap-2 rounded-full border border-white/10 bg-background/80 px-3 py-1.5 text-xs font-bold shadow-sm backdrop-blur-xl">
+              <Sparkles className="size-3.5 text-primary" /> Official kit
             </div>
             {jerseys ? (
               <JerseyFlipping front={jerseys.front} back={jerseys.back} alt={team.name} />
             ) : null}
-            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 text-xs text-muted-foreground font-semibold tracking-wide bg-background/50 backdrop-blur-sm px-3 py-1 rounded-full border">
-              Hover or tap to flip
-            </div>
           </div>
         </div>
 
@@ -107,8 +111,8 @@ export function TeamDetail({ team }: { team: Team }) {
                   transition={{ delay: i * 0.03, duration: 0.3 }}
                   className="flex items-center gap-3 rounded-xl border bg-card/50 p-3 text-sm transition-all hover:bg-card hover:shadow-md group"
                 >
-                  <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-gradient-to-br from-muted to-muted/50 text-xs font-bold group-hover:scale-105 transition-transform">
-                    {player.jerseyNumber ?? "-"}
+                  <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-primary/15 bg-primary/10 text-xs font-black tabular-nums text-primary transition-transform group-hover:scale-105">
+                    {player.jerseyNumber === null ? "TBD" : `#${player.jerseyNumber}`}
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="truncate font-semibold text-sm">{player.name}</p>
@@ -138,34 +142,35 @@ export function TeamDetail({ team }: { team: Team }) {
 
 function JerseyFlipping({ front, back, alt }: { front: string; back: string; alt: string }) {
   const [flipped, setFlipped] = useState(false);
-  const [hasInteracted, setHasInteracted] = useState(false);
-
-  useEffect(() => {
-    const timer1 = setTimeout(() => {
-      if (!hasInteracted) setFlipped(true);
-    }, 2000);
-    
-    const timer2 = setTimeout(() => {
-      if (!hasInteracted) setFlipped(false);
-    }, 4000);
-
-    return () => { clearTimeout(timer1); clearTimeout(timer2); };
-  }, [hasInteracted]);
 
   return (
-    <div 
-      className="group relative h-72 w-72 sm:h-80 sm:w-80 cursor-pointer preserve-3d transition-transform duration-700 ease-[cubic-bezier(0.175,0.885,0.32,1.275)] hover:scale-105"
-      style={{ transform: flipped ? 'rotateY(180deg)' : 'rotateY(0deg)' }}
-      onMouseEnter={() => { setFlipped(true); setHasInteracted(true); }}
+    <button
+      type="button"
+      aria-label={`Show ${flipped ? "front" : "back"} of ${alt} jersey`}
+      aria-pressed={flipped}
+      className="group relative z-10 aspect-[4/5] h-[390px] max-h-[72vh] max-w-full cursor-pointer outline-none transition-transform duration-300 hover:scale-[1.025] focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-4 focus-visible:ring-offset-background sm:h-[430px]"
+      onMouseEnter={() => setFlipped(true)}
       onMouseLeave={() => setFlipped(false)}
-      onClick={() => { setFlipped(!flipped); setHasInteracted(true); }}
+      onClick={() => setFlipped(!flipped)}
     >
-      <div className="absolute inset-0 backface-hidden drop-shadow-2xl">
-        <Image src={front} alt={`${alt} Front`} fill className="object-contain p-2" priority sizes="(max-width: 768px) 100vw, 400px" />
-      </div>
-      <div className="absolute inset-0 backface-hidden rotate-y-180 drop-shadow-2xl">
-        <Image src={back} alt={`${alt} Back`} fill className="object-contain p-2" priority sizes="(max-width: 768px) 100vw, 400px" />
-      </div>
-    </div>
+      <span className="pointer-events-none absolute -inset-4 -z-10 rounded-[2rem] bg-primary/15 opacity-50 blur-2xl transition-opacity group-hover:opacity-80" />
+      <span
+        className="preserve-3d absolute inset-0 rounded-2xl transition-transform duration-700 ease-[cubic-bezier(.2,.8,.2,1)]"
+        style={{ transform: flipped ? "rotateY(180deg)" : "rotateY(0deg)" }}
+      >
+      <span className="backface-hidden absolute inset-0 overflow-hidden rounded-2xl border border-black/10 bg-stone-100 shadow-2xl">
+        <Image src={front} alt={`${alt} jersey front`} fill className="object-cover" priority sizes="(max-width: 640px) 82vw, 344px" />
+        <span className="pointer-events-none absolute inset-0 bg-gradient-to-tr from-white/15 via-transparent to-white/30 opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+      </span>
+      <span className="backface-hidden rotate-y-180 absolute inset-0 overflow-hidden rounded-2xl border border-black/10 bg-stone-100 shadow-2xl">
+        <Image src={back} alt={`${alt} jersey back`} fill className="object-cover" priority sizes="(max-width: 640px) 82vw, 344px" />
+        <span className="pointer-events-none absolute inset-0 bg-gradient-to-tr from-white/15 via-transparent to-white/30 opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+      </span>
+      </span>
+      <span className="absolute -bottom-3 left-1/2 flex -translate-x-1/2 items-center gap-2 whitespace-nowrap rounded-full border bg-background/90 px-3 py-1.5 text-xs font-bold shadow-lg backdrop-blur-xl">
+        <Rotate3D className="size-3.5 text-primary transition-transform duration-500 group-hover:rotate-180" />
+        {flipped ? "Showing back" : "Tap or hover to flip"}
+      </span>
+    </button>
   );
 }

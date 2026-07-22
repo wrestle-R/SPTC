@@ -29,6 +29,13 @@ const rosterNames = {
   ],
 } as const;
 
+const rosterNumbers = {
+  crimson: [10, 99, 8, 7, 29, 17, 7, 6, 3, 1, 3, 16, 44, 10, 4, 13, 17, 29, 20],
+  gladiators: [9, 22, 10, 1, 12, 7, 4, 28, 1, 18, 7, 11, 14, 13, 9, 2, 17, 5, 23],
+  knights: [17, 22, 2, 3, 14, 15, 1, null, 10, 28, 13, 29, 24, 7, null, 16, 5, 12, 5],
+  ivory: [10, 14, 11, 8, 9, 7, 29, 9, 4, 5, 21, 7, 22, 32, 24, 4, 17, 6, null, 7],
+} as const satisfies Record<keyof typeof rosterNames, readonly (number | null)[]>;
+
 export const S9_TEAMS: Team[] = [
   {
     id: "crimson-warriors",
@@ -76,12 +83,13 @@ function slugify(name: string) {
   return name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
 }
 
-function roster(teamId: string, names: readonly string[]): Player[] {
+function roster(teamId: string, names: readonly string[], numbers: readonly (number | null)[]): Player[] {
+  if (names.length !== numbers.length) throw new Error(`Jersey numbers do not match the ${teamId} roster.`);
   return names.map((name, index) => ({
     id: `${teamId}-${slugify(name)}-${index + 1}`,
     teamId,
     name,
-    jerseyNumber: null,
+    jerseyNumber: numbers[index],
     role: "unassigned",
     battingStyle: null,
     bowlingStyle: null,
@@ -90,10 +98,10 @@ function roster(teamId: string, names: readonly string[]): Player[] {
 }
 
 export const S9_PLAYERS: Player[] = [
-  ...roster("crimson-warriors", rosterNames.crimson),
-  ...roster("gods-gladiators", rosterNames.gladiators),
-  ...roster("karuppu-knights", rosterNames.knights),
-  ...roster("ivory-elites", rosterNames.ivory),
+  ...roster("crimson-warriors", rosterNames.crimson, rosterNumbers.crimson),
+  ...roster("gods-gladiators", rosterNames.gladiators, rosterNumbers.gladiators),
+  ...roster("karuppu-knights", rosterNames.knights, rosterNumbers.knights),
+  ...roster("ivory-elites", rosterNames.ivory, rosterNumbers.ivory),
 ];
 
 type SeedDelivery = CricketDeliveryInput & Partial<Pick<CricketDelivery, "bowlerId" | "strikerId">>;

@@ -59,10 +59,14 @@ export function OrganizerMatchScorer({ matchId }: { matchId: string }) {
 
 function LineupForm({ team, players, pending, onSave }: { team?: Team; players: Player[]; pending: boolean; onSave: (ids: string[]) => void }) {
   function submit(event: React.FormEvent<HTMLFormElement>) { event.preventDefault(); onSave(new FormData(event.currentTarget).getAll("players").map(String)); }
-  return <form onSubmit={submit} className="rounded-md border p-4"><FieldGroup><div><p className="font-semibold">{team?.name ?? "Team"}</p><p className="text-sm text-muted-foreground">Select the playing lineup.</p></div><div className="grid max-h-60 gap-2 overflow-y-auto">{players.map((player) => <label key={player.id} className="flex min-h-10 items-center gap-3 rounded-md border px-3 text-sm"><input type="checkbox" name="players" value={player.id} defaultChecked /> {player.name}</label>)}</div><Button type="submit" variant="outline" disabled={pending || players.length === 0}>Publish lineup</Button></FieldGroup></form>;
+  return <form onSubmit={submit} className="rounded-md border p-4"><FieldGroup><div><p className="font-semibold">{team?.name ?? "Team"}</p><p className="text-sm text-muted-foreground">Select the playing lineup.</p></div><div className="grid max-h-60 gap-2 overflow-y-auto">{players.map((player) => <label key={player.id} className="flex min-h-10 items-center gap-3 rounded-md border px-3 text-sm"><input type="checkbox" name="players" value={player.id} defaultChecked /> {playerLabel(player)}</label>)}</div><Button type="submit" variant="outline" disabled={pending || players.length === 0}>Publish lineup</Button></FieldGroup></form>;
 }
 
 type RunCommand = (name: string, data?: Record<string, unknown>) => Promise<void>;
+
+function playerLabel(player: Player) {
+  return player.jerseyNumber === null ? player.name : `#${player.jerseyNumber} · ${player.name}`;
+}
 
 function CricketConsole({ match, players, teams, pending, run, teamName, playerName }: { match: PublicMatch; players: Player[]; teams: Team[]; pending: boolean; run: RunCommand; teamName: (id: string) => string; playerName: (id?: string | null) => string }) {
   const entries = match.cricket?.innings ?? [];
@@ -186,6 +190,7 @@ function FieldConsole({ match, players, teams, pending, run, teamName, playerNam
     ? `${teamName(winnerTeamId)} beat ${teamName(loserTeamId)} ${Math.max(homeScore, awayScore)}-${Math.min(homeScore, awayScore)}`
     : "";
   const finalResult = tied ? manualResult.trim() : automaticResult;
+  const jerseyFor = (id: string) => players.find((player) => player.id === id)?.jerseyNumber ?? null;
 
   return (
     <div className="grid gap-4 xl:grid-cols-[0.8fr_1.2fr]">
@@ -200,7 +205,7 @@ function FieldConsole({ match, players, teams, pending, run, teamName, playerNam
           <div className="mt-6 flex flex-col gap-2">
             {[...(match.fieldState?.events ?? [])].reverse().map((event, index) => (
               <div key={String(event.id ?? index)} className="flex justify-between gap-3 rounded-md border p-3 text-sm">
-                <span className="font-medium capitalize">{String(event.type).replace("-", " ")} · {playerName(String(event.playerId ?? ""))}</span>
+                <span className="font-medium capitalize">{String(event.type).replace("-", " ")} · {jerseyFor(String(event.playerId ?? "")) !== null ? `#${jerseyFor(String(event.playerId ?? ""))} · ` : ""}{playerName(String(event.playerId ?? ""))}</span>
                 <span className="text-muted-foreground">{teamName(String(event.teamId))}</span>
               </div>
             ))}
@@ -213,7 +218,7 @@ function FieldConsole({ match, players, teams, pending, run, teamName, playerNam
           <FieldGroup>
             <SimpleSelect label="Event" value={type} setValue={(value) => setType(value as FieldEventType)} items={["goal", "own-goal", "yellow-card", "red-card", "shootout-goal", "shootout-miss"].map((value) => ({ value, label: value.replaceAll("-", " ") }))} />
             <SimpleSelect label="Team" value={teamId} setValue={(value) => { setTeamId(value); setPlayerId(""); }} items={teams.filter((team) => [match.homeTeamId, match.awayTeamId].includes(team.id)).map((team) => ({ value: team.id, label: team.name }))} />
-            <SimpleSelect label="Player" value={playerId} setValue={setPlayerId} items={eligible.map((player) => ({ value: player.id, label: player.name }))} />
+            <SimpleSelect label="Player" value={playerId} setValue={setPlayerId} items={eligible.map((player) => ({ value: player.id, label: playerLabel(player) }))} />
             <Button size="lg" disabled={pending || !teamId || (!playerId && !type.startsWith("shootout"))} onClick={() => run("recordFieldEvent", { event: { type, teamId, playerId: playerId || undefined } })}>Record event</Button>
             {tied ? (
               <Field>

@@ -36,7 +36,7 @@ export function OrganizerOverview() {
     setPending(true);
     try {
       const result = await callOrganizerCommand<{ bootstrapped: boolean }>("bootstrapTournament");
-      toast.success(result.bootstrapped ? "Tournament teams and rosters added." : "Tournament is already configured.");
+      toast.success(result.bootstrapped ? "Tournament data added." : "Fixtures and jersey numbers synchronized.");
     } catch (cause) {
       toast.error(cause instanceof Error ? cause.message : "Tournament setup failed.");
     } finally {
@@ -55,12 +55,12 @@ export function OrganizerOverview() {
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {metrics.map(({ key, label, icon: Icon }) => <Card key={key} className="shadow-none"><CardHeader><div className="flex items-center justify-between gap-3"><CardDescription>{label}</CardDescription><Icon /></div><CardTitle className="text-3xl tabular-nums">{values[key]}</CardTitle></CardHeader></Card>)}
       </div>
-      {!teams.data.length ? (
+      {!teams.data.length || !matches.data.length ? (
         <Card className="shadow-none">
           <CardContent className="flex min-h-64 flex-col items-center justify-center gap-4 text-center">
             <span className="grid size-12 place-items-center rounded-md bg-muted"><DatabaseZap /></span>
-            <div><h2 className="font-semibold">Set up Sports Fiesta</h2><p className="mt-1 max-w-md text-sm text-muted-foreground">Add the four approved teams and finalized rosters. No fixtures or scores will be created.</p></div>
-            <Button onClick={bootstrap} disabled={pending}>{pending ? <LoaderCircle data-icon="inline-start" className="animate-spin" /> : <DatabaseZap data-icon="inline-start" />}{pending ? "Setting up" : "Add teams and rosters"}</Button>
+            <div><h2 className="font-semibold">{teams.data.length ? "Restore tournament fixtures" : "Set up Sports Fiesta"}</h2><p className="mt-1 max-w-md text-sm text-muted-foreground">Synchronize the approved teams, jersey numbers, and editable sample fixtures with organizer and public data.</p></div>
+            <Button onClick={bootstrap} disabled={pending}>{pending ? <LoaderCircle data-icon="inline-start" className="animate-spin" /> : <DatabaseZap data-icon="inline-start" />}{pending ? "Synchronizing" : "Synchronize tournament"}</Button>
           </CardContent>
         </Card>
       ) : null}

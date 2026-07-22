@@ -19,7 +19,13 @@ export function MatchDetail({ sport, matchId }: { sport: Sport; matchId: string 
   const playersState = usePublicCollection<PublicPlayer>("players");
   const match = matchState.data ?? S9_SEEDED_MATCHES.find((seededMatch) => seededMatch.id === matchId) as PublicMatch | undefined;
   const teams = teamsState.data.length ? teamsState.data : S9_TEAMS;
-  const players = playersState.data.length ? playersState.data : S9_PLAYERS;
+  const players = [
+    ...S9_PLAYERS.map((seededPlayer) => {
+      const storedPlayer = playersState.data.find((player) => player.id === seededPlayer.id);
+      return { ...seededPlayer, ...storedPlayer, jerseyNumber: seededPlayer.jerseyNumber };
+    }),
+    ...playersState.data.filter((player) => !S9_PLAYERS.some((seededPlayer) => seededPlayer.id === player.id)),
+  ];
 
   if (matchState.loading || teamsState.loading || playersState.loading) return <ContentSkeleton rows={3} />;
   if (matchState.error) return <DataError message={matchState.error} retry={matchState.retry} />;
@@ -41,6 +47,7 @@ export function MatchDetail({ sport, matchId }: { sport: Sport; matchId: string 
   const home = teams.find((team) => team.id === match.homeTeamId);
   const away = teams.find((team) => team.id === match.awayTeamId);
   const playerName = (id: string | null | undefined) => players.find((player) => player.id === id)?.name ?? fallbackPlayerName(id, teams);
+  const playerJersey = (id: string | null | undefined) => players.find((player) => player.id === id)?.jerseyNumber ?? null;
   const teamName = (id: string) => teams.find((team) => team.id === id)?.name ?? "Team";
   const resultText = match.resultText || (match.status === "completed" ? "Result pending - organizer must confirm." : null);
 
@@ -63,7 +70,7 @@ export function MatchDetail({ sport, matchId }: { sport: Sport; matchId: string 
           {sport === "cricket" ? (
             <CricketScore match={match} teamName={teamName} playerName={playerName} />
           ) : (
-            <FieldScore match={match} homeName={home?.name ?? "Team"} awayName={away?.name ?? "Team"} playerName={playerName} teamName={teamName} />
+            <FieldScore match={match} homeName={home?.name ?? "Team"} awayName={away?.name ?? "Team"} playerName={playerName} playerJersey={playerJersey} teamName={teamName} />
           )}
           {resultText ? <p className="rounded-md bg-muted p-3 font-medium">{resultText}</p> : null}
         </CardContent>
@@ -84,11 +91,12 @@ function fallbackPlayerName(id: string | null | undefined, teams: PublicTeam[]) 
     .join(" ") || "Player";
 }
 
-function FieldScore({ match, homeName, awayName, playerName, teamName }: {
+function FieldScore({ match, homeName, awayName, playerName, playerJersey, teamName }: {
   match: PublicMatch;
   homeName: string;
   awayName: string;
   playerName: (id?: string) => string;
+  playerJersey: (id?: string) => number | null;
   teamName: (id: string) => string;
 }) {
   const events = match.fieldState?.events ?? [];
@@ -105,12 +113,10 @@ function FieldScore({ match, homeName, awayName, playerName, teamName }: {
           <div className="flex flex-col gap-2">
             {[...events].reverse().map((event, index) => (
               <div key={String(event.id ?? index)} className="flex items-start justify-between gap-4 rounded-xl border bg-card/60 p-3 text-sm">
-                <div className="flex min-w-0 gap-3">
-                  {typeof event.minute === "number" ? (
-                    <span className="mt-0.5 shrink-0 rounded-full bg-blue-500/10 px-2 py-0.5 text-xs font-semibold text-blue-700 dark:text-blue-300">
-                      {event.minute}&apos;
-                    </span>
-                  ) : null}
+                <div className="flex min-w-0 items-center gap-3">
+                  <span className="grid size-10 shrink-0 place-items-center rounded-xl border border-primary/20 bg-primary/10 font-black tabular-nums text-primary">
+                    {playerJersey(String(event.playerId ?? "")) !== null ? `#${playerJersey(String(event.playerId ?? ""))}` : "—"}
+                  </span>
                   <div className="min-w-0">
                     <p className="font-semibold capitalize">{String(event.type).replace("-", " ")}</p>
                     <p className="break-words text-muted-foreground">{playerName(String(event.playerId ?? ""))}</p>

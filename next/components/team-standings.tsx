@@ -13,10 +13,10 @@ import { motion } from "framer-motion";
 import { Trophy, Medal } from "lucide-react";
 
 const TEAM_JERSEYS: Record<string, { front: string; back: string }> = {
-  "crimson-warriors": { front: "/Jersey/red-front.png", back: "/Jersey/red-back.png" },
-  "gods-gladiators": { front: "/Jersey/blue-front.png", back: "/Jersey/blue-back.png" },
-  "karuppu-knights": { front: "/Jersey/black-front.png", back: "/Jersey/black-back.png" },
-  "ivory-elites": { front: "/Jersey/ivory-front.png", back: "/Jersey/ivory-back.png" },
+  "crimson-warriors": { front: "/Jersey/red-front-v2.png", back: "/Jersey/red-back-v2.png" },
+  "gods-gladiators": { front: "/Jersey/blue-front-v2.png", back: "/Jersey/blue-back-v2.png" },
+  "karuppu-knights": { front: "/Jersey/black-front-v2.png", back: "/Jersey/black-back-v2.png" },
+  "ivory-elites": { front: "/Jersey/ivory-front-v2.png", back: "/Jersey/ivory-back-v2.png" },
 };
 
 const TEAM_GRADIENTS: Record<string, string> = {
@@ -54,7 +54,7 @@ export function TeamStandings() {
     <section className="flex flex-col gap-6" aria-labelledby="standings-heading">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <p className="text-sm font-bold uppercase tracking-widest text-primary">Sports Fiesta 2024</p>
+          <p className="text-sm font-bold uppercase tracking-widest text-primary">Sports Fiesta S9</p>
           <h2 id="standings-heading" className="mt-1 text-2xl sm:text-3xl font-black tracking-tight">Team Standings</h2>
         </div>
       </div>
@@ -87,8 +87,8 @@ export function TeamStandings() {
                       <div className={`absolute bottom-0 left-0 h-1.5 w-full bg-gradient-to-r ${gradient} opacity-70 group-hover:opacity-100 group-hover:h-2 transition-all duration-300`} />
                       <div className="flex items-center gap-4">
                         {jersey && (
-                          <div className="relative h-20 w-20 shrink-0 transition-transform duration-500 group-hover:scale-110 group-hover:rotate-2">
-                            <Image src={jersey.front} alt={row.name} fill className="object-contain drop-shadow-xl" />
+                          <div className="relative h-24 w-20 shrink-0 overflow-hidden rounded-xl bg-stone-100 shadow-inner transition-transform duration-500 group-hover:scale-105 group-hover:-rotate-2 sm:h-28 sm:w-24">
+                            <Image src={jersey.front} alt={`${row.name} jersey`} fill className="object-cover drop-shadow-xl" sizes="(max-width: 640px) 80px, 96px" />
                           </div>
                         )}
                         <div className="min-w-0 flex-1">
