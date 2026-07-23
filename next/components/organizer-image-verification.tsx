@@ -84,11 +84,13 @@ export function OrganizerImageVerification({ type }: { type: SubmissionType }) {
 
   const [teamId, setTeamId] = useState("");
   const [arrivalPosition, setArrivalPosition] = useState("1");
-  const [groupPostedTime, setGroupPostedTime] = useState("");
+  const [groupPostedHour, setGroupPostedHour] = useState("");
+  const [groupPostedMinute, setGroupPostedMinute] = useState("");
   const [todayStr] = useState(() => {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
   });
+  const groupPostedTime = groupPostedHour && groupPostedMinute ? `${groupPostedHour.padStart(2, "0")}:${groupPostedMinute.padStart(2, "0")}` : "";
   const groupPostedAt = groupPostedTime ? `${todayStr}T${groupPostedTime}` : "";
   const [memberCountConfirmed, setMemberCountConfirmed] = useState(false);
   const [file, setFile] = useState<File | null>(null);
@@ -163,7 +165,8 @@ export function OrganizerImageVerification({ type }: { type: SubmissionType }) {
       });
       toast.success(`${copy.eyebrow} verified.`);
       handleFileChange(null);
-      setGroupPostedTime("");
+      setGroupPostedHour("");
+      setGroupPostedMinute("");
       setMemberCountConfirmed(false);
       setArrivalPosition("1");
       setTeamId("");
@@ -249,14 +252,38 @@ export function OrganizerImageVerification({ type }: { type: SubmissionType }) {
                 ) : null}
 
                 <Field>
-                  <FieldLabel htmlFor={`${type}-posted-at`}>Actual group-post time</FieldLabel>
-                  <Input
-                    id={`${type}-posted-at`}
-                    type="time"
-                    value={groupPostedTime}
-                    onChange={(event) => setGroupPostedTime(event.target.value)}
-                    required
-                  />
+                  <FieldLabel>Actual group-post time</FieldLabel>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="number"
+                      min={0}
+                      max={23}
+                      placeholder="HH"
+                      className="w-20 text-center"
+                      value={groupPostedHour}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (val === "" || (Number(val) >= 0 && Number(val) <= 23)) setGroupPostedHour(val);
+                      }}
+                      onBlur={() => groupPostedHour && setGroupPostedHour(groupPostedHour.padStart(2, "0"))}
+                      required
+                    />
+                    <span className="text-lg font-semibold text-muted-foreground">:</span>
+                    <Input
+                      type="number"
+                      min={0}
+                      max={59}
+                      placeholder="MM"
+                      className="w-20 text-center"
+                      value={groupPostedMinute}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (val === "" || (Number(val) >= 0 && Number(val) <= 59)) setGroupPostedMinute(val);
+                      }}
+                      onBlur={() => groupPostedMinute && setGroupPostedMinute(groupPostedMinute.padStart(2, "0"))}
+                      required
+                    />
+                  </div>
                   <FieldDescription>
                     Using <strong>{todayStr}</strong> as the date.
                     {type === "early-bird" && " Must be before 2:30 PM local event time."}
@@ -279,7 +306,7 @@ export function OrganizerImageVerification({ type }: { type: SubmissionType }) {
                 <div className="overflow-hidden rounded-[1.5rem] border border-dashed bg-muted/25">
                   {previewUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={previewUrl} alt="Submission preview" className="aspect-[4/3] w-full object-cover" />
+                    <img src={previewUrl} alt="Submission preview" className="block aspect-[4/3] w-full bg-muted/40 object-contain p-1" />
                   ) : (
                     <div className="flex aspect-[4/3] flex-col items-center justify-center gap-3 text-center text-muted-foreground">
                       <Camera className="size-6" />
@@ -384,7 +411,7 @@ export function OrganizerImageVerification({ type }: { type: SubmissionType }) {
                           <TableCell className="font-black tabular-nums">{submission.pointsAwarded}</TableCell>
                           <TableCell>
                             {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img src={submission.imageUrl} alt={`${team.name} submission`} className="h-14 w-20 rounded-lg object-cover ring-1 ring-black/10" />
+                            <img src={submission.imageUrl} alt={`${team.name} submission`} className="h-14 w-20 rounded-lg bg-muted/40 object-contain p-0.5 ring-1 ring-black/10" />
                           </TableCell>
                           <TableCell className="text-right">
                             <Button

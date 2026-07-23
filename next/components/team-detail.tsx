@@ -200,7 +200,7 @@ function BonusEvidenceCard({
     <Card className="overflow-hidden py-0 shadow-none ring-1 ring-foreground/10">
       {imageUrl ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={imageUrl} alt={imageAlt} className="aspect-[16/10] w-full object-cover" />
+        <img src={imageUrl} alt={imageAlt} className="block aspect-[16/10] w-full bg-muted/40 object-contain p-1" />
       ) : (
         <div className="flex aspect-[16/10] items-center justify-center bg-muted/30 text-sm text-muted-foreground">
           No verified image

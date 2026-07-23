@@ -60,7 +60,7 @@ export function PublicEarlyBird() {
                 <Card className="overflow-hidden border-0 py-0 shadow-none ring-1 ring-black/6 transition-all duration-300 hover:-translate-y-1 hover:ring-primary/30">
                   <div className="relative aspect-[4/5] overflow-hidden">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={submission.imageUrl} alt={`${team.name} early bird photo`} className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]" />
+                    <img src={submission.imageUrl} alt={`${team.name} early bird photo`} className="block h-full w-full bg-muted/40 object-contain p-1 transition-transform duration-500 group-hover:scale-[1.03]" />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/15 to-transparent" />
                     <div className="absolute left-4 top-4 inline-flex items-center gap-2 rounded-full bg-white/90 px-3 py-1 text-xs font-semibold text-zinc-900 shadow-sm">
                       <Clock3 className="size-3.5" />
