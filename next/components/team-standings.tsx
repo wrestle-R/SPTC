@@ -3,7 +3,6 @@
 import { S9_TEAMS } from "@sports-fiesta/domain";
 import Image from "next/image";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { ContentSkeleton, DataError } from "@/components/data-state";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -14,7 +13,6 @@ import { Trophy, Medal } from "lucide-react";
 import { TEAM_GRADIENTS, TEAM_JERSEYS } from "@/lib/team-assets";
 
 export function TeamStandings() {
-  const router = useRouter();
   const standings = usePublicDocument<OverallStandingDocument>("standings", "overall");
   const rows = S9_TEAMS.map((team, index) => {
     const stored = standings.data?.rows.find((row) => row.teamId === team.id);
@@ -106,43 +104,21 @@ export function TeamStandings() {
                 <Table>
                   <TableHeader>
                     <TableRow className="hover:bg-transparent">
-                      <TableHead className="pl-6 font-bold">Team</TableHead>
-                      <TableHead className="text-right font-bold">Football</TableHead>
-                      <TableHead className="text-right font-bold">Handball</TableHead>
-                      <TableHead className="text-right font-bold">Cricket</TableHead>
-                      <TableHead className="text-right font-bold">Throwball</TableHead>
-                      <TableHead className="text-right font-bold">League Win</TableHead>
-                      <TableHead className="text-right font-bold">League Tie</TableHead>
-                      <TableHead className="text-right font-bold">Arrival</TableHead>
-                      <TableHead className="text-right font-bold">Early Bird</TableHead>
-                      <TableHead className="pr-6 text-right font-bold">Total</TableHead>
+                      <TableHead className="sticky left-0 z-10 bg-card pl-6 font-bold">Sport / event</TableHead>
+                      {rows.map((row) => <TableHead key={row.teamId} className="min-w-28 text-right font-bold">{row.name}</TableHead>)}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {rows.map((row, index) => (
+                    {[
+                      ["Football", "football"], ["Handball", "handball"], ["Cricket", "cricket"], ["Throwball", "throwball"],
+                      ["League win", "leagueWin"], ["League tie", "leagueTie"], ["Arrival", "timelyArrival"], ["Early Bird", "earlyBird"], ["Total", "total"],
+                    ].map(([label, key]) => (
                       <TableRow 
-                        key={row.teamId} 
-                        className="border-l-[4px] cursor-pointer transition-all hover:bg-muted/50 hover:shadow-sm" 
-                        style={{ borderLeftColor: row.accentColor }}
-                        onClick={() => router.push(`/teams/${row.teamId}`)}
+                        key={key}
+                        className="transition-all hover:bg-muted/50"
                       >
-                        <TableCell className="pl-6 font-medium">
-                          <span className="flex items-center gap-3">
-                            <span className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold ${index === 0 ? 'bg-amber-500 text-white' : 'bg-muted text-muted-foreground'}`}>
-                              {index + 1}
-                            </span>
-                            <span className="text-sm font-bold">{row.name}</span>
-                          </span>
-                        </TableCell>
-                        <TableCell className="text-right tabular-nums text-sm">{row.football}</TableCell>
-                        <TableCell className="text-right tabular-nums text-sm">{row.handball}</TableCell>
-                        <TableCell className="text-right tabular-nums text-sm">{row.cricket}</TableCell>
-                        <TableCell className="text-right tabular-nums text-sm">{row.throwball}</TableCell>
-                        <TableCell className="text-right tabular-nums text-sm">{row.leagueWin}</TableCell>
-                        <TableCell className="text-right tabular-nums text-sm">{row.leagueTie}</TableCell>
-                        <TableCell className="text-right tabular-nums text-sm">{row.timelyArrival}</TableCell>
-                        <TableCell className="text-right tabular-nums text-sm">{row.earlyBird}</TableCell>
-                        <TableCell className="pr-6 text-right font-black tabular-nums text-base">{row.total}</TableCell>
+                        <TableCell className="sticky left-0 z-10 bg-card pl-6 font-bold">{label}</TableCell>
+                        {rows.map((row) => <TableCell key={row.teamId} className={`text-right tabular-nums ${key === "total" ? "font-black text-base" : "text-sm"}`}><Link href={`/teams/${row.teamId}`} className="hover:underline">{row[key as keyof typeof row] as number}</Link></TableCell>)}
                       </TableRow>
                     ))}
                   </TableBody>
