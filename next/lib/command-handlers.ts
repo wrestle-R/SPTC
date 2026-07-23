@@ -832,8 +832,8 @@ function cricketStandings(matches: MatchRow[]) {
     for (const state of [first, second]) {
       const batting = byTeam.get(state.battingTeamId)!;
       const bowling = byTeam.get(state.bowlingTeamId)!;
-      batting.runsFor += state.score; batting.ballsFaced += state.wickets >= state.battingLineup.length - 1 ? state.maxOvers * 6 : state.legalBalls;
-      bowling.runsAgainst += state.score; bowling.ballsBowled += state.wickets >= state.battingLineup.length - 1 ? state.maxOvers * 6 : state.legalBalls;
+      batting.runsFor += state.score; batting.ballsFaced += state.wickets >= Math.min(state.battingLineup.length - 1, 8) ? state.maxOvers * 6 : state.legalBalls;
+      bowling.runsAgainst += state.score; bowling.ballsBowled += state.wickets >= Math.min(state.battingLineup.length - 1, 8) ? state.maxOvers * 6 : state.legalBalls;
     }
     const home = byTeam.get(match.homeTeamId)!; const away = byTeam.get(match.awayTeamId)!;
     home.played += 1; away.played += 1;

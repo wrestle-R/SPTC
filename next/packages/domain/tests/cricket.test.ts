@@ -291,6 +291,29 @@ describe("five-over cricket scoring", () => {
     expect(state.completed).toBe(true);
   });
 
+  it("hard-caps all out at 8 wickets even for an 11-player lineup", () => {
+    const eleven = ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k"];
+    let state = createCricketInnings({
+      battingTeamId: "red",
+      bowlingTeamId: "green",
+      battingLineup: eleven,
+      bowlingLineup: ["bowler1", "bowler2"],
+      strikerId: "a",
+      nonStrikerId: "b",
+      bowlerId: "bowler1",
+    });
+
+    const order = ["a", "c", "d", "e", "f", "g", "h", "i"];
+    for (const playerId of order) {
+      if (!state.currentBowlerId) state = setCricketBowler(state, "bowler2");
+      state = recordCricketDelivery(state, { runsOffBat: 0, dismissal: { type: "bowled", playerOutId: state.strikerId! } });
+      if (!state.completed) state = setNextBatter(state, playerId === "a" ? "c" : eleven[eleven.indexOf(playerId) + 1]);
+    }
+
+    expect(state.wickets).toBe(8);
+    expect(state.completed).toBe(true);
+  });
+
   it("recalculates a corrected scorecard from stored deliveries", () => {
     const initial = {
       battingTeamId: "red",

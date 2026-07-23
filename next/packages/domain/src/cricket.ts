@@ -325,7 +325,8 @@ export function recordCricketDelivery(
   }
 
   const oversExhausted = legalBalls >= state.maxOvers * 6;
-  const allOut = wickets >= state.battingLineup.length - 1;
+  const MAX_WICKETS = 8;
+  const allOut = wickets >= Math.min(state.battingLineup.length - 1, MAX_WICKETS);
   const targetChased = state.targetScore != null && state.score + totalRuns >= state.targetScore;
   const completed = oversExhausted || allOut || targetChased;
   return {
