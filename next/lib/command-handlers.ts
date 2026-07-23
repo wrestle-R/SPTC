@@ -206,7 +206,19 @@ function cricketStatus(match: MatchDocument, state: CricketInningsState): Cricke
   const second = innings.filter((entry) => !entry.superOver)[1]?.state;
   if (!first || !second) return { status: "innings-break" };
   const resultText = cricketResultText(first, second, teamName);
-  if (!resultText && first.score === second.score) return { status: "super-over", resultText: "Super Over tied - organizer result required" };
+  if (!resultText && first.score === second.score) {
+    const superOvers = innings.filter((entry) => entry.superOver && entry.state.completed);
+    if (superOvers.length % 2 === 1) return { status: "super-over", winnerTeamId: null, resultText: "Super Over innings complete — start the reply." };
+    if (superOvers.length >= 2) {
+      const [firstSuperOver, secondSuperOver] = superOvers.slice(-2).map((entry) => entry.state);
+      if (firstSuperOver.score !== secondSuperOver.score) {
+        const winner = firstSuperOver.score > secondSuperOver.score ? firstSuperOver.battingTeamId : secondSuperOver.battingTeamId;
+        const margin = Math.abs(firstSuperOver.score - secondSuperOver.score);
+        return { winnerTeamId: winner, resultText: `${teamName(winner)} won the Super Over by ${margin} run${margin === 1 ? "" : "s"}` };
+      }
+    }
+    return { status: "super-over", winnerTeamId: null, resultText: "Super Over tied — start another Super Over." };
+  }
   const winnerTeamId = second.score > first.score ? second.battingTeamId : first.battingTeamId;
   return { winnerTeamId, resultText };
 }
@@ -418,9 +430,22 @@ export async function handleUpdateMatch(data: CallableData) {
   const id = asString(data.matchId, "Match");
   const match = await getDocument<MatchDocument>("matches", id);
   if (!match) throw new CommandError(404, "NOT_FOUND", "Match not found.");
-  if (match.status === "live") throw new CommandError(400, "FAILED_PRECONDITION", "A live match cannot be rescheduled.");
+  if (match.status !== "scheduled") throw new CommandError(400, "FAILED_PRECONDITION", "Only scheduled fixtures can be edited.");
+  const fixture = validateFixture({
+    sport: (data.sport ?? match.sport) as "football" | "handball" | "cricket" | "throwball",
+    homeTeamId: data.homeTeamId ? asString(data.homeTeamId, "Home team") : match.homeTeamId,
+    awayTeamId: data.awayTeamId ? asString(data.awayTeamId, "Away team") : match.awayTeamId,
+    stage: (data.stage ?? match.stage) as "league" | "third-place" | "final",
+    maxOvers: data.sport === "cricket" || (!data.sport && match.sport === "cricket") ? 5 : undefined,
+  });
+  const matches = await listDocuments<MatchDocument>("matches");
+  if (matches.some((entry) => entry.id !== id && entry.sport === fixture.sport && entry.stage === fixture.stage && [entry.homeTeamId, entry.awayTeamId].sort().join(":") === [fixture.homeTeamId, fixture.awayTeamId].sort().join(":"))) {
+    throw new CommandError(409, "ALREADY_EXISTS", "This matchup already exists for the stage.");
+  }
   await upsertDocument("matches", id, {
     ...match,
+    ...fixture,
+    scoreSummary: fixture.sport === "cricket" ? { innings: [] } : { [fixture.homeTeamId]: 0, [fixture.awayTeamId]: 0 },
     startsAt: data.startsAt ? asString(data.startsAt, "Start date") : match.startsAt,
     venue: data.venue ? asString(data.venue, "Venue") : match.venue,
     updatedAt: nowIso(),
@@ -499,6 +524,7 @@ export async function handleStartInnings(data: CallableData) {
   return mutateMatch(data, async (match) => {
     if (match.sport !== "cricket") throw new CommandError(400, "FAILED_PRECONDITION", "This is not a cricket match.");
     if (!["scheduled", "innings-break", "super-over"].includes(match.status)) throw new CommandError(400, "FAILED_PRECONDITION", "This cricket innings cannot be started now.");
+    const isSuperOver = data.superOver === true;
     const battingTeamId = asString(data.battingTeamId, "Batting team");
     const bowlingTeamId = asString(data.bowlingTeamId, "Bowling team");
     if (battingTeamId === bowlingTeamId || ![match.homeTeamId, match.awayTeamId].includes(battingTeamId) || ![match.homeTeamId, match.awayTeamId].includes(bowlingTeamId)) {
@@ -511,8 +537,14 @@ export async function handleStartInnings(data: CallableData) {
     await assertRosterPlayer(match, battingTeamId, asString(data.strikerId, "Striker"), "Striker");
     await assertRosterPlayer(match, battingTeamId, asString(data.nonStrikerId, "Non-striker"), "Non-striker");
     await assertRosterPlayer(match, bowlingTeamId, asString(data.bowlerId, "Bowler"), "Bowler");
-    const firstInnings = match.cricket?.innings?.[0]?.state;
-    const targetScore = firstInnings?.completed ? firstInnings.score + 1 : undefined;
+    const previousInnings = match.cricket?.innings?.at(-1);
+    if (isSuperOver && previousInnings?.superOver && battingTeamId !== previousInnings.state.bowlingTeamId) {
+      throw new CommandError(400, "INVALID_ARGUMENT", "The other team must bat in the Super Over reply.");
+    }
+    const firstInnings = match.cricket?.innings?.find((entry) => !entry.superOver)?.state;
+    const targetScore = isSuperOver
+      ? previousInnings?.superOver && previousInnings.state.completed ? previousInnings.state.score + 1 : undefined
+      : firstInnings?.completed ? firstInnings.score + 1 : undefined;
     const initial = {
       battingTeamId,
       bowlingTeamId,
@@ -521,12 +553,13 @@ export async function handleStartInnings(data: CallableData) {
       strikerId: asString(data.strikerId, "Striker"),
       nonStrikerId: asString(data.nonStrikerId, "Non-striker"),
       bowlerId: asString(data.bowlerId, "Bowler"),
-      maxOvers: rules.cricket.maxOvers ?? 5,
+      maxOvers: isSuperOver ? 1 : rules.cricket.maxOvers ?? 5,
       targetScore,
+      isSuperOver,
     };
     let state: CricketInningsState;
     try { state = createCricketInnings(initial); } catch (error) { throw new CommandError(400, "INVALID_ARGUMENT", (error as Error).message); }
-    const innings = [...(match.cricket?.innings ?? []), { initial, state, superOver: data.superOver === true }];
+    const innings = [...(match.cricket?.innings ?? []), { initial, state, superOver: isSuperOver }];
     return { match: { ...match, status: "live", cricket: { innings, currentInnings: innings.length - 1 }, scoreSummary: inningsSummary(innings) } };
   });
 }
@@ -557,7 +590,20 @@ export async function handleSelectCricketBowler(data: CallableData) {
   return mutateMatch(data, (match) => {
     if (match.sport !== "cricket" || match.status !== "live") throw new CommandError(400, "FAILED_PRECONDITION", "The cricket match is not live.");
     const { index, innings } = currentCricketInnings(match);
-    try { innings[index] = { ...innings[index], state: applyCricketBowler(innings[index].state, asString(data.playerId, "Bowler")) }; } catch (error) { throw new CommandError(400, "FAILED_PRECONDITION", (error as Error).message); }
+    const bowlerId = asString(data.playerId, "Bowler");
+    const current = innings[index].state;
+    if (current.isSuperOver) {
+      const eligibleBowlers = current.bowlingLineup;
+      const previousSuperOverBowlers = innings
+        .filter((candidate, candidateIndex) => candidateIndex !== index && candidate.superOver && candidate.state.bowlingTeamId === current.bowlingTeamId && candidate.state.events.length)
+        .map((candidate) => candidate.state.events[0]?.bowlerId)
+        .filter((id): id is string => Boolean(id));
+      const usedInCycle = new Set(previousSuperOverBowlers);
+      if (usedInCycle.size < eligibleBowlers.length && usedInCycle.has(bowlerId)) {
+        throw new CommandError(400, "FAILED_PRECONDITION", "That bowler has already bowled a Super Over. Choose another eligible bowler until the rotation resets.");
+      }
+    }
+    try { innings[index] = { ...innings[index], state: applyCricketBowler(current, bowlerId) }; } catch (error) { throw new CommandError(400, "FAILED_PRECONDITION", (error as Error).message); }
     return { match: cricketMatch(match, innings, index) };
   });
 }

@@ -193,7 +193,9 @@ function OrganizerCricketScorecard({ entries, currentIndex, teamName, playerName
   const safeIndex = entries[activeInnings] ? activeInnings : Math.max(0, entries.length - 1);
   const state = entries[safeIndex]?.state;
   if (!state) return <Card className="shadow-none"><CardContent className="py-12 text-center text-muted-foreground">The scorecard will appear when the innings starts.</CardContent></Card>;
-  const target = safeIndex % 2 === 1 ? (entries[safeIndex - 1]?.state.score ?? 0) + 1 : null;
+  const target = entries[safeIndex]?.superOver
+    ? entries[safeIndex - 1]?.superOver ? (entries[safeIndex - 1]?.state.score ?? 0) + 1 : null
+    : safeIndex % 2 === 1 ? (entries[safeIndex - 1]?.state.score ?? 0) + 1 : null;
   const metrics = cricketInningsMetrics(state, target);
   const chaseText = cricketChaseText(state, target);
   const batters = Object.values(state.batters);
@@ -212,7 +214,9 @@ function OrganizerCricketScorecard({ entries, currentIndex, teamName, playerName
   const extrasTotal = state.extras.wides + state.extras.noBalls + state.extras.byes + state.extras.legByes + state.extras.penalty;
   const fow = fallOfWickets(state);
   const inningsLabel = (index: number) => {
-    const innings = entries[index]?.state;
+    const entry = entries[index];
+    const innings = entry?.state;
+    if (entry?.superOver) return innings ? `Super Over · ${teamName(innings.battingTeamId)}` : "Super Over";
     return innings ? `${teamName(innings.battingTeamId)} ${index % 2 === 1 ? "2nd" : "1st"}` : `Innings ${index + 1}`;
   };
 
@@ -401,7 +405,7 @@ function DeliveryControls({ current, pending, run, battingPlayers, bowlingPlayer
       <div>
         <p className="mb-2 text-sm font-medium">Record wicket</p>
         <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
-          <SimpleSelect label="Dismissal" hideLabel value={dismissal} setValue={(value) => { setDismissal(value as DismissalType); setFielderId(""); }} items={["bowled", "caught", "lbw", "stumped", "run-out", "hit-wicket", "retired-hurt", "retired-out", "obstructing-field"].map((value) => ({ value, label: value.replaceAll("-", " ") }))} />
+          <SimpleSelect label="Dismissal" hideLabel value={dismissal} setValue={(value) => { setDismissal(value as DismissalType); setFielderId(""); }} items={["bowled", "caught", "stumped", "run-out", "hit-wicket", "retired-hurt", "retired-out", "obstructing-field"].map((value) => ({ value, label: value.replaceAll("-", " ") }))} />
           <Button variant="destructive" disabled={pending || !dismissal || (needsFielder && !fielderId)} onClick={recordWicket}>Record wicket</Button>
         </div>
         {needsFielder ? <div className="mt-2"><SimpleSelect label={dismissal === "caught" ? "Catcher" : "Keeper"} value={fielderId} setValue={setFielderId} items={bowlingPlayers.map((player) => ({ value: player.id, label: playerLabel(player) }))} /></div> : null}

@@ -18,6 +18,7 @@ function innings() {
     battingTeamId: "red",
     bowlingTeamId: "green",
     battingLineup: battingOrder,
+    bowlingLineup: ["g1", "g2", "g3", "g4", "g5"],
     strikerId: "a",
     nonStrikerId: "b",
     bowlerId: "g1",
@@ -226,6 +227,7 @@ describe("five-over cricket scoring", () => {
       battingTeamId: "green",
       bowlingTeamId: "red",
       battingLineup: battingOrder,
+      bowlingLineup: ["g1", "g2", "g3", "g4", "g5"],
       strikerId: "a",
       nonStrikerId: "b",
       bowlerId: "g2",
@@ -239,7 +241,10 @@ describe("five-over cricket scoring", () => {
     state = recordCricketDelivery(state, { runsOffBat: 6 });
     expect(state.completed).toBe(false);
 
-    state = recordCricketDelivery(state, { runsOffBat: 22 });
+    state = recordCricketDelivery(state, { runsOffBat: 6 });
+    state = recordCricketDelivery(state, { runsOffBat: 6 });
+    state = recordCricketDelivery(state, { runsOffBat: 6 });
+    state = recordCricketDelivery(state, { runsOffBat: 4 });
     expect(state.completed).toBe(true);
     expect(state.score).toBe(32);
   });
