@@ -84,7 +84,12 @@ export function OrganizerImageVerification({ type }: { type: SubmissionType }) {
 
   const [teamId, setTeamId] = useState("");
   const [arrivalPosition, setArrivalPosition] = useState("1");
-  const [groupPostedAt, setGroupPostedAt] = useState("");
+  const [groupPostedTime, setGroupPostedTime] = useState("");
+  const [todayStr] = useState(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  });
+  const groupPostedAt = groupPostedTime ? `${todayStr}T${groupPostedTime}` : "";
   const [memberCountConfirmed, setMemberCountConfirmed] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState("");
@@ -158,7 +163,7 @@ export function OrganizerImageVerification({ type }: { type: SubmissionType }) {
       });
       toast.success(`${copy.eyebrow} verified.`);
       handleFileChange(null);
-      setGroupPostedAt("");
+      setGroupPostedTime("");
       setMemberCountConfirmed(false);
       setArrivalPosition("1");
       setTeamId("");
@@ -247,13 +252,14 @@ export function OrganizerImageVerification({ type }: { type: SubmissionType }) {
                   <FieldLabel htmlFor={`${type}-posted-at`}>Actual group-post time</FieldLabel>
                   <Input
                     id={`${type}-posted-at`}
-                    type="datetime-local"
-                    value={groupPostedAt}
-                    onChange={(event) => setGroupPostedAt(event.target.value)}
+                    type="time"
+                    value={groupPostedTime}
+                    onChange={(event) => setGroupPostedTime(event.target.value)}
                     required
                   />
                   <FieldDescription>
-                    {type === "early-bird" ? "Must be before 2:30 PM local event time." : "Use the timestamp from the group post."}
+                    Using <strong>{todayStr}</strong> as the date.
+                    {type === "early-bird" && " Must be before 2:30 PM local event time."}
                   </FieldDescription>
                 </Field>
 
