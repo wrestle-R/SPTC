@@ -9,7 +9,6 @@ import { motion } from "framer-motion";
 import { ContentSkeleton, DataError } from "@/components/data-state";
 import { MatchStatusBadge } from "@/components/match-status-badge";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { usePublicCollection, usePublicDocument } from "@/lib/public-data";
 import type { PublicMatch, PublicPlayer, PublicTeam } from "@/lib/web-types";
@@ -29,6 +28,23 @@ export function MatchDetail({ sport, matchId }: { sport: Sport; matchId: string 
     }),
     ...playersState.data.filter((player) => !S9_PLAYERS.some((seededPlayer) => seededPlayer.id === player.id)),
   ];
+  const isComplete = match?.status === "completed" && Boolean(match.winnerTeamId) && match?.sport === sport;
+
+  useEffect(() => {
+    if (!isComplete) return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+
+    const duration = 1500;
+    const end = Date.now() + duration;
+
+    const frame = () => {
+      confetti({ particleCount: 3, angle: 60, spread: 55, origin: { x: 0, y: 0.6 } });
+      confetti({ particleCount: 3, angle: 120, spread: 55, origin: { x: 1, y: 0.6 } });
+      if (Date.now() < end) requestAnimationFrame(frame);
+    };
+
+    frame();
+  }, [isComplete]);
 
   if (matchState.loading || teamsState.loading || playersState.loading) return <ContentSkeleton rows={3} />;
   if (matchState.error) return <DataError message={matchState.error} retry={matchState.retry} />;
@@ -55,23 +71,6 @@ export function MatchDetail({ sport, matchId }: { sport: Sport; matchId: string 
   const teamName = (id: string) => teams.find((team) => team.id === id)?.name ?? "Team";
   const resultText = match.resultText || (match.status === "completed" ? "Result pending - organizer must confirm." : null);
   const motmTeamId = playerTeam(match.manOfTheMatchPlayerId);
-  const isComplete = match.status === "completed" && Boolean(match.winnerTeamId);
-
-  useEffect(() => {
-    if (!isComplete) return;
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-
-    const duration = 1500;
-    const end = Date.now() + duration;
-
-    const frame = () => {
-      confetti({ particleCount: 3, angle: 60, spread: 55, origin: { x: 0, y: 0.6 } });
-      confetti({ particleCount: 3, angle: 120, spread: 55, origin: { x: 1, y: 0.6 } });
-      if (Date.now() < end) requestAnimationFrame(frame);
-    };
-
-    frame();
-  }, [isComplete]);
 
   return (
     <div className="flex flex-col gap-6">

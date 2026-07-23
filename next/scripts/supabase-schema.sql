@@ -39,6 +39,14 @@ create table if not exists public.awards (
   updated_at timestamptz not null default now()
 );
 
+create table if not exists public.image_submissions (
+  id text primary key,
+  data jsonb not null default '{}'::jsonb,
+  team_id text generated always as (data ->> 'teamId') stored,
+  type text generated always as (data ->> 'type') stored,
+  updated_at timestamptz not null default now()
+);
+
 create table if not exists public.standings (
   id text primary key,
   data jsonb not null default '{}'::jsonb,
@@ -66,6 +74,7 @@ create table if not exists public.command_receipts (
 create index if not exists players_team_id_idx on public.players (team_id);
 create index if not exists matches_sport_status_idx on public.matches (sport, status);
 create index if not exists matches_stage_idx on public.matches (stage);
+create unique index if not exists image_submissions_team_type_idx on public.image_submissions (team_id, type);
 
 create or replace function public.touch_updated_at()
 returns trigger
@@ -95,6 +104,9 @@ create trigger matches_touch_updated_at before update on public.matches for each
 drop trigger if exists awards_touch_updated_at on public.awards;
 create trigger awards_touch_updated_at before update on public.awards for each row execute function public.touch_updated_at();
 
+drop trigger if exists image_submissions_touch_updated_at on public.image_submissions;
+create trigger image_submissions_touch_updated_at before update on public.image_submissions for each row execute function public.touch_updated_at();
+
 drop trigger if exists standings_touch_updated_at on public.standings;
 create trigger standings_touch_updated_at before update on public.standings for each row execute function public.touch_updated_at();
 
@@ -113,6 +125,7 @@ alter table public.teams enable row level security;
 alter table public.players enable row level security;
 alter table public.matches enable row level security;
 alter table public.awards enable row level security;
+alter table public.image_submissions enable row level security;
 alter table public.standings enable row level security;
 alter table public.leaderboards enable row level security;
 alter table public.brackets enable row level security;
@@ -125,6 +138,7 @@ grant select on public.teams to anon, authenticated;
 grant select on public.players to anon, authenticated;
 grant select on public.matches to anon, authenticated;
 grant select on public.awards to anon, authenticated;
+grant select on public.image_submissions to anon, authenticated;
 grant select on public.standings to anon, authenticated;
 grant select on public.leaderboards to anon, authenticated;
 grant select on public.brackets to anon, authenticated;
@@ -134,6 +148,7 @@ grant all on public.teams to service_role;
 grant all on public.players to service_role;
 grant all on public.matches to service_role;
 grant all on public.awards to service_role;
+grant all on public.image_submissions to service_role;
 grant all on public.standings to service_role;
 grant all on public.leaderboards to service_role;
 grant all on public.brackets to service_role;
@@ -150,6 +165,7 @@ begin
     'players',
     'matches',
     'awards',
+    'image_submissions',
     'standings',
     'leaderboards',
     'brackets',
@@ -190,6 +206,11 @@ end $$;
 do $$
 begin
   alter publication supabase_realtime add table public.awards;
+exception when duplicate_object then null;
+end $$;
+do $$
+begin
+  alter publication supabase_realtime add table public.image_submissions;
 exception when duplicate_object then null;
 end $$;
 do $$

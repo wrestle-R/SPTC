@@ -11,27 +11,7 @@ import { usePublicDocument } from "@/lib/public-data";
 import type { OverallStandingDocument } from "@/lib/web-types";
 import { motion } from "framer-motion";
 import { Trophy, Medal } from "lucide-react";
-
-const TEAM_JERSEYS: Record<string, { front: string; back: string }> = {
-  "crimson-warriors": { front: "/Jersey/red-front-v2.png", back: "/Jersey/red-back-v2.png" },
-  "gods-gladiators": { front: "/Jersey/blue-front-v2.png", back: "/Jersey/blue-back-v2.png" },
-  "karuppu-knights": { front: "/Jersey/black-front-v2.png", back: "/Jersey/black-back-v2.png" },
-  "ivory-elites": { front: "/Jersey/ivory-front-v2.png", back: "/Jersey/ivory-back-v2.png" },
-};
-
-const TEAM_GRADIENTS: Record<string, string> = {
-  "crimson-warriors": "from-red-600 to-orange-500",
-  "gods-gladiators": "from-blue-600 to-cyan-500",
-  "karuppu-knights": "from-zinc-700 to-slate-500",
-  "ivory-elites": "from-amber-100 to-orange-50",
-};
-
-const TEAM_TEXT_COLORS: Record<string, string> = {
-  "crimson-warriors": "text-red-500",
-  "gods-gladiators": "text-blue-500",
-  "karuppu-knights": "text-zinc-500",
-  "ivory-elites": "text-orange-600",
-};
+import { TEAM_GRADIENTS, TEAM_JERSEYS } from "@/lib/team-assets";
 
 export function TeamStandings() {
   const router = useRouter();
@@ -47,6 +27,10 @@ export function TeamStandings() {
       handball: stored?.handball ?? 0,
       cricket: stored?.cricket ?? 0,
       throwball: stored?.throwball ?? 0,
+      timelyArrival: stored?.timelyArrival ?? 0,
+      earlyBird: stored?.earlyBird ?? 0,
+      leagueWin: stored?.leagueWin ?? 0,
+      leagueTie: stored?.leagueTie ?? 0,
       total: stored?.total ?? 0,
     };
   }).sort((a, b) => b.total - a.total || a.rank - b.rank);
@@ -69,7 +53,7 @@ export function TeamStandings() {
             {rows.map((row, i) => {
               const jersey = TEAM_JERSEYS[row.teamId];
               const gradient = TEAM_GRADIENTS[row.teamId] || "from-zinc-600 to-zinc-400";
-              const textColor = TEAM_TEXT_COLORS[row.teamId] || "text-zinc-500";
+              const bonusSwing = row.timelyArrival + row.earlyBird + row.leagueWin + row.leagueTie;
               return (
                 <motion.div
                   key={row.teamId}
@@ -93,8 +77,11 @@ export function TeamStandings() {
                           </div>
                         )}
                         <div className="min-w-0 flex-1">
-                          <p className={`text-4xl font-black tabular-nums tracking-tighter ${textColor} drop-shadow-sm`}>{row.total}</p>
+                          <p className="text-4xl font-black tabular-nums tracking-tighter text-foreground drop-shadow-sm">{row.total}</p>
                           <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mt-0.5">points</p>
+                          <p className="mt-2 text-xs font-medium text-muted-foreground">
+                            Bonus swing: <span className="font-semibold text-foreground">{bonusSwing}</span>
+                          </p>
                         </div>
                       </div>
                       <p className="mt-4 text-base font-extrabold truncate tracking-tight text-foreground/90 group-hover:text-foreground transition-colors">{row.name}</p>
@@ -105,7 +92,7 @@ export function TeamStandings() {
             })}
           </div>
 
-          <div>
+          <div className="overflow-hidden rounded-2xl">
             <Card className="shadow-none overflow-hidden">
               <CardHeader className="pb-2">
                 <CardTitle className="flex items-center gap-2">
@@ -115,6 +102,7 @@ export function TeamStandings() {
                 <CardDescription>Click a row to view team details.</CardDescription>
               </CardHeader>
               <CardContent className="px-0">
+                <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow className="hover:bg-transparent">
@@ -123,6 +111,10 @@ export function TeamStandings() {
                       <TableHead className="text-right font-bold">Handball</TableHead>
                       <TableHead className="text-right font-bold">Cricket</TableHead>
                       <TableHead className="text-right font-bold">Throwball</TableHead>
+                      <TableHead className="text-right font-bold">League Win</TableHead>
+                      <TableHead className="text-right font-bold">League Tie</TableHead>
+                      <TableHead className="text-right font-bold">Arrival</TableHead>
+                      <TableHead className="text-right font-bold">Early Bird</TableHead>
                       <TableHead className="pr-6 text-right font-bold">Total</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -146,11 +138,16 @@ export function TeamStandings() {
                         <TableCell className="text-right tabular-nums text-sm">{row.handball}</TableCell>
                         <TableCell className="text-right tabular-nums text-sm">{row.cricket}</TableCell>
                         <TableCell className="text-right tabular-nums text-sm">{row.throwball}</TableCell>
+                        <TableCell className="text-right tabular-nums text-sm">{row.leagueWin}</TableCell>
+                        <TableCell className="text-right tabular-nums text-sm">{row.leagueTie}</TableCell>
+                        <TableCell className="text-right tabular-nums text-sm">{row.timelyArrival}</TableCell>
+                        <TableCell className="text-right tabular-nums text-sm">{row.earlyBird}</TableCell>
                         <TableCell className="pr-6 text-right font-black tabular-nums text-base">{row.total}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
                 </Table>
+                </div>
               </CardContent>
             </Card>
           </div>

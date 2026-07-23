@@ -1,7 +1,7 @@
 "use client";
 
 import { S9_TEAMS } from "@sports-fiesta/domain";
-import { ArrowRight, ArrowUpRight, CheckCircle2, Clock, Radio, Users } from "lucide-react";
+import { ArrowRight, ArrowUpRight, Camera, CheckCircle2, Clock, Radio, Sparkles, Users } from "lucide-react";
 import { TbPlayFootball, TbPlayHandball, TbCricket } from "react-icons/tb";
 import { MdSportsVolleyball } from "react-icons/md";
 import Link from "next/link";
@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { usePublicCollection } from "@/lib/public-data";
-import type { PublicMatch, PublicTeam } from "@/lib/web-types";
+import type { ImageSubmission, PublicMatch, PublicTeam } from "@/lib/web-types";
 
 const sportLinks = [
   { href: "/football", label: "Football", icon: TbPlayFootball, color: "text-orange-400", bg: "bg-orange-500/15", glow: "from-orange-500/15", line: "stroke-orange-400/25" },
@@ -23,8 +23,15 @@ const sportLinks = [
 export function HomeView() {
   const matchesState = usePublicCollection<PublicMatch>("matches");
   const teamsState = usePublicCollection<PublicTeam>("teams");
+  const bonusState = usePublicCollection<ImageSubmission>("image_submissions");
   const teams = teamsState.data.length ? teamsState.data : S9_TEAMS;
   const matches = matchesState.data;
+  const arrivals = bonusState.data
+    .filter((submission) => submission.type === "timely-arrival")
+    .sort((a, b) => (a.arrivalPosition ?? 99) - (b.arrivalPosition ?? 99));
+  const earlyBird = bonusState.data
+    .filter((submission) => submission.type === "early-bird")
+    .sort((a, b) => a.groupPostedAt.localeCompare(b.groupPostedAt));
 
   const liveMatches = matches
     .filter((match) => ["live", "innings-break", "super-over"].includes(match.status))
@@ -103,8 +110,71 @@ export function HomeView() {
         </div>
       </section>
 
+      <section className="grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]" aria-labelledby="bonus-heading">
+        <div className="flex items-end justify-between gap-4 lg:col-span-2">
+          <div>
+            <p className="text-sm font-semibold uppercase tracking-wider text-primary">Bonus race</p>
+            <h2 id="bonus-heading" className="mt-1 text-2xl font-black tracking-tight">Arrival momentum and early-bird points</h2>
+          </div>
+        </div>
+
+        <Link href="/arrivals" className="group rounded-[1.75rem] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+          <Card className="h-full overflow-hidden border-0 bg-[radial-gradient(circle_at_top_left,rgba(251,191,36,0.18),transparent_38%),linear-gradient(135deg,rgba(255,255,255,0.98),rgba(255,247,237,0.98))] py-0 shadow-none ring-1 ring-black/6 transition-all duration-300 hover:-translate-y-1 hover:ring-primary/30 dark:bg-[radial-gradient(circle_at_top_left,rgba(251,191,36,0.16),transparent_38%),linear-gradient(135deg,rgba(28,25,23,0.98),rgba(24,24,27,0.98))]">
+            <CardContent className="flex h-full flex-col gap-6 p-6">
+              <div className="flex items-center justify-between gap-3">
+                <Badge variant="secondary">Timely Arrival</Badge>
+                <Camera className="size-5 text-primary" />
+              </div>
+              <div className="space-y-3">
+                <p className="max-w-sm text-2xl font-black tracking-tight text-balance">
+                  {arrivals[0]
+                    ? `${teams.find((team) => team.id === arrivals[0].teamId)?.name ?? "First team"} currently holds the opening 100-point slot.`
+                    : "The first four verified team photos will land here as soon as the organizer confirms them."}
+                </p>
+                <p className="text-sm leading-7 text-muted-foreground">
+                  {arrivals.length
+                    ? `${arrivals.length} of 4 arrival positions are already locked in.`
+                    : "First, second, third, and fourth arrivals earn 100, 60, 40, and 20 points."}
+                </p>
+              </div>
+              <div className="mt-auto flex items-center justify-between border-t pt-4 text-sm font-medium text-muted-foreground">
+                <span>Open the arrival leaderboard</span>
+                <ArrowUpRight className="size-4 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
+
+        <Link href="/early-bird" className="group rounded-[1.75rem] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+          <Card className="h-full overflow-hidden border-0 bg-[radial-gradient(circle_at_top_right,rgba(14,165,233,0.18),transparent_38%),linear-gradient(135deg,rgba(255,255,255,0.98),rgba(240,249,255,0.98))] py-0 shadow-none ring-1 ring-black/6 transition-all duration-300 hover:-translate-y-1 hover:ring-primary/30 dark:bg-[radial-gradient(circle_at_top_right,rgba(14,165,233,0.18),transparent_38%),linear-gradient(135deg,rgba(20,23,31,0.98),rgba(24,24,27,0.98))]">
+            <CardContent className="flex h-full flex-col gap-6 p-6">
+              <div className="flex items-center justify-between gap-3">
+                <Badge variant="secondary">Early Bird Jackpot</Badge>
+                <Sparkles className="size-5 text-primary" />
+              </div>
+              <div className="space-y-3">
+                <p className="text-4xl font-black tracking-tight text-primary">{earlyBird.length}</p>
+                <p className="max-w-sm text-lg font-semibold tracking-tight text-balance">
+                  {earlyBird.length
+                    ? `${earlyBird.length} teams have already banked the extra 100-point bonus.`
+                    : "No early-bird bonus has been verified yet."}
+                </p>
+                <p className="text-sm leading-7 text-muted-foreground">
+                  Every verified team photo posted before 2:30 PM earns an additional 100 points toward Team of the Year.
+                </p>
+              </div>
+              <div className="mt-auto flex items-center justify-between border-t pt-4 text-sm font-medium text-muted-foreground">
+                <span>See early-bird teams</span>
+                <ArrowUpRight className="size-4 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
+      </section>
+
       {matchesState.loading || teamsState.loading ? <ContentSkeleton rows={2} /> : null}
       {matchesState.error ? <DataError message={matchesState.error} retry={matchesState.retry} /> : null}
+      {bonusState.error ? <DataError message={bonusState.error} retry={bonusState.retry} /> : null}
 
       {!matchesState.loading && !matchesState.error ? (
         <>

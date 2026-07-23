@@ -2,12 +2,15 @@ import { NextResponse } from "next/server";
 import { CommandError } from "@/lib/supabase-admin";
 import {
   handleConfirmAward, handleConfirmFixtures, handleCreateMatch,
+  handleDeleteSubmission,
   handleEditMatchEvent, handleEndInnings, handleEndMatch, handleRecordCricketDelivery, handleRecordFieldSportEvent,
   handleRecordThrowballRally,
   handleRefreshProjections, handleResolveShootoutToss, handleSavePlayer, handleSaveTeam, handleSaveTournamentSettings, handleSelectCricketBowler,
   handleSelectNextBatter, handleSetPlacementPoints, handleSetToss, handleStartInnings, handleStartMatch,
   handleStartShootout,
   handleUndoLastEvent, handleUpdateMatch, handleDeleteMatch,
+  handleVerifyArrival,
+  handleVerifyEarlyBird,
 } from "@/lib/command-handlers";
 
 export async function POST(request: Request) {
@@ -52,6 +55,9 @@ async function dispatch(command: string, data: Record<string, unknown>): Promise
     case "endMatch": return handleEndMatch(data);
     case "confirmAward": return handleConfirmAward(data);
     case "setPlacementPoints": return handleSetPlacementPoints(data);
+    case "verifyArrival": return handleVerifyArrival(data);
+    case "verifyEarlyBird": return handleVerifyEarlyBird(data);
+    case "deleteSubmission": return handleDeleteSubmission(data);
     case "refreshProjections": return handleRefreshProjections();
     default: throw new CommandError(400, "INVALID_ARGUMENT", `Unknown command: ${command}`);
   }

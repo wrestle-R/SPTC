@@ -37,12 +37,31 @@ export interface OverallStandingRow {
   handball: number;
   cricket: number;
   throwball: number;
+  timelyArrival: number;
+  earlyBird: number;
+  leagueWin: number;
+  leagueTie: number;
   total: number;
 }
 
 export interface OverallStandingDocument {
   id: string;
   rows: OverallStandingRow[];
+}
+
+export interface ImageSubmission {
+  id: string;
+  teamId: string;
+  type: "timely-arrival" | "early-bird";
+  imageUrl: string;
+  groupPostedAt: string;
+  groupPostedAtLocal: string;
+  pointsAwarded: number;
+  status: "verified";
+  memberCountConfirmed: true;
+  arrivalPosition?: number;
+  verifiedAt: string;
+  updatedAt?: string;
 }
 
 export interface FieldSportStandingRow {

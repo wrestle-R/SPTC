@@ -104,7 +104,7 @@ describe("five-over cricket scoring", () => {
     }
     state = recordCricketDelivery(state, {
       runsOffBat: 0,
-      dismissal: { type: "bowled", playerOutId: state.strikerId },
+      dismissal: { type: "bowled", playerOutId: state.strikerId ?? "a" },
     });
 
     expect(state.legalBalls).toBe(6);
@@ -239,7 +239,16 @@ describe("five-over cricket scoring", () => {
     state = recordCricketDelivery(state, { runsOffBat: 6 });
     expect(state.completed).toBe(false);
 
-    state = recordCricketDelivery(state, { runsOffBat: 22 });
+    state = recordCricketDelivery(state, { runsOffBat: 6 });
+    expect(state.completed).toBe(false);
+
+    state = recordCricketDelivery(state, { runsOffBat: 6 });
+    expect(state.completed).toBe(false);
+
+    state = recordCricketDelivery(state, { runsOffBat: 6 });
+    expect(state.completed).toBe(false);
+
+    state = recordCricketDelivery(state, { runsOffBat: 4 });
     expect(state.completed).toBe(true);
     expect(state.score).toBe(32);
   });
