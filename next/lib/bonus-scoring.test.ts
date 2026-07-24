@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   calculateLeagueBonusByTeam,
+  deriveSportPlacementsFromLeaderboards,
   isEarlyBirdLocalTime,
   parseLocalDateTimeInput,
   timelyArrivalPointsForPosition,
@@ -46,7 +47,24 @@ describe("bonus scoring", () => {
       },
     );
 
-    expect(totals.red).toEqual({ leagueWin: 17, leagueTie: 2 });
-    expect(totals.blue).toEqual({ leagueWin: 8, leagueTie: 0 });
+    expect(totals.red).toEqual({ leagueWin: 80, leagueTie: 10 });
+    expect(totals.blue).toEqual({ leagueWin: 40, leagueTie: 0 });
+  });
+
+  it("derives main-sport placement points from each sport leaderboard", () => {
+    expect(deriveSportPlacementsFromLeaderboards([
+      { sport: "football", teamId: "red", rank: 1, played: 3 },
+      { sport: "football", teamId: "blue", rank: 2, played: 3 },
+      { sport: "football", teamId: "green", rank: 3, played: 3 },
+      { sport: "football", teamId: "black", rank: 4, played: 3 },
+      { sport: "cricket", teamId: "blue", rank: 1, played: 2 },
+      { sport: "cricket", teamId: "red", rank: 2, played: 0 },
+    ])).toEqual([
+      { sport: "football", teamId: "red", place: 1 },
+      { sport: "football", teamId: "blue", place: 2 },
+      { sport: "football", teamId: "green", place: 3 },
+      { sport: "football", teamId: "black", place: 4 },
+      { sport: "cricket", teamId: "blue", place: 1 },
+    ]);
   });
 });

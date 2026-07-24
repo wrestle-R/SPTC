@@ -276,6 +276,7 @@ export interface SeedMatch {
     currentInnings: number;
   };
   throwball?: ThrowballMatchState;
+  lineups?: Record<TeamId, PlayerId[]>;
   winnerTeamId?: TeamId | null;
   resultText?: string;
   manOfTheMatchPlayerId?: PlayerId | null;

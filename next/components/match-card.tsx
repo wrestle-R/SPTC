@@ -1,5 +1,5 @@
 import { S9_PLAYERS } from "@sports-fiesta/domain";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, Trophy } from "lucide-react";
 import Link from "next/link";
 import { MatchStatusBadge } from "@/components/match-status-badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -19,10 +19,23 @@ export function MatchCard({ match, teams, players = S9_PLAYERS, featured = false
   const href = `/${match.sport}/${match.id}`;
   const resultText = match.resultText || (match.status === "completed" ? "Result pending - organizer must confirm." : null);
   const motm = players.find((player) => player.id === match.manOfTheMatchPlayerId);
+  const winner = match.status === "completed"
+    ? teams.find((team) => team.id === match.winnerTeamId)
+    : undefined;
+  const winnerColor = winner?.accentColor || winner?.color;
+  const winnerAura = winnerColor
+    ? {
+        borderColor: winnerColor,
+        boxShadow: `0 0 0 1px color-mix(in srgb, ${winnerColor} 55%, transparent), 0 12px 38px color-mix(in srgb, ${winnerColor} 30%, transparent)`,
+      }
+    : undefined;
 
   return (
     <Link href={href} className="block rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-      <Card className={featured ? "gap-0 overflow-hidden py-0 shadow-none ring-1 ring-primary/30 transition-colors hover:border-primary/50" : "gap-0 overflow-hidden py-0 shadow-none transition-colors hover:border-primary/50"}>
+      <Card
+        className={featured ? "gap-0 overflow-hidden py-0 shadow-none ring-1 ring-primary/30 transition-[border-color,box-shadow] hover:border-primary/50" : "gap-0 overflow-hidden py-0 shadow-none transition-[border-color,box-shadow] hover:border-primary/50"}
+        style={winnerAura}
+      >
         <CardContent className="p-4 sm:p-5">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-2 text-xs font-medium uppercase text-muted-foreground">
@@ -35,8 +48,17 @@ export function MatchCard({ match, teams, players = S9_PLAYERS, featured = false
             <span className="text-xs font-semibold text-muted-foreground">VS</span>
             <TeamScore team={away} score={isCricket ? cricketScore(awayScore) : isThrowball ? throwballScore(match, match.awayTeamId) : match.scoreSummary?.[match.awayTeamId]} align="right" />
           </div>
+          {winner ? (
+            <div
+              className="mt-4 flex items-center gap-2 rounded-md border px-3 py-2 text-sm font-bold"
+              style={{ borderColor: winnerColor, color: winnerColor }}
+            >
+              <Trophy className="size-4 shrink-0" aria-hidden="true" />
+              <span className="truncate">Winner: {winner.name}</span>
+            </div>
+          ) : null}
           {resultText ? (
-            <p className="mt-4 rounded-md bg-muted px-3 py-2 text-sm font-medium text-card-foreground">{resultText}</p>
+            <p className={`${winner ? "mt-2" : "mt-4"} rounded-md bg-muted px-3 py-2 text-sm font-medium text-card-foreground`}>{resultText}</p>
           ) : null}
           {motm ? (
             <p className="mt-2 rounded-md border px-3 py-2 text-sm text-muted-foreground">
