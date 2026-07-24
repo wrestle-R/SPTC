@@ -24,10 +24,10 @@ export const ACTIVITY_SPORTS: readonly ActivitySport[] = [
     label: "Women’s Games",
     shortLabel: "Women’s",
     events: [
-      { id: "blindfold-colour-ball", name: "Blindfold pick the colour ball", kind: "individual", points: INDIVIDUAL_POINTS },
-      { id: "ring-toss-challenge", name: "Ring Toss Challenge", kind: "individual", points: INDIVIDUAL_POINTS },
-      { id: "lemon-spoon", name: "Lemon Spoon", kind: "individual", points: INDIVIDUAL_POINTS },
-      { id: "book-balancing", name: "Book Balancing", kind: "individual", points: INDIVIDUAL_POINTS },
+      { id: "blindfold-colour-ball", name: "Blindfold pick the colour ball", kind: "relay", points: INDIVIDUAL_POINTS },
+      { id: "ring-toss-challenge", name: "Ring Toss Challenge", kind: "relay", points: INDIVIDUAL_POINTS },
+      { id: "lemon-spoon", name: "Lemon Spoon", kind: "relay", points: INDIVIDUAL_POINTS },
+      { id: "book-balancing", name: "Book Balancing", kind: "relay", points: INDIVIDUAL_POINTS },
     ],
   },
   {
@@ -35,9 +35,9 @@ export const ACTIVITY_SPORTS: readonly ActivitySport[] = [
     label: "Senior Kids",
     shortLabel: "Senior Kids",
     events: [
-      { id: "sack-race", name: "Sack Race", kind: "individual", points: INDIVIDUAL_POINTS },
-      { id: "hurdles-obstacle-race", name: "Hurdles & Obstacle Race", kind: "individual", points: INDIVIDUAL_POINTS },
-      { id: "hit-the-stumps-senior", name: "Hit the Stumps Challenge", kind: "individual", points: INDIVIDUAL_POINTS },
+      { id: "sack-race", name: "Sack Race", kind: "relay", points: INDIVIDUAL_POINTS },
+      { id: "hurdles-obstacle-race", name: "Hurdles & Obstacle Race", kind: "relay", points: INDIVIDUAL_POINTS },
+      { id: "hit-the-stumps-senior", name: "Hit the Stumps Challenge", kind: "relay", points: INDIVIDUAL_POINTS },
     ],
   },
   {
@@ -45,10 +45,10 @@ export const ACTIVITY_SPORTS: readonly ActivitySport[] = [
     label: "Junior Kids",
     shortLabel: "Junior Kids",
     events: [
-      { id: "arrange-colour-balls", name: "Arrange the balls based on the colours", kind: "individual", points: INDIVIDUAL_POINTS },
-      { id: "ball-bucket-toss", name: "Ball Bucket Toss", kind: "individual", points: INDIVIDUAL_POINTS },
-      { id: "hurdles", name: "Hurdles", kind: "individual", points: INDIVIDUAL_POINTS },
-      { id: "hit-the-stumps-junior", name: "Hit the Stumps Challenge", kind: "individual", points: INDIVIDUAL_POINTS },
+      { id: "arrange-colour-balls", name: "Arrange the balls based on the colours", kind: "relay", points: INDIVIDUAL_POINTS },
+      { id: "ball-bucket-toss", name: "Ball Bucket Toss", kind: "relay", points: INDIVIDUAL_POINTS },
+      { id: "hurdles", name: "Hurdles", kind: "relay", points: INDIVIDUAL_POINTS },
+      { id: "hit-the-stumps-junior", name: "Hit the Stumps Challenge", kind: "relay", points: INDIVIDUAL_POINTS },
     ],
   },
   {
@@ -94,8 +94,9 @@ export type ActivityFixture = {
   updatedAt?: string;
 };
 
-export type ActivityRecord = ActivityResult | ActivityFixture;
+export type ActivityRecord = ActivityResult | ActivityFixture | QuickEventFixture | QuickEventResult;
 
 export function activityFixtureId(sport: ActivitySportId, eventId: string) {
   return `activity-fixture:${sport}:${eventId}`;
 }
+import type { QuickEventFixture, QuickEventResult } from "@/lib/quick-events";

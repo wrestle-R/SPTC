@@ -42,6 +42,7 @@ export interface OverallStandingRow {
   "senior-kids"?: number;
   "junior-kids"?: number;
   relay?: number;
+  quickEvents?: number;
   bonus?: number;
   adjustments?: number;
   timelyArrival: number;

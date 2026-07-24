@@ -2,13 +2,13 @@ import { NextResponse } from "next/server";
 import { hasOrganizerAccess } from "@/lib/organizer-access";
 import { CommandError } from "@/lib/supabase-admin";
 import {
-  handleConfirmAward, handleConfirmFixtures, handleCreateActivityFixture, handleCreateMatch, handleDeleteActivityFixture, handleDeleteActivityResult, handleDeleteManualPointsAdjustment,
+  handleConfirmAward, handleConfirmFixtures, handleCreateActivityFixture, handleCreateMatch, handleCreateQuickEvent, handleDeleteActivityFixture, handleDeleteActivityResult, handleDeleteManualPointsAdjustment, handleDeleteQuickEvent,
   handleDeleteSubmission,
   handleEditMatchEvent, handleEndInnings, handleEndMatch, handleRecordCricketDelivery, handleRecordFieldSportEvent,
   handleRecordThrowballRally,
-  handleRefreshProjections, handleResolveShootoutToss, handleSaveActivityResult, handleSaveManualPointsAdjustment, handleSavePlayer, handleSaveSportPlacement, handleSaveTeam, handleSaveTeamBonus, handleSaveTournamentSettings, handleSelectCricketBowler,
+  handleRefreshProjections, handleResolveShootoutToss, handleSaveActivityResult, handleSaveManualPointsAdjustment, handleSavePlayer, handleSaveQuickEventResult, handleSaveSportPlacement, handleSaveTeam, handleSaveTeamBonus, handleSaveTournamentSettings, handleSelectCricketBowler,
   handleSelectNextBatter, handleSetPlacementPoints, handleSetToss, handleStartActivityFixture, handleStartInnings, handleStartMatch,
-  handleStartShootout,
+  handleStartQuickEvent, handleStartShootout,
   handleUndoLastEvent, handleUpdateMatch, handleDeleteMatch,
   handleVerifyArrival,
   handleVerifyEarlyBird,
@@ -63,6 +63,10 @@ async function dispatch(command: string, data: Record<string, unknown>): Promise
     case "deleteActivityFixture": return handleDeleteActivityFixture(data);
     case "createActivityFixture": return handleCreateActivityFixture(data);
     case "startActivityFixture": return handleStartActivityFixture(data);
+    case "createQuickEvent": return handleCreateQuickEvent(data);
+    case "startQuickEvent": return handleStartQuickEvent(data);
+    case "saveQuickEventResult": return handleSaveQuickEventResult(data);
+    case "deleteQuickEvent": return handleDeleteQuickEvent(data);
     case "saveTeamBonus": return handleSaveTeamBonus(data);
     case "saveManualPointsAdjustment": return handleSaveManualPointsAdjustment(data);
     case "deleteManualPointsAdjustment": return handleDeleteManualPointsAdjustment(data);

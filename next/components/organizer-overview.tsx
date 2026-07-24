@@ -10,6 +10,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { TeamPointsChart } from "@/components/team-points-chart";
 import { usePrivateCollection, usePrivateDocument } from "@/lib/organizer-data";
 import { getActivityEvent, getActivitySport, type ActivityFixture, type ActivityRecord, type ActivityResult } from "@/lib/activity-events";
+import { splitPlacementPoints, type QuickEventResult } from "@/lib/quick-events";
 import type { OverallStandingDocument, PublicMatch } from "@/lib/web-types";
 
 type FieldLeaders = { id: string; topScorers?: Array<{ playerId: string; teamId: string; goals: number }> };
@@ -146,9 +147,20 @@ function crossSportLeaders(matches: PublicMatch[], activities: ActivityRecord[])
     addNormalized(matchPerformanceScores(match));
   }
   for (const result of activities.filter((item): item is ActivityResult => item.type === "activity-result" && item.confirmed)) addNormalized(activityPerformanceScores(result));
+  for (const result of activities.filter((item): item is QuickEventResult => item.type === "quick-event-result" && item.confirmed)) addNormalized(quickEventPerformanceScores(result));
   return [...totals.entries()]
     .map(([playerId, score]) => ({ playerId, score }))
     .sort((a, b) => b.score - a.score || a.playerId.localeCompare(b.playerId));
+}
+
+function quickEventPerformanceScores(result: QuickEventResult) {
+  const scores = new Map<string, number>();
+  for (const [index, points] of result.points.entries()) {
+    const teamId = result.placements[String(index + 1)];
+    const lineup = result.lineups[teamId] ?? [];
+    for (const playerId of lineup) scores.set(playerId, splitPlacementPoints(points, lineup.length));
+  }
+  return scores;
 }
 
 function activityPerformanceScores(result: ActivityResult) {
