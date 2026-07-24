@@ -41,6 +41,7 @@ import {
   type ThrowballStandingInput,
 } from "@sports-fiesta/domain";
 import { activityFixtureId, getActivityEvent, type ActivityFixture, type ActivityResult, type ActivitySportId } from "@/lib/activity-events";
+import { quickEventResultId, type QuickEventFixture, type QuickEventResult } from "@/lib/quick-events";
 import {
   calculateLeagueBonusByTeam,
   DEFAULT_PLACEMENT_POINTS_BY_SPORT,
@@ -996,6 +997,119 @@ export async function handleStartActivityFixture(data: CallableData) {
   return { id };
 }
 
+function quickEventPoints(value: unknown): [number, number, number] {
+  if (!Array.isArray(value) || value.length !== 3) {
+    throw new CommandError(400, "INVALID_ARGUMENT", "Enter points for first, second, and third place.");
+  }
+  const points = value.map(Number);
+  if (points.some((point) => !Number.isFinite(point) || point < 0 || point > 10000)) {
+    throw new CommandError(400, "INVALID_ARGUMENT", "Quick-event points must be between 0 and 10,000.");
+  }
+  return points as [number, number, number];
+}
+
+async function validateQuickEventLineups(value: unknown) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new CommandError(400, "INVALID_ARGUMENT", "Add the participating players first.");
+  }
+  const [teams, players] = await Promise.all([
+    listDocuments<Team & JsonDocument>("teams"),
+    listDocuments<Player & JsonDocument>("players"),
+  ]);
+  const rawLineups = value as Record<string, unknown>;
+  const lineups: Record<string, string[]> = {};
+  for (const team of teams) {
+    const rawLineup = rawLineups[team.id];
+    const lineup: string[] = Array.isArray(rawLineup) ? rawLineup.map(String) : [];
+    if (!lineup.length) continue;
+    if (new Set(lineup).size !== lineup.length) {
+      throw new CommandError(400, "INVALID_ARGUMENT", `${team.name} has a duplicate player.`);
+    }
+    if (lineup.some((playerId) => !players.some((player) => player.id === playerId && player.teamId === team.id && player.active))) {
+      throw new CommandError(400, "INVALID_ARGUMENT", `${team.name} can only use active players from its own roster.`);
+    }
+    lineups[team.id] = lineup;
+  }
+  if (Object.keys(lineups).length < 3) {
+    throw new CommandError(400, "INVALID_ARGUMENT", "Add players for at least three teams.");
+  }
+  return lineups;
+}
+
+export async function handleCreateQuickEvent(data: CallableData) {
+  const title = asString(data.title, "Event title", 100);
+  const points = quickEventPoints(data.points);
+  const lineups = await validateQuickEventLineups(data.lineups);
+  const id = `quick-event-fixture:${newId()}`;
+  const timestamp = nowIso();
+  const fixture: QuickEventFixture & JsonDocument = {
+    id,
+    type: "quick-event-fixture",
+    title,
+    status: "scheduled",
+    points,
+    lineups,
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  };
+  await upsertDocument("awards", id, fixture);
+  return { id };
+}
+
+export async function handleStartQuickEvent(data: CallableData) {
+  const fixtureId = asString(data.fixtureId, "Quick-event fixture");
+  const fixture = await getDocument<QuickEventFixture & JsonDocument>("awards", fixtureId);
+  if (!fixture || fixture.type !== "quick-event-fixture") throw new CommandError(404, "NOT_FOUND", "Quick-event fixture not found.");
+  if (fixture.status !== "scheduled") throw new CommandError(400, "FAILED_PRECONDITION", "Only a scheduled quick event can be started.");
+  await upsertDocument("awards", fixtureId, { ...fixture, status: "live", updatedAt: nowIso() });
+  return { id: fixtureId };
+}
+
+export async function handleSaveQuickEventResult(data: CallableData) {
+  const fixtureId = asString(data.fixtureId, "Quick-event fixture");
+  const fixture = await getDocument<QuickEventFixture & JsonDocument>("awards", fixtureId);
+  if (!fixture || fixture.type !== "quick-event-fixture") throw new CommandError(404, "NOT_FOUND", "Quick-event fixture not found.");
+  if (fixture.status !== "live" && fixture.status !== "completed") {
+    throw new CommandError(400, "FAILED_PRECONDITION", "Start the quick event before recording results.");
+  }
+  if (!data.placements || typeof data.placements !== "object" || Array.isArray(data.placements)) {
+    throw new CommandError(400, "INVALID_ARGUMENT", "Choose first, second, and third place.");
+  }
+  const placements = Object.fromEntries(Object.entries(data.placements as Record<string, unknown>).map(([place, teamId]) => [place, String(teamId ?? "").trim()]));
+  const winners = ["1", "2", "3"].map((place) => placements[place]);
+  if (winners.some((teamId) => !fixture.lineups[teamId]?.length) || new Set(winners).size !== 3) {
+    throw new CommandError(400, "INVALID_ARGUMENT", "Choose three different participating teams.");
+  }
+  const id = quickEventResultId(fixtureId);
+  const result: QuickEventResult & JsonDocument = {
+    id,
+    type: "quick-event-result",
+    fixtureId,
+    title: fixture.title,
+    confirmed: true,
+    points: fixture.points,
+    lineups: fixture.lineups,
+    placements,
+    updatedAt: nowIso(),
+  };
+  await upsertDocument("awards", id, result);
+  await upsertDocument("awards", fixtureId, { ...fixture, status: "completed", updatedAt: nowIso() });
+  await handleRefreshProjections();
+  return { id };
+}
+
+export async function handleDeleteQuickEvent(data: CallableData) {
+  const fixtureId = asString(data.fixtureId, "Quick-event fixture");
+  const fixture = await getDocument<QuickEventFixture & JsonDocument>("awards", fixtureId);
+  if (!fixture || fixture.type !== "quick-event-fixture") throw new CommandError(404, "NOT_FOUND", "Quick-event fixture not found.");
+  await Promise.all([
+    deleteDocument("awards", quickEventResultId(fixtureId)),
+    deleteDocument("awards", fixtureId),
+  ]);
+  await handleRefreshProjections();
+  return { id: fixtureId, deleted: true };
+}
+
 export async function handleSaveTeamBonus(data: CallableData) {
   const kind = asString(data.kind, "Bonus type");
   if (!["timely-arrival", "early-bird-bonus", "combined-team-game"].includes(kind)) throw new CommandError(400, "INVALID_ARGUMENT", "Choose a valid bonus type.");
@@ -1377,7 +1491,8 @@ export async function handleRefreshProjections() {
   ]);
   const leagueBonuses = calculateLeagueBonusByTeam(S9_TEAMS.map((team) => team.id), { football, handball, cricket, throwball });
   const activityResults = awards.filter((award) => award.type === "activity-result" && award.confirmed) as unknown as ActivityResult[];
-  const activitySportIds = ["womens-games", "senior-kids", "junior-kids", "relay"] as const;
+  const quickEventResults = awards.filter((award) => award.type === "quick-event-result" && award.confirmed) as unknown as QuickEventResult[];
+  const activitySportIds = ["womens-games", "senior-kids", "junior-kids", "relay", "quickEvents"] as const;
   const activityScores = new Map(S9_TEAMS.map((team) => [team.id, Object.fromEntries(activitySportIds.map((sport) => [sport, 0])) as Record<string, number>]));
   const bonusScores = new Map(S9_TEAMS.map((team) => [team.id, 0]));
   const adjustmentScores = new Map(S9_TEAMS.map((team) => [team.id, 0]));
@@ -1398,6 +1513,12 @@ export async function handleRefreshProjections() {
       const winnerId = result.placements[String(index + 1)];
       const teamId = result.kind === "relay" ? winnerId : players.find((player) => player.id === winnerId)?.teamId;
       if (teamId && activityScores.has(teamId)) activityScores.get(teamId)![result.sport] += points;
+    }
+  }
+  for (const result of quickEventResults) {
+    for (const [index, points] of result.points.entries()) {
+      const teamId = result.placements[String(index + 1)];
+      if (teamId && activityScores.has(teamId)) activityScores.get(teamId)!.quickEvents += points;
     }
   }
   const bonusByTeam = imageSubmissions.reduce((acc, submission) => {
