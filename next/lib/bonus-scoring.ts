@@ -27,6 +27,29 @@ export const DEFAULT_PLACEMENT_POINTS_BY_SPORT = {
   throwball: [120, 80, 30, 30],
 } as const satisfies Record<string, readonly number[]>;
 
+export const LEAGUE_BONUS_POINTS_BY_SPORT = {
+  football: { win: 20, tie: 10 },
+  cricket: { win: 20, tie: 0 },
+  handball: { win: 20, tie: 0 },
+  throwball: { win: 0, tie: 0 },
+} as const;
+
+type RankedLeagueTeam = {
+  sport: string;
+  teamId: string;
+  rank: number;
+  played: number;
+};
+
+export function deriveSportPlacementsFromLeaderboards(standings: RankedLeagueTeam[]) {
+  return standings
+    .filter((row): row is RankedLeagueTeam & { rank: 1 | 2 | 3 | 4 } => (
+      row.played > 0
+      && (row.rank === 1 || row.rank === 2 || row.rank === 3 || row.rank === 4)
+    ))
+    .map((row) => ({ sport: row.sport, teamId: row.teamId, place: row.rank }));
+}
+
 const INDIA_OFFSET_MINUTES = 330;
 
 export function timelyArrivalPointsForPosition(position: number) {
@@ -96,19 +119,27 @@ export function calculateLeagueBonusByTeam(
   ) as Record<string, { leagueWin: number; leagueTie: number }>;
 
   for (const row of standings.football) {
-    bonuses[row.teamId].leagueWin += row.wins * 3;
-    bonuses[row.teamId].leagueTie += row.draws;
+    const teamBonus = bonuses[row.teamId];
+    if (!teamBonus) continue;
+    teamBonus.leagueWin += row.wins * LEAGUE_BONUS_POINTS_BY_SPORT.football.win;
+    teamBonus.leagueTie += row.draws * LEAGUE_BONUS_POINTS_BY_SPORT.football.tie;
   }
   for (const row of standings.handball) {
-    bonuses[row.teamId].leagueWin += row.wins * 3;
-    bonuses[row.teamId].leagueTie += row.draws;
+    const teamBonus = bonuses[row.teamId];
+    if (!teamBonus) continue;
+    teamBonus.leagueWin += row.wins * LEAGUE_BONUS_POINTS_BY_SPORT.handball.win;
+    teamBonus.leagueTie += row.draws * LEAGUE_BONUS_POINTS_BY_SPORT.handball.tie;
   }
   for (const row of standings.cricket) {
-    bonuses[row.teamId].leagueWin += row.wins * 2;
-    bonuses[row.teamId].leagueTie += row.ties;
+    const teamBonus = bonuses[row.teamId];
+    if (!teamBonus) continue;
+    teamBonus.leagueWin += row.wins * LEAGUE_BONUS_POINTS_BY_SPORT.cricket.win;
+    teamBonus.leagueTie += row.ties * LEAGUE_BONUS_POINTS_BY_SPORT.cricket.tie;
   }
   for (const row of standings.throwball) {
-    bonuses[row.teamId].leagueWin += row.wins * 3;
+    const teamBonus = bonuses[row.teamId];
+    if (!teamBonus) continue;
+    teamBonus.leagueWin += row.wins * LEAGUE_BONUS_POINTS_BY_SPORT.throwball.win;
   }
 
   return bonuses;

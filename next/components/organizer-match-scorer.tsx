@@ -117,23 +117,16 @@ export function OrganizerMatchScorer({ matchId }: { matchId: string }) {
     }
   }
 
-  async function completeMatch(manOfTheMatchPlayerId?: string) {
+  async function completeMatch() {
     if (!match) return;
     setPending(true);
     try {
-      await callOrganizerCommand("endMatch", revisionCommand(match.id, match.revision, { manOfTheMatchPlayerId }));
+      await callOrganizerCommand("endMatch", revisionCommand(match.id, match.revision));
       router.replace("/organizer/matches");
       router.refresh();
     } catch (cause) {
       const msg = cause instanceof Error ? cause.message : "Match completion failed.";
-      try {
-        const parsed = JSON.parse(msg) as { reason?: string; message?: string };
-        if (parsed.reason === "MOTM_REQUIRED") {
-          toast.error(parsed.message ?? "Select Man of the Match.");
-        } else toast.error(msg);
-      } catch {
-        toast.error(msg);
-      }
+      toast.error(msg);
     } finally { setPending(false); }
   }
 
@@ -145,14 +138,15 @@ export function OrganizerMatchScorer({ matchId }: { matchId: string }) {
   const away = teams.data.find((team) => team.id === match.awayTeamId);
   const teamName = (id: string) => teams.data.find((team) => team.id === id)?.name ?? "Team";
   const playerName = (id: string | null | undefined) => players.data.find((player) => player.id === id)?.name ?? "Player";
-  const confirmedPlayers = players.data.filter((player) => [match.homeTeamId, match.awayTeamId].includes(player.teamId));
-
+  const throwballPlayers = match.sport === "throwball" && match.lineups
+    ? players.data.filter((player) => match.lineups?.[player.teamId]?.includes(player.id))
+    : players.data;
   return <div className="flex flex-col gap-6">
     <div className="flex flex-wrap items-start justify-between gap-4"><div><Button nativeButton={false} variant="ghost" className="mb-3" render={<Link href="/organizer/matches" />}><ArrowLeft data-icon="inline-start" /> Matches</Button><h1 className="text-2xl font-semibold">{home?.name ?? "Home"} vs {away?.name ?? "Away"}</h1><p className="mt-1 text-sm capitalize text-muted-foreground">{match.sport} · {match.stage} · revision {match.revision}</p></div><div className="flex items-center gap-2"><Badge variant={match.status === "live" ? "destructive" : "secondary"}>{match.status.replace("-", " ")}</Badge><Dialog><DialogTrigger render={<Button variant="outline" size="icon" />}><Trash2 className="size-4 text-destructive" /></DialogTrigger><DialogContent><DialogHeader><DialogTitle>Delete match</DialogTitle><DialogDescription>Are you sure you want to delete this match? This action cannot be undone. All recorded events and scores for this match will be lost.</DialogDescription></DialogHeader><DialogFooter className="mt-4"><DialogClose render={<Button variant="outline" />}>Cancel</DialogClose><Button variant="destructive" disabled={pending} onClick={deleteMatch}>{pending ? <LoaderCircle className="mr-2 size-4 animate-spin" /> : null}Delete</Button></DialogFooter></DialogContent></Dialog></div></div>
 
     {match.status === "scheduled" && match.sport !== "cricket" ? <Card className="shadow-none"><CardHeader><CardTitle>Start match</CardTitle><CardDescription>Start scoring when the match is ready.</CardDescription></CardHeader><CardContent><Button size="lg" onClick={() => run("startMatch")} disabled={pending}>{pending ? <LoaderCircle data-icon="inline-start" className="animate-spin" /> : null}Start match</Button></CardContent></Card> : null}
 
-    {match.sport === "cricket" ? <CricketConsole key={`${match.id}-${match.status}-${match.revision}`} match={match} players={players.data} teams={teams.data} pending={pending} run={run} completeMatch={completeMatch} confirmedPlayers={confirmedPlayers} teamName={teamName} playerName={playerName} /> : match.sport === "throwball" ? <ThrowballConsole match={match} players={players.data} pending={pending} run={run} completeMatch={completeMatch} confirmedPlayers={confirmedPlayers} teamName={teamName} playerName={playerName} /> : <FieldConsole match={match} players={players.data} teams={teams.data} pending={pending} run={run} completeMatch={completeMatch} confirmedPlayers={confirmedPlayers} teamName={teamName} playerName={playerName} />}
+    {match.sport === "cricket" ? <CricketConsole key={`${match.id}-${match.status}-${match.revision}`} match={match} players={players.data} teams={teams.data} pending={pending} run={run} completeMatch={completeMatch} teamName={teamName} playerName={playerName} /> : match.sport === "throwball" ? <ThrowballConsole match={match} players={throwballPlayers} pending={pending} run={run} completeMatch={completeMatch} teamName={teamName} playerName={playerName} /> : <FieldConsole match={match} players={players.data} teams={teams.data} pending={pending} run={run} completeMatch={completeMatch} teamName={teamName} playerName={playerName} />}
   </div>;
 }
 
@@ -162,7 +156,7 @@ function playerLabel(player: Player) {
   return player.jerseyNumber === null ? player.name : `#${player.jerseyNumber} · ${player.name}`;
 }
 
-function CricketConsole({ match, players, teams, pending, run, completeMatch, confirmedPlayers, teamName, playerName }: { match: PublicMatch; players: Player[]; teams: Team[]; pending: boolean; run: RunCommand; completeMatch: (playerId?: string) => void; confirmedPlayers: Player[]; teamName: (id: string) => string; playerName: (id?: string | null) => string }) {
+function CricketConsole({ match, players, teams, pending, run, completeMatch, teamName, playerName }: { match: PublicMatch; players: Player[]; teams: Team[]; pending: boolean; run: RunCommand; completeMatch: () => void; teamName: (id: string) => string; playerName: (id?: string | null) => string }) {
   const entries = match.cricket?.innings ?? [];
   const currentIndex = match.cricket?.currentInnings ?? -1;
   const current = entries[currentIndex]?.state;
@@ -178,7 +172,7 @@ function CricketConsole({ match, players, teams, pending, run, completeMatch, co
       {!current.currentBowlerId ? <ParticipantSelect label="Bowler for this over" players={bowlingPlayers.filter((player) => player.id !== current.previousOverBowlerId)} pending={pending} onSelect={(playerId) => run("selectCricketBowler", { playerId })} /> : null}
       {current.strikerId && current.currentBowlerId && !current.completed ? <DeliveryControls current={current} pending={pending} run={run} battingPlayers={battingPlayers} bowlingPlayers={bowlingPlayers} playerName={playerName} battingTeamName={teamName(current.battingTeamId)} /> : null}
       <div className="mt-5 flex flex-wrap gap-2"><Button variant="outline" onClick={() => run("endInnings")} disabled={pending || current.completed}><Square data-icon="inline-start" /> End innings</Button></div>
-      {match.resultText || current.completed ? <MotmPicker players={confirmedPlayers} pending={pending} onComplete={completeMatch} /> : null}
+      {match.resultText || current.completed ? <AutomaticAwardCompletion pending={pending} onComplete={completeMatch} /> : null}
     </CardContent></Card>
     <details className="group rounded-2xl border bg-muted/10 lg:hidden"><summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-4 text-sm font-semibold marker:content-none"><span>View full scorecard</span><span className="text-muted-foreground transition-transform group-open:rotate-180">⌄</span></summary><div className="border-t p-3"><OrganizerCricketScorecard entries={entries} currentIndex={currentIndex} teamName={teamName} playerName={playerName} /></div></details>
   </div>;
@@ -450,7 +444,7 @@ function DeliveryControls({ current, pending, run, battingPlayers, bowlingPlayer
 
 function ParticipantSelect({ label, players, pending, onSelect }: { label: string; players: Player[]; pending: boolean; onSelect: (id: string) => void }) { const [value, setValue] = useState(""); return <div className="mb-5 rounded-md border p-4"><FieldGroup><PlayerSelect label={label} value={value} setValue={setValue} items={players.map((player) => ({ value: player.id, label: playerLabel(player) }))} /><Button disabled={pending || !value} onClick={() => onSelect(value)}>Confirm {label.toLowerCase()}</Button></FieldGroup></div>; }
 
-function ThrowballConsole({ match, players, pending, run, completeMatch, confirmedPlayers, teamName, playerName }: { match: PublicMatch; players: Player[]; pending: boolean; run: RunCommand; completeMatch: (playerId?: string) => void; confirmedPlayers: Player[]; teamName: (id: string) => string; playerName: (id?: string | null) => string }) {
+function ThrowballConsole({ match, players, pending, run, completeMatch, teamName, playerName }: { match: PublicMatch; players: Player[]; pending: boolean; run: RunCommand; completeMatch: () => void; teamName: (id: string) => string; playerName: (id?: string | null) => string }) {
   const state = match.throwball;
   const [pointType, setPointType] = useState<ThrowballPointType>("successful-attack");
   const [teamId, setTeamId] = useState(match.homeTeamId);
@@ -624,7 +618,7 @@ function ThrowballConsole({ match, players, pending, run, completeMatch, confirm
             <div className="flex flex-wrap gap-2">
               <Button variant="outline" onClick={() => run("undoLastEvent")} disabled={pending || !(state?.events.length)}><RotateCcw data-icon="inline-start" /> Undo</Button>
             </div>
-            {canComplete ? <MotmPicker players={confirmedPlayers} pending={pending} onComplete={completeMatch} /> : null}
+            {canComplete ? <AutomaticAwardCompletion pending={pending} onComplete={completeMatch} /> : null}
           </FieldGroup>
         </CardContent>
       </Card>
@@ -632,7 +626,7 @@ function ThrowballConsole({ match, players, pending, run, completeMatch, confirm
   );
 }
 
-function FieldConsole({ match, players, teams, pending, run, completeMatch, confirmedPlayers, teamName, playerName }: { match: PublicMatch; players: Player[]; teams: Team[]; pending: boolean; run: RunCommand; completeMatch: (playerId?: string) => void; confirmedPlayers: Player[]; teamName: (id: string) => string; playerName: (id?: string | null) => string }) {
+function FieldConsole({ match, players, teams, pending, run, completeMatch, teamName, playerName }: { match: PublicMatch; players: Player[]; teams: Team[]; pending: boolean; run: RunCommand; completeMatch: () => void; teamName: (id: string) => string; playerName: (id?: string | null) => string }) {
   const [teamId, setTeamId] = useState(match.homeTeamId);
   const [playerId, setPlayerId] = useState("");
   const [type, setType] = useState<FieldEventType>("goal");
@@ -855,7 +849,7 @@ function FieldConsole({ match, players, teams, pending, run, completeMatch, conf
             <div className="flex flex-wrap gap-2">
               <Button variant="outline" onClick={() => run("undoLastEvent")} disabled={pending || !(match.fieldState?.events.length)}><RotateCcw data-icon="inline-start" /> Undo</Button>
             </div>
-            {canFinishMatch ? <MotmPicker players={confirmedPlayers} pending={pending} onComplete={completeMatch} /> : null}
+            {canFinishMatch ? <AutomaticAwardCompletion pending={pending} onComplete={completeMatch} /> : null}
           </FieldGroup>
         </CardContent>
       </Card>
@@ -863,15 +857,12 @@ function FieldConsole({ match, players, teams, pending, run, completeMatch, conf
   );
 }
 
-function MotmPicker({ players, pending, onComplete }: { players: Player[]; pending: boolean; onComplete: (playerId?: string) => void }) {
-  const [value, setValue] = useState("");
-  const ordered = [...players].sort((a, b) => a.name.localeCompare(b.name));
+function AutomaticAwardCompletion({ pending, onComplete }: { pending: boolean; onComplete: () => void }) {
   return (
     <div className="rounded-md border p-4">
       <FieldGroup>
-        <div><p className="font-semibold">Man of the Match</p><p className="text-sm text-muted-foreground">Select the award winner before completing.</p></div>
-        <PlayerSelect label="Award winner" value={value} setValue={setValue} items={ordered.map((player) => ({ value: player.id, label: playerLabel(player) }))} />
-        <Button variant="destructive" onClick={() => onComplete(value)} disabled={pending || !value}><Trophy data-icon="inline-start" /> End match</Button>
+        <div><p className="font-semibold">Complete match</p><p className="text-sm text-muted-foreground">The best player will be selected automatically from the recorded match performance.</p></div>
+        <Button variant="destructive" onClick={onComplete} disabled={pending}><Trophy data-icon="inline-start" /> End match</Button>
       </FieldGroup>
     </div>
   );

@@ -23,6 +23,7 @@ export interface PublicMatch {
     currentInnings: number;
   };
   throwball?: ThrowballMatchState;
+  lineups?: Record<string, string[]>;
   winnerTeamId?: string | null;
   resultText?: string;
   manOfTheMatchPlayerId?: string | null;

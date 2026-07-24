@@ -43,6 +43,7 @@ import { activityFixtureId, getActivityEvent, type ActivityFixture, type Activit
 import {
   calculateLeagueBonusByTeam,
   DEFAULT_PLACEMENT_POINTS_BY_SPORT,
+  deriveSportPlacementsFromLeaderboards,
   EARLY_BIRD_POINTS,
   isEarlyBirdLocalTime,
   parseLocalDateTimeInput,
@@ -79,6 +80,7 @@ type MatchDocument = JsonDocument & {
   fieldState?: FieldMatchState;
   cricket?: { innings: Array<{ initial: unknown; state: CricketInningsState; superOver?: boolean }>; currentInnings: number };
   throwball?: ThrowballMatchState;
+  lineups?: Record<string, string[]>;
   winnerTeamId?: string | null;
   resultText?: string | null;
   manOfTheMatchPlayerId?: string | null;
@@ -314,7 +316,10 @@ async function suggestManOfTheMatch(match: MatchDocument) {
     return rankCricketMvpCandidates([...rows.values()]).slice(0, 5);
   }
   if (match.sport === "throwball") {
-    const candidates = roster.map((player) => {
+    const lineupPlayers = match.lineups
+      ? roster.filter((player) => match.lineups?.[player.teamId]?.includes(player.id))
+      : roster;
+    const candidates = lineupPlayers.map((player) => {
       const stats = match.throwball?.playerStats[player.id];
       return {
         playerId: player.id,
@@ -445,11 +450,31 @@ export async function handleCreateMatch(data: CallableData) {
     throw new CommandError(409, "ALREADY_EXISTS", "This matchup already exists for the stage.");
   }
   const id = newId();
+  let lineups: Record<string, string[]> | undefined;
+  if (fixture.sport === "throwball") {
+    const rawLineups = data.lineups && typeof data.lineups === "object" && !Array.isArray(data.lineups)
+      ? data.lineups as Record<string, unknown>
+      : null;
+    if (!rawLineups) throw new CommandError(400, "INVALID_ARGUMENT", "Build both Throwball lineups before creating the fixture.");
+    const players = await listDocuments<Player & JsonDocument>("players");
+    lineups = {};
+    for (const teamId of [fixture.homeTeamId, fixture.awayTeamId]) {
+      const lineup = Array.isArray(rawLineups[teamId]) ? rawLineups[teamId].map(String) : [];
+      if (!lineup.length || new Set(lineup).size !== lineup.length) {
+        throw new CommandError(400, "INVALID_ARGUMENT", "Each Throwball team needs at least one unique lineup player.");
+      }
+      if (lineup.some((playerId) => !players.some((player) => player.id === playerId && player.teamId === teamId && player.active))) {
+        throw new CommandError(400, "INVALID_ARGUMENT", "Throwball lineups can contain only active players from the selected team.");
+      }
+      lineups[teamId] = lineup;
+    }
+  }
   const match: MatchDocument = {
     id,
     ...fixture,
     matchNumber: nextMatchNumber(fixture.sport, matches.filter((match) => match.sport === fixture.sport).map((match) => String(match.matchNumber ?? ""))),
     scoreSummary: fixture.sport === "cricket" ? { innings: [] } : { [fixture.homeTeamId]: 0, [fixture.awayTeamId]: 0 },
+    ...(lineups ? { lineups } : {}),
     revision: 0,
     createdAt: nowIso(),
     updatedAt: nowIso(),
@@ -490,13 +515,9 @@ export async function handleDeleteMatch(data: CallableData) {
   const match = await getDocument<MatchDocument>("matches", id);
   if (!match) throw new CommandError(404, "NOT_FOUND", "Match not found.");
   
-  const { error } = await supabaseAdmin.from("matches").delete().eq("id", id);
-  if (error) throw new CommandError(500, "INTERNAL", error.message);
-  
-  if (match.status === "completed") {
-    await handleRefreshProjections();
-  }
-  
+  await deleteDocument("matches", id);
+  await handleRefreshProjections();
+
   return { id, deleted: true };
 }
 
@@ -521,6 +542,9 @@ export async function handleStartMatch(data: CallableData) {
     if (match.status !== "scheduled") throw new CommandError(400, "FAILED_PRECONDITION", "This match cannot be started.");
     if (match.sport === "cricket") return { match: { ...match, status: "innings-break" } };
     if (match.sport === "throwball") {
+      if (!match.lineups?.[match.homeTeamId]?.length || !match.lineups?.[match.awayTeamId]?.length) {
+        throw new CommandError(400, "FAILED_PRECONDITION", "Both Throwball lineups are required before starting the match.");
+      }
       const throwball = createThrowballMatch(match.homeTeamId, match.awayTeamId);
       return { match: { ...match, status: "live", throwball, scoreSummary: throwballScoreSummary(match, throwball) } };
     }
@@ -820,25 +844,14 @@ export async function handleEndMatch(data: CallableData) {
       };
     } else if (match.sport === "cricket" && !match.resultText) throw new CommandError(400, "FAILED_PRECONDITION", "Cricket result is not ready yet.");
     const suggestions = await suggestManOfTheMatch(completed);
-    const manOfTheMatchPlayerId = data.manOfTheMatchPlayerId ? asString(data.manOfTheMatchPlayerId, "Man of the match") : "";
-    if (!manOfTheMatchPlayerId) {
-      throw new CommandError(400, "FAILED_PRECONDITION", JSON.stringify({
-        reason: "MOTM_REQUIRED",
-        message: "Select Man of the Match before completing this match.",
-        suggestions,
-      }));
-    }
-    const roster = await getMatchRoster(completed);
-    const selected = roster.find((player) => player.id === manOfTheMatchPlayerId);
-    if (!selected) throw new CommandError(400, "INVALID_ARGUMENT", "Man of the Match must be selected from one of the match team rosters.");
-    const breakdown = suggestions.find((row) => row.playerId === manOfTheMatchPlayerId) ?? null;
+    const automaticWinner = suggestions[0] ?? null;
     return {
       match: {
         ...completed,
         status: "completed",
-        manOfTheMatchPlayerId,
+        manOfTheMatchPlayerId: automaticWinner?.playerId ?? null,
         manOfTheMatchSuggestedPlayerIds: suggestions.map((row) => row.playerId),
-        manOfTheMatchScoreBreakdown: breakdown ? { ...breakdown } : null,
+        manOfTheMatchScoreBreakdown: automaticWinner ? { ...automaticWinner } : null,
       },
     };
   });
@@ -1355,7 +1368,12 @@ export async function handleRefreshProjections() {
   const throwball = throwballStandings(matches);
   const placementPoints = (tournament?.placementPoints as Record<string, number[]>) ?? { ...DEFAULT_PLACEMENT_POINTS_BY_SPORT };
   const coreSports = ["football", "handball", "cricket", "throwball"] as const;
-  const placements = awards.filter((award) => award.type === "sport-placement" && award.confirmed && award.teamId && award.sport && award.place);
+  const leaderboardPlacements = deriveSportPlacementsFromLeaderboards([
+    ...football.map((row) => ({ sport: "football", teamId: row.teamId, rank: row.rank, played: row.played })),
+    ...handball.map((row) => ({ sport: "handball", teamId: row.teamId, rank: row.rank, played: row.played })),
+    ...cricket.map((row) => ({ sport: "cricket", teamId: row.teamId, rank: row.rank, played: row.played })),
+    ...throwball.map((row) => ({ sport: "throwball", teamId: row.teamId, rank: row.rank, played: row.played })),
+  ]);
   const leagueBonuses = calculateLeagueBonusByTeam(S9_TEAMS.map((team) => team.id), { football, handball, cricket, throwball });
   const activityResults = awards.filter((award) => award.type === "activity-result" && award.confirmed) as unknown as ActivityResult[];
   const activitySportIds = ["womens-games", "senior-kids", "junior-kids", "relay"] as const;
@@ -1390,7 +1408,7 @@ export async function handleRefreshProjections() {
   }, {} as Record<string, { timelyArrival: number; earlyBird: number }>);
   const overall = S9_TEAMS.map((team) => {
     const sportScores = Object.fromEntries(coreSports.map((sport) => {
-      const place = placements.find((row) => row.teamId === team.id && row.sport === sport)?.place;
+      const place = leaderboardPlacements.find((row) => row.teamId === team.id && row.sport === sport)?.place;
       return [sport, place ? placementPoints[sport]?.[Number(place) - 1] ?? 0 : 0];
     })) as Record<string, number>;
     const extraScores = activityScores.get(team.id) ?? {};
