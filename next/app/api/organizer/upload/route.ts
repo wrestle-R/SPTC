@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { hasOrganizerAccess } from "@/lib/organizer-access";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 
 function safeFileName(name: string) {
@@ -6,6 +7,9 @@ function safeFileName(name: string) {
 }
 
 export async function POST(request: Request) {
+  if (!(await hasOrganizerAccess())) {
+    return NextResponse.json({ error: { message: "Organizer access required." } }, { status: 401 });
+  }
   try {
     const formData = await request.formData();
     const file = formData.get("file");
