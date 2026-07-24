@@ -1,10 +1,11 @@
 "use client";
 
 import { S9_TEAMS } from "@sports-fiesta/domain";
-import { ArrowRight, ArrowUpRight, Camera, CheckCircle2, Clock, Flag, Medal, Radio, Sparkles, Timer, Users } from "lucide-react";
+import { ArrowRight, ArrowUpRight, Camera, CheckCircle2, ChevronDown, ChevronUp, Clock, Flag, Medal, Radio, Sparkles, Timer, Users } from "lucide-react";
 import { TbPlayFootball, TbPlayHandball, TbCricket } from "react-icons/tb";
 import { MdSportsVolleyball } from "react-icons/md";
 import Link from "next/link";
+import { useState } from "react";
 import { DataError, ContentSkeleton } from "@/components/data-state";
 import { MatchCard } from "@/components/match-card";
 import { Badge } from "@/components/ui/badge";
@@ -27,6 +28,8 @@ const sportLinks = [
 ] as const;
 
 export function HomeView() {
+  const [showAllUpcoming, setShowAllUpcoming] = useState(false);
+  const [showAllCompleted, setShowAllCompleted] = useState(false);
   const matchesState = usePublicCollection<PublicMatch>("matches");
   const teamsState = usePublicCollection<PublicTeam>("teams");
   const activitiesState = usePublicCollection<ActivityRecord>("awards");
@@ -49,13 +52,13 @@ export function HomeView() {
 
   const completedMatches = matches
     .filter((match) => match.status === "completed")
-    .sort((a, b) => (b.matchNumber ?? b.id).localeCompare(a.matchNumber ?? a.id))
-    .slice(0, 3);
+    .sort((a, b) => (b.matchNumber ?? b.id).localeCompare(a.matchNumber ?? a.id));
 
   const upcomingMatches = matches
     .filter((match) => match.status === "scheduled")
-    .sort((a, b) => (a.matchNumber ?? a.id).localeCompare(b.matchNumber ?? b.id))
-    .slice(0, 3);
+    .sort((a, b) => (a.matchNumber ?? a.id).localeCompare(b.matchNumber ?? b.id));
+  const visibleUpcomingMatches = showAllUpcoming ? upcomingMatches : upcomingMatches.slice(0, 3);
+  const visibleCompletedMatches = showAllCompleted ? completedMatches : completedMatches.slice(0, 3);
 
   return (
     <div className="flex flex-col gap-8">
@@ -204,8 +207,13 @@ export function HomeView() {
                 <Badge variant="secondary" className="ml-1">{upcomingMatches.length}</Badge>
               </div>
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {upcomingMatches.map((match) => <MatchCard key={match.id} match={match} teams={teams} />)}
+                {visibleUpcomingMatches.map((match) => <MatchCard key={match.id} match={match} teams={teams} />)}
               </div>
+              {upcomingMatches.length > 3 ? (
+                <Button variant="outline" className="mx-auto mt-2" onClick={() => setShowAllUpcoming((value) => !value)} aria-expanded={showAllUpcoming}>
+                  {showAllUpcoming ? <>Show less <ChevronUp data-icon="inline-end" /></> : <>View all {upcomingMatches.length} <ChevronDown data-icon="inline-end" /></>}
+                </Button>
+              ) : null}
             </section>
           ) : null}
 
@@ -217,8 +225,13 @@ export function HomeView() {
                 <Badge variant="secondary" className="ml-1">{completedMatches.length}</Badge>
               </div>
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {completedMatches.map((match) => <MatchCard key={match.id} match={match} teams={teams} />)}
+                {visibleCompletedMatches.map((match) => <MatchCard key={match.id} match={match} teams={teams} />)}
               </div>
+              {completedMatches.length > 3 ? (
+                <Button variant="outline" className="mx-auto mt-2" onClick={() => setShowAllCompleted((value) => !value)} aria-expanded={showAllCompleted}>
+                  {showAllCompleted ? <>Show less <ChevronUp data-icon="inline-end" /></> : <>View all {completedMatches.length} <ChevronDown data-icon="inline-end" /></>}
+                </Button>
+              ) : null}
             </section>
           ) : null}
         </>

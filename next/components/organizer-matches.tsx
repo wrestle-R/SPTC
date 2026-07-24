@@ -954,6 +954,12 @@ function GlobalFixtureGrid({
   onDelete: (match: PublicMatch) => void;
   onDeleteActivity: (fixture: ActivityFixture) => void;
 }) {
+  const [expanded, setExpanded] = useState(false);
+  const limit = 6;
+  const total = matches.length + activities.length;
+  const visibleMatches = expanded ? matches : matches.slice(0, limit);
+  const remainingSlots = Math.max(0, limit - visibleMatches.length);
+  const visibleActivities = expanded ? activities : activities.slice(0, remainingSlots);
   if (!matches.length && !activities.length)
     return (
       <Card className="border-dashed shadow-none">
@@ -963,8 +969,9 @@ function GlobalFixtureGrid({
       </Card>
     );
   return (
+    <div className="space-y-4">
     <div className="grid gap-3 lg:grid-cols-2">
-      {matches.map((match) => {
+      {visibleMatches.map((match) => {
         const home = teams.find((team) => team.id === match.homeTeamId);
         const away = teams.find((team) => team.id === match.awayTeamId);
         const editable = match.status === "scheduled";
@@ -1030,7 +1037,7 @@ function GlobalFixtureGrid({
           </Card>
         );
       })}
-      {activities.map((fixture) => {
+      {visibleActivities.map((fixture) => {
         const event = getActivityEvent(fixture.sport, fixture.eventId);
         return (
           <Card
@@ -1091,6 +1098,12 @@ function GlobalFixtureGrid({
           </Card>
         );
       })}
+    </div>
+    {total > limit ? (
+      <Button variant="outline" className="mx-auto flex" onClick={() => setExpanded((value) => !value)} aria-expanded={expanded}>
+        {expanded ? "Show less" : `View all ${total}`}
+      </Button>
+    ) : null}
     </div>
   );
 }

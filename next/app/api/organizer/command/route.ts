@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { hasOrganizerAccess } from "@/lib/organizer-access";
 import { CommandError } from "@/lib/supabase-admin";
 import {
   handleConfirmAward, handleConfirmFixtures, handleCreateActivityFixture, handleCreateMatch, handleDeleteActivityFixture, handleDeleteActivityResult, handleDeleteManualPointsAdjustment,
@@ -14,6 +15,9 @@ import {
 } from "@/lib/command-handlers";
 
 export async function POST(request: Request) {
+  if (!(await hasOrganizerAccess())) {
+    return NextResponse.json({ error: { message: "Organizer access required.", status: "UNAUTHENTICATED" } }, { status: 401 });
+  }
   try {
     const { command, data } = await request.json() as { command: string; data?: Record<string, unknown> };
     if (!command || typeof command !== "string") {
