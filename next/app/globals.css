@@ -184,7 +184,9 @@
 
 .sptc-intro__logo { position: relative; width: min(94vw, 520px); height: auto; overflow: visible; }
 .sptc-intro__logo text { fill: none; stroke: var(--sptc-ink); stroke-width: 1.2px; stroke-dasharray: 1600; stroke-dashoffset: 1600; paint-order: stroke fill; font-family: "Snell Roundhand", "Segoe Script", "URW Chancery L", "Apple Chancery", cursive; font-size: 82px; font-style: normal; font-weight: 600; letter-spacing: -3px; animation: sptc-wordmark-write 1.45s cubic-bezier(0.22, 0.8, 0.25, 1) forwards; }
-.sptc-intro__nine { font-size: 112px !important; letter-spacing: 0 !important; }
+.sptc-intro__desktop-wordmark { font-size: 74px !important; letter-spacing: -2px !important; }
+.sptc-intro__mobile-name, .sptc-intro__mobile-nine { display: none; }
+.sptc-intro__mobile-nine { font-size: 116px !important; letter-spacing: 0 !important; }
 
 .sptc-intro__field { opacity: 0.3; background: radial-gradient(circle at 50% 45%, color-mix(in srgb, var(--sptc-ink) 10%, transparent), transparent 30%), linear-gradient(115deg, transparent 48%, color-mix(in srgb, var(--sptc-ink) 4%, transparent) 49%, transparent 50%); }
 .dark .sptc-intro__field { opacity: 0.42; }
@@ -197,7 +199,7 @@
 
 @media (max-width: 420px) {
   .sptc-intro__logo { height: 280px; }
-  .sptc-intro__logo text { font-size: 70px; letter-spacing: -2px; }
-  .sptc-intro__name { transform: translate(25px, -30px) scale(1.02); }
-  .sptc-intro__nine { transform: translate(-180px, 58px) scale(1.35); font-size: 116px !important; }
+  .sptc-intro__desktop-wordmark { display: none; }
+  .sptc-intro__mobile-name, .sptc-intro__mobile-nine { display: block; }
+  .sptc-intro__mobile-name { font-size: 70px !important; letter-spacing: -2px !important; }
 }

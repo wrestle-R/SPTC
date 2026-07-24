@@ -38,8 +38,9 @@ export function SptcIntroAnimation() {
           aria-label="Sports Fiesta intro"
         >
           <motion.svg viewBox="0 0 520 220" className="sptc-intro__logo" aria-hidden="true">
-            <text className="sptc-intro__name" x="235" y="140" textAnchor="middle">Sports Fiesta</text>
-            <text className="sptc-intro__nine" x="440" y="140" textAnchor="middle">9</text>
+            <text className="sptc-intro__desktop-wordmark" x="260" y="140" textAnchor="middle">Sports Fiesta 9</text>
+            <text className="sptc-intro__mobile-name" x="260" y="110" textAnchor="middle">Sports Fiesta</text>
+            <text className="sptc-intro__mobile-nine" x="260" y="200" textAnchor="middle">9</text>
           </motion.svg>
         </motion.div>
       ) : null}
