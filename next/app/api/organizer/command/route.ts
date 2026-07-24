@@ -2,12 +2,15 @@ import { NextResponse } from "next/server";
 import { CommandError } from "@/lib/supabase-admin";
 import {
   handleConfirmAward, handleConfirmFixtures, handleCreateActivityFixture, handleCreateMatch, handleDeleteActivityFixture, handleDeleteActivityResult, handleDeleteManualPointsAdjustment,
+  handleDeleteSubmission,
   handleEditMatchEvent, handleEndInnings, handleEndMatch, handleRecordCricketDelivery, handleRecordFieldSportEvent,
   handleRecordThrowballRally,
   handleRefreshProjections, handleResolveShootoutToss, handleSaveActivityResult, handleSaveManualPointsAdjustment, handleSavePlayer, handleSaveSportPlacement, handleSaveTeam, handleSaveTeamBonus, handleSaveTournamentSettings, handleSelectCricketBowler,
   handleSelectNextBatter, handleSetPlacementPoints, handleSetToss, handleStartActivityFixture, handleStartInnings, handleStartMatch,
   handleStartShootout,
   handleUndoLastEvent, handleUpdateMatch, handleDeleteMatch,
+  handleVerifyArrival,
+  handleVerifyEarlyBird,
 } from "@/lib/command-handlers";
 
 export async function POST(request: Request) {
@@ -61,6 +64,9 @@ async function dispatch(command: string, data: Record<string, unknown>): Promise
     case "deleteManualPointsAdjustment": return handleDeleteManualPointsAdjustment(data);
     case "saveSportPlacement": return handleSaveSportPlacement(data);
     case "setPlacementPoints": return handleSetPlacementPoints(data);
+    case "verifyArrival": return handleVerifyArrival(data);
+    case "verifyEarlyBird": return handleVerifyEarlyBird(data);
+    case "deleteSubmission": return handleDeleteSubmission(data);
     case "refreshProjections": return handleRefreshProjections();
     default: throw new CommandError(400, "INVALID_ARGUMENT", `Unknown command: ${command}`);
   }

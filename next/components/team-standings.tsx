@@ -47,7 +47,7 @@ export function TeamStandings() {
       handball: stored?.handball ?? 0,
       cricket: stored?.cricket ?? 0,
       throwball: stored?.throwball ?? 0,
-      activities: (stored?.["womens-games"] ?? 0) + (stored?.["senior-kids"] ?? 0) + (stored?.["junior-kids"] ?? 0) + (stored?.relay ?? 0) + (stored?.bonus ?? 0) + (stored?.adjustments ?? 0),
+      activities: (stored?.["womens-games"] ?? 0) + (stored?.["senior-kids"] ?? 0) + (stored?.["junior-kids"] ?? 0) + (stored?.relay ?? 0) + (stored?.bonus ?? 0) + (stored?.adjustments ?? 0) + (stored?.timelyArrival ?? 0) + (stored?.earlyBird ?? 0),
       total: stored?.total ?? 0,
     };
   }).sort((a, b) => b.total - a.total || a.rank - b.rank);

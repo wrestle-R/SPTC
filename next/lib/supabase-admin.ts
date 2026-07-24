@@ -11,6 +11,7 @@ export type CollectionName =
   | "players"
   | "matches"
   | "awards"
+  | "image_submissions"
   | "standings"
   | "leaderboards"
   | "brackets"

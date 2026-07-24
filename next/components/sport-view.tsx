@@ -275,7 +275,7 @@ function fallbackCricketStandings(matches: PublicMatch[]): CricketStandingRow[] 
       const batting = byTeam.get(state.battingTeamId);
       const bowling = byTeam.get(state.bowlingTeamId);
       if (!batting || !bowling) continue;
-      const balls = state.wickets >= state.battingLineup.length - 1 ? state.maxOvers * 6 : state.legalBalls;
+      const balls = state.wickets >= Math.min(state.battingLineup.length - 1, 8) ? state.maxOvers * 6 : state.legalBalls;
       batting.runsFor += state.score; batting.ballsFaced += balls;
       bowling.runsAgainst += state.score; bowling.ballsBowled += balls;
     }

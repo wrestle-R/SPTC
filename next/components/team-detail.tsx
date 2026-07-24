@@ -5,24 +5,13 @@ import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
 import { ArrowLeft, Crown, Rotate3D, Sparkles, Star, Users } from "lucide-react";
-import { usePublicCollection } from "@/lib/public-data";
-import type { PublicPlayer } from "@/lib/web-types";
+import { usePublicCollection, usePublicDocument } from "@/lib/public-data";
+import type { ImageSubmission, OverallStandingDocument, PublicPlayer } from "@/lib/web-types";
 import { ContentSkeleton } from "@/components/data-state";
 import { motion } from "framer-motion";
-
-const TEAM_JERSEYS: Record<string, { front: string; back: string }> = {
-  "crimson-warriors": { front: "/Jersey/red-front-v2.png", back: "/Jersey/red-back-v2.png" },
-  "gods-gladiators": { front: "/Jersey/blue-front-v2.png", back: "/Jersey/blue-back-v2.png" },
-  "karuppu-knights": { front: "/Jersey/black-front-v2.png", back: "/Jersey/black-back-v2.png" },
-  "ivory-elites": { front: "/Jersey/ivory-front-v2.png", back: "/Jersey/ivory-back-v2.png" },
-};
-
-const TEAM_GRADIENTS: Record<string, string> = {
-  "crimson-warriors": "from-red-600 via-red-500 to-orange-500",
-  "gods-gladiators": "from-emerald-700 via-emerald-500 to-green-400",
-  "karuppu-knights": "from-zinc-950 via-zinc-900 to-zinc-700",
-  "ivory-elites": "from-amber-100 via-orange-50 to-rose-50",
-};
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { TEAM_GRADIENTS, TEAM_JERSEYS, TEAM_TEXT_COLORS } from "@/lib/team-assets";
 
 const TEAM_GLOWS: Record<string, string> = {
   "crimson-warriors": "shadow-red-500/30",
@@ -31,15 +20,17 @@ const TEAM_GLOWS: Record<string, string> = {
   "ivory-elites": "shadow-orange-300/30",
 };
 
-const TEAM_TEXT_COLORS: Record<string, string> = {
-  "crimson-warriors": "text-white",
-  "gods-gladiators": "text-white",
-  "karuppu-knights": "text-white",
-  "ivory-elites": "text-zinc-900",
-};
+function formatWhen(value: string) {
+  return new Intl.DateTimeFormat("en-IN", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(new Date(value));
+}
 
 export function TeamDetail({ team }: { team: Team }) {
   const playersState = usePublicCollection<PublicPlayer>("players");
+  const standingsState = usePublicDocument<OverallStandingDocument>("standings", "overall");
+  const submissionsState = usePublicCollection<ImageSubmission>("image_submissions");
   const jerseys = TEAM_JERSEYS[team.id];
   const roster = S9_PLAYERS
     .filter((player) => player.teamId === team.id)
@@ -51,6 +42,9 @@ export function TeamDetail({ team }: { team: Team }) {
   const gradient = TEAM_GRADIENTS[team.id] || "from-zinc-600 to-zinc-400";
   const glow = TEAM_GLOWS[team.id] || "shadow-zinc-500/30";
   const textColor = TEAM_TEXT_COLORS[team.id] || "text-white";
+  const standing = standingsState.data?.rows.find((row) => row.teamId === team.id);
+  const timelyArrival = submissionsState.data.find((submission) => submission.teamId === team.id && submission.type === "timely-arrival");
+  const earlyBird = submissionsState.data.find((submission) => submission.teamId === team.id && submission.type === "early-bird");
 
   return (
     <div className="flex flex-col gap-6">
@@ -80,6 +74,53 @@ export function TeamDetail({ team }: { team: Team }) {
           </div>
         </div>
       </div>
+
+      <section className="flex flex-col gap-4" aria-labelledby="bonus-heading">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-sm font-semibold uppercase tracking-widest text-primary">Team of the Year</p>
+            <h2 id="bonus-heading" className="mt-1 text-2xl font-black tracking-tight">Bonus Points</h2>
+          </div>
+          <Badge variant="secondary">
+            {standing ? `${standing.total} total pts` : "Waiting for standings"}
+          </Badge>
+        </div>
+
+        {submissionsState.loading || standingsState.loading ? (
+          <ContentSkeleton rows={2} />
+        ) : (
+          <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_18rem_18rem]">
+            <BonusEvidenceCard
+              title="Timely Arrival"
+              points={timelyArrival?.pointsAwarded ?? 0}
+              description={timelyArrival
+                ? `${timelyArrival.arrivalPosition}${timelyArrival.arrivalPosition === 1 ? "st" : timelyArrival.arrivalPosition === 2 ? "nd" : timelyArrival.arrivalPosition === 3 ? "rd" : "th"} team verified`
+                : "Not awarded"}
+              imageUrl={timelyArrival?.imageUrl}
+              imageAlt={`${team.name} timely arrival photo`}
+              meta={timelyArrival ? formatWhen(timelyArrival.groupPostedAt) : "No verified arrival photo"}
+            />
+            <BonusEvidenceCard
+              title="Early Bird"
+              points={earlyBird?.pointsAwarded ?? 0}
+              description={earlyBird ? "Verified before 2:30 PM" : "Not awarded"}
+              imageUrl={earlyBird?.imageUrl}
+              imageAlt={`${team.name} early bird photo`}
+              meta={earlyBird ? formatWhen(earlyBird.groupPostedAt) : "No verified early bird photo"}
+            />
+            <BonusStatCard
+              title="League Win"
+              points={standing?.leagueWin ?? 0}
+              description="Accumulated from league-stage wins across sports."
+            />
+            <BonusStatCard
+              title="League Tie"
+              points={standing?.leagueTie ?? 0}
+              description="Accumulated from league-stage tied results."
+            />
+          </div>
+        )}
+      </section>
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.25fr)]">
         <div className="flex flex-col">
@@ -137,6 +178,65 @@ export function TeamDetail({ team }: { team: Team }) {
         </div>
       </div>
     </div>
+  );
+}
+
+function BonusEvidenceCard({
+  title,
+  points,
+  description,
+  imageUrl,
+  imageAlt,
+  meta,
+}: {
+  title: string;
+  points: number;
+  description: string;
+  imageUrl?: string;
+  imageAlt: string;
+  meta: string;
+}) {
+  return (
+    <Card className="overflow-hidden py-0 shadow-none ring-1 ring-foreground/10">
+      {imageUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={imageUrl} alt={imageAlt} className="block aspect-[16/10] w-full bg-muted/40 object-contain p-1" />
+      ) : (
+        <div className="flex aspect-[16/10] items-center justify-center bg-muted/30 text-sm text-muted-foreground">
+          No verified image
+        </div>
+      )}
+      <CardHeader className="pb-2">
+        <CardDescription>{title}</CardDescription>
+        <CardTitle className="text-3xl font-black tracking-tight">{points}</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-1 pb-5">
+        <p className="text-sm font-medium">{description}</p>
+        <p className="text-sm text-muted-foreground">{meta}</p>
+      </CardContent>
+    </Card>
+  );
+}
+
+function BonusStatCard({
+  title,
+  points,
+  description,
+}: {
+  title: string;
+  points: number;
+  description: string;
+}) {
+  return (
+    <Card className="shadow-none">
+      <CardHeader>
+        <CardDescription>{title}</CardDescription>
+        <CardTitle className="text-4xl font-black tracking-tight">{points}</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <p className="text-sm text-muted-foreground">{description}</p>
+      </CardContent>
+    </Card>
   );
 }
 

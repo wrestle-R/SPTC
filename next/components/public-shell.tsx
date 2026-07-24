@@ -19,6 +19,8 @@ export function PublicShell({ children }: { children: React.ReactNode }) {
             <Link href="/events/relay" className="font-medium text-muted-foreground transition-colors hover:text-foreground">Relay</Link>
             <span className="hidden text-muted-foreground/30 sm:inline">|</span>
             <Link href="/teams" className="font-medium text-muted-foreground transition-colors hover:text-foreground">Standings</Link>
+            <Link href="/arrivals" className="font-medium text-muted-foreground transition-colors hover:text-foreground">Arrivals</Link>
+            <Link href="/early-bird" className="font-medium text-muted-foreground transition-colors hover:text-foreground">Early Bird</Link>
             <Link href="/leaderboards" className="font-medium text-muted-foreground transition-colors hover:text-foreground">Leaders</Link>
           </nav>
           <p className="text-sm text-muted-foreground">

@@ -1,7 +1,7 @@
 "use client";
 
 import { S9_TEAMS } from "@sports-fiesta/domain";
-import { ArrowRight, ArrowUpRight, CheckCircle2, Clock, Flag, Medal, Radio, Sparkles, Timer, Users } from "lucide-react";
+import { ArrowRight, ArrowUpRight, Camera, CheckCircle2, Clock, Flag, Medal, Radio, Sparkles, Timer, Users } from "lucide-react";
 import { TbPlayFootball, TbPlayHandball, TbCricket } from "react-icons/tb";
 import { MdSportsVolleyball } from "react-icons/md";
 import Link from "next/link";
@@ -13,7 +13,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { TeamPointsChart } from "@/components/team-points-chart";
 import { getActivityEvent, getActivitySport, type ActivityFixture, type ActivityRecord } from "@/lib/activity-events";
 import { usePublicCollection, usePublicDocument } from "@/lib/public-data";
-import type { OverallStandingDocument, PublicMatch, PublicTeam } from "@/lib/web-types";
+import type { ImageSubmission, OverallStandingDocument, PublicMatch, PublicTeam } from "@/lib/web-types";
 
 const sportLinks = [
   { href: "/football", label: "Football", icon: TbPlayFootball, color: "text-orange-400", bg: "bg-orange-500/15", glow: "from-orange-500/15", line: "stroke-orange-400/25" },
@@ -31,9 +31,16 @@ export function HomeView() {
   const teamsState = usePublicCollection<PublicTeam>("teams");
   const activitiesState = usePublicCollection<ActivityRecord>("awards");
   const standingsState = usePublicDocument<OverallStandingDocument>("standings", "overall");
+  const bonusState = usePublicCollection<ImageSubmission>("image_submissions");
   const teams = teamsState.data.length ? teamsState.data : S9_TEAMS;
   const matches = matchesState.data;
   const liveActivities = activitiesState.data.filter((record): record is ActivityFixture => record.type === "activity-fixture" && record.status === "live");
+  const arrivals = bonusState.data
+    .filter((submission) => submission.type === "timely-arrival")
+    .sort((a, b) => (a.arrivalPosition ?? 99) - (b.arrivalPosition ?? 99));
+  const earlyBird = bonusState.data
+    .filter((submission) => submission.type === "early-bird")
+    .sort((a, b) => a.groupPostedAt.localeCompare(b.groupPostedAt));
 
   const liveMatches = matches
     .filter((match) => ["live", "innings-break", "super-over"].includes(match.status))
@@ -115,8 +122,54 @@ export function HomeView() {
         </div>
       </section>
 
+      <section className="flex flex-col gap-3" aria-labelledby="bonus-heading">
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wider text-primary">Bonus race</p>
+            <h2 id="bonus-heading" className="mt-1 text-lg font-black tracking-tight">Arrival momentum & early-bird points</h2>
+          </div>
+        </div>
+
+        <div className="grid gap-2 sm:grid-cols-2">
+          <Link href="/arrivals" className="group rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+            <Card className="h-full shadow-none transition-colors hover:border-primary/40">
+              <CardContent className="flex items-center gap-3 p-3">
+                <Camera className="size-4 shrink-0 text-primary" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-bold">Timely Arrival</p>
+                  <p className="truncate text-xs text-muted-foreground">
+                  {arrivals[0]
+                    ? `${teams.find((team) => team.id === arrivals[0].teamId)?.name ?? "First team"} leads`
+                    : "First four verified photos earn bonus points"}
+                  </p>
+                </div>
+                <span className="shrink-0 text-xs font-bold text-primary">{arrivals.length ? `${arrivals.length}/4` : "100 · 60 · 40 · 20"}</span>
+              </CardContent>
+            </Card>
+          </Link>
+
+          <Link href="/early-bird" className="group rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+            <Card className="h-full shadow-none transition-colors hover:border-primary/40">
+              <CardContent className="flex items-center gap-3 p-3">
+                <Sparkles className="size-4 shrink-0 text-primary" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-bold">Early Bird Jackpot</p>
+                  <p className="truncate text-xs text-muted-foreground">
+                  {earlyBird.length
+                    ? `${earlyBird.length} teams banked +100`
+                    : "Before 2:30 PM earns +100 TOTY points"}
+                  </p>
+                </div>
+                <span className="shrink-0 text-xs font-bold text-primary">{earlyBird.length}</span>
+              </CardContent>
+            </Card>
+          </Link>
+        </div>
+      </section>
+
       {matchesState.loading || teamsState.loading || activitiesState.loading ? <ContentSkeleton rows={2} /> : null}
       {matchesState.error || activitiesState.error ? <DataError message={matchesState.error ?? activitiesState.error ?? "Unable to load live fixtures."} retry={matchesState.error ? matchesState.retry : activitiesState.retry} /> : null}
+      {bonusState.error ? <DataError message={bonusState.error} retry={bonusState.retry} /> : null}
 
       {!matchesState.loading && !activitiesState.loading && !matchesState.error && !activitiesState.error ? (
         <>

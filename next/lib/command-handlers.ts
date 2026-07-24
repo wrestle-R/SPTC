@@ -41,6 +41,16 @@ import {
 } from "@sports-fiesta/domain";
 import { activityFixtureId, getActivityEvent, type ActivityFixture, type ActivityResult, type ActivitySportId } from "@/lib/activity-events";
 import {
+  calculateLeagueBonusByTeam,
+  DEFAULT_PLACEMENT_POINTS_BY_SPORT,
+  EARLY_BIRD_POINTS,
+  isEarlyBirdLocalTime,
+  parseLocalDateTimeInput,
+  submissionId,
+  timelyArrivalPointsForPosition,
+  type SubmissionType,
+} from "./bonus-scoring";
+import {
   CommandError,
   deleteDocument,
   getDocument,
@@ -80,6 +90,21 @@ interface MatchMutationResult {
   match: MatchDocument;
 }
 
+type ImageSubmissionDocument = JsonDocument & {
+  id: string;
+  teamId: string;
+  type: SubmissionType;
+  imageUrl: string;
+  groupPostedAt: string;
+  groupPostedAtLocal: string;
+  pointsAwarded: number;
+  status: "verified";
+  memberCountConfirmed: true;
+  arrivalPosition?: number;
+  verifiedAt: string;
+  updatedAt?: string;
+};
+
 type CricketEntry = NonNullable<MatchDocument["cricket"]>["innings"][number];
 type CricketStatusPatch = Partial<Pick<MatchDocument, "status" | "winnerTeamId" | "resultText">>;
 
@@ -87,6 +112,10 @@ function asString(value: unknown, label: string, max = 160) {
   const result = String(value ?? "").trim();
   if (!result || result.length > max) throw new CommandError(400, "INVALID_ARGUMENT", `${label} is required.`);
   return result;
+}
+
+function assertTrue(value: unknown, label: string) {
+  if (value !== true) throw new CommandError(400, "INVALID_ARGUMENT", `${label} must be confirmed.`);
 }
 
 function teamName(teamId: string) {
@@ -1043,6 +1072,109 @@ export async function handleSetPlacementPoints(data: CallableData) {
   return { sport, points };
 }
 
+async function assertValidTeam(teamId: string) {
+  const team = await getDocument<JsonDocument>("teams", teamId);
+  if (!team) throw new CommandError(400, "INVALID_ARGUMENT", "Choose a valid team.");
+}
+
+async function assertNoSubmission(type: SubmissionType, teamId: string) {
+  const existing = await getDocument<ImageSubmissionDocument>("image_submissions", submissionId(type, teamId));
+  if (existing) throw new CommandError(409, "ALREADY_EXISTS", "This team has already been verified for that bonus.");
+}
+
+async function upsertSubmission(record: ImageSubmissionDocument) {
+  await upsertDocument("image_submissions", record.id, record);
+  await handleRefreshProjections();
+  return { id: record.id };
+}
+
+export async function handleVerifyArrival(data: CallableData) {
+  const teamId = asString(data.teamId, "Team");
+  const imageUrl = asString(data.imageUrl, "Image URL", 1000);
+  const position = Number(data.arrivalPosition);
+  const groupPostedAtLocal = asString(data.groupPostedAt, "Group post time", 32);
+  const verifiedAt = nowIso();
+
+  if (!Number.isInteger(position) || position < 1 || position > 4) {
+    throw new CommandError(400, "INVALID_ARGUMENT", "Arrival position must be between 1 and 4.");
+  }
+  assertTrue(data.memberCountConfirmed, "The 14-member jersey rule");
+  await assertValidTeam(teamId);
+  await assertNoSubmission("timely-arrival", teamId);
+
+  const existingArrivals = await listDocuments<ImageSubmissionDocument>("image_submissions");
+  if (existingArrivals.some((row) => row.type === "timely-arrival" && row.arrivalPosition === position)) {
+    throw new CommandError(409, "ALREADY_EXISTS", "That arrival position is already assigned.");
+  }
+
+  let groupPostedAt: string;
+  try {
+    groupPostedAt = parseLocalDateTimeInput(groupPostedAtLocal).isoString;
+  } catch (error) {
+    throw new CommandError(400, "INVALID_ARGUMENT", (error as Error).message);
+  }
+
+  return upsertSubmission({
+    id: submissionId("timely-arrival", teamId),
+    teamId,
+    type: "timely-arrival",
+    imageUrl,
+    groupPostedAt,
+    groupPostedAtLocal,
+    arrivalPosition: position,
+    pointsAwarded: timelyArrivalPointsForPosition(position),
+    status: "verified",
+    memberCountConfirmed: true,
+    verifiedAt,
+    updatedAt: verifiedAt,
+  });
+}
+
+export async function handleVerifyEarlyBird(data: CallableData) {
+  const teamId = asString(data.teamId, "Team");
+  const imageUrl = asString(data.imageUrl, "Image URL", 1000);
+  const groupPostedAtLocal = asString(data.groupPostedAt, "Group post time", 32);
+  const verifiedAt = nowIso();
+
+  assertTrue(data.memberCountConfirmed, "The 14-member jersey rule");
+  await assertValidTeam(teamId);
+  await assertNoSubmission("early-bird", teamId);
+
+  if (!isEarlyBirdLocalTime(groupPostedAtLocal)) {
+    throw new CommandError(400, "INVALID_ARGUMENT", "Early Bird applies only to photos posted before 2:30 PM.");
+  }
+
+  let groupPostedAt: string;
+  try {
+    groupPostedAt = parseLocalDateTimeInput(groupPostedAtLocal).isoString;
+  } catch (error) {
+    throw new CommandError(400, "INVALID_ARGUMENT", (error as Error).message);
+  }
+
+  return upsertSubmission({
+    id: submissionId("early-bird", teamId),
+    teamId,
+    type: "early-bird",
+    imageUrl,
+    groupPostedAt,
+    groupPostedAtLocal,
+    pointsAwarded: EARLY_BIRD_POINTS,
+    status: "verified",
+    memberCountConfirmed: true,
+    verifiedAt,
+    updatedAt: verifiedAt,
+  });
+}
+
+export async function handleDeleteSubmission(data: CallableData) {
+  const id = asString(data.id, "Submission");
+  const existing = await getDocument<ImageSubmissionDocument>("image_submissions", id);
+  if (!existing) throw new CommandError(404, "NOT_FOUND", "Submission not found.");
+  await deleteDocument("image_submissions", id);
+  await handleRefreshProjections();
+  return { id, deleted: true };
+}
+
 type MatchRow = MatchDocument;
 
 function emptyFieldRows() {
@@ -1077,8 +1209,8 @@ function cricketStandings(matches: MatchRow[]) {
     for (const state of [first, second]) {
       const batting = byTeam.get(state.battingTeamId)!;
       const bowling = byTeam.get(state.bowlingTeamId)!;
-      batting.runsFor += state.score; batting.ballsFaced += state.wickets >= state.battingLineup.length - 1 ? state.maxOvers * 6 : state.legalBalls;
-      bowling.runsAgainst += state.score; bowling.ballsBowled += state.wickets >= state.battingLineup.length - 1 ? state.maxOvers * 6 : state.legalBalls;
+      batting.runsFor += state.score; batting.ballsFaced += state.wickets >= Math.min(state.battingLineup.length - 1, 8) ? state.maxOvers * 6 : state.legalBalls;
+      bowling.runsAgainst += state.score; bowling.ballsBowled += state.wickets >= Math.min(state.battingLineup.length - 1, 8) ? state.maxOvers * 6 : state.legalBalls;
     }
     const home = byTeam.get(match.homeTeamId)!; const away = byTeam.get(match.awayTeamId)!;
     home.played += 1; away.played += 1;
@@ -1210,30 +1342,21 @@ function throwballLeaders(matches: MatchRow[]) {
 }
 
 export async function handleRefreshProjections() {
-  const [matches, awards, players] = await Promise.all([
+  const [matches, awards, players, tournament, imageSubmissions] = await Promise.all([
     listDocuments<MatchRow>("matches"),
     listDocuments<JsonDocument>("awards"),
     listDocuments<Player & JsonDocument>("players"),
+    getDocument<JsonDocument>("tournament_settings", "sports-fiesta-s9"),
+    listDocuments<ImageSubmissionDocument>("image_submissions"),
   ]);
   const football = fieldStandings(matches, "football");
   const handball = fieldStandings(matches, "handball");
   const cricket = cricketStandings(matches);
   const throwball = throwballStandings(matches);
-  const placementPoints = { football: [200, 150, 100, 50], handball: [150, 100, 50, 30], cricket: [200, 150, 100, 50], throwball: [120, 80, 30, 30] };
+  const placementPoints = (tournament?.placementPoints as Record<string, number[]>) ?? { ...DEFAULT_PLACEMENT_POINTS_BY_SPORT };
   const coreSports = ["football", "handball", "cricket", "throwball"] as const;
   const placements = awards.filter((award) => award.type === "sport-placement" && award.confirmed && award.teamId && award.sport && award.place);
-  const leagueBonus = new Map(S9_TEAMS.map((team) => [team.id, { football: 0, handball: 0, cricket: 0, throwball: 0 }]));
-  for (const match of matches.filter((match) => match.status === "completed" && match.stage === "league")) {
-    const home = leagueBonus.get(match.homeTeamId); const away = leagueBonus.get(match.awayTeamId);
-    if (!home || !away) continue;
-    if (match.sport === "football") {
-      if (match.winnerTeamId === match.homeTeamId) home.football += 20;
-      else if (match.winnerTeamId === match.awayTeamId) away.football += 20;
-      else { home.football += 10; away.football += 10; }
-    }
-    if (match.sport === "handball" && match.winnerTeamId) { const winner = leagueBonus.get(match.winnerTeamId); if (winner) winner.handball += 20; }
-    if (match.sport === "cricket" && match.winnerTeamId) { const winner = leagueBonus.get(match.winnerTeamId); if (winner) winner.cricket += 20; }
-  }
+  const leagueBonuses = calculateLeagueBonusByTeam(S9_TEAMS.map((team) => team.id), { football, handball, cricket, throwball });
   const activityResults = awards.filter((award) => award.type === "activity-result" && award.confirmed) as unknown as ActivityResult[];
   const activitySportIds = ["womens-games", "senior-kids", "junior-kids", "relay"] as const;
   const activityScores = new Map(S9_TEAMS.map((team) => [team.id, Object.fromEntries(activitySportIds.map((sport) => [sport, 0])) as Record<string, number>]));
@@ -1258,16 +1381,40 @@ export async function handleRefreshProjections() {
       if (teamId && activityScores.has(teamId)) activityScores.get(teamId)![result.sport] += points;
     }
   }
+  const bonusByTeam = imageSubmissions.reduce((acc, submission) => {
+    const bucket = acc[submission.teamId] ?? { timelyArrival: 0, earlyBird: 0 };
+    if (submission.type === "timely-arrival") bucket.timelyArrival += Number(submission.pointsAwarded ?? 0);
+    if (submission.type === "early-bird") bucket.earlyBird += Number(submission.pointsAwarded ?? 0);
+    acc[submission.teamId] = bucket;
+    return acc;
+  }, {} as Record<string, { timelyArrival: number; earlyBird: number }>);
   const overall = S9_TEAMS.map((team) => {
     const sportScores = Object.fromEntries(coreSports.map((sport) => {
       const place = placements.find((row) => row.teamId === team.id && row.sport === sport)?.place;
-      return [sport, (place ? placementPoints[sport]?.[Number(place) - 1] ?? 0 : 0) + (leagueBonus.get(team.id)?.[sport] ?? 0)];
+      return [sport, place ? placementPoints[sport]?.[Number(place) - 1] ?? 0 : 0];
     })) as Record<string, number>;
     const extraScores = activityScores.get(team.id) ?? {};
     const bonus = bonusScores.get(team.id) ?? 0;
     const adjustments = adjustmentScores.get(team.id) ?? 0;
-    return { teamId: team.id, ...sportScores, ...extraScores, bonus, adjustments, total: [...Object.values(sportScores), ...Object.values(extraScores), bonus, adjustments].reduce((sum, value) => sum + value, 0) };
-  }).sort((a, b) => b.total - a.total || a.teamId.localeCompare(b.teamId)).map((row, index) => ({ ...row, rank: index + 1 }));
+    const teamBonuses = bonusByTeam[team.id] ?? { timelyArrival: 0, earlyBird: 0 };
+    const league = leagueBonuses[team.id] ?? { leagueWin: 0, leagueTie: 0 };
+    return {
+      teamId: team.id,
+      ...sportScores,
+      leagueWin: league.leagueWin,
+      leagueTie: league.leagueTie,
+      timelyArrival: teamBonuses.timelyArrival,
+      earlyBird: teamBonuses.earlyBird,
+      ...extraScores,
+      bonus,
+      adjustments,
+      total: [...Object.values(sportScores), ...Object.values(extraScores), bonus, adjustments].reduce((sum, value) => sum + value, 0)
+        + league.leagueWin
+        + league.leagueTie
+        + teamBonuses.timelyArrival
+        + teamBonuses.earlyBird,
+    };
+  }).sort((a, b) => b.total - a.total || b.leagueWin - a.leagueWin || a.teamId.localeCompare(b.teamId)).map((row, index) => ({ ...row, rank: index + 1 }));
 
   await Promise.all([
     upsertDocument("standings", "football", { id: "football", rows: football }),
@@ -1305,7 +1452,7 @@ export async function seedBaseTournamentData() {
       venues: [],
       cricketOvers: 5,
       sportRules: DEFAULT_SPORT_RULES,
-      placementPoints: { football: [200, 150, 100, 50], handball: [150, 100, 50, 30], cricket: [200, 150, 100, 50], throwball: [120, 80, 30, 30] },
+      placementPoints: { ...DEFAULT_PLACEMENT_POINTS_BY_SPORT },
       createdAt: timestamp,
       updatedAt: timestamp,
     }),
@@ -1313,12 +1460,13 @@ export async function seedBaseTournamentData() {
     ...S9_PLAYERS.map((player) => upsertDocument("players", player.id, player)),
     ...S9_SPORTS.map((sport) => upsertDocument("sports", sport.id, { ...sport, fixturesConfirmed: false })),
   ]);
-  const [matchesResult, awardsResult, receiptsResult] = await Promise.all([
+  const [matchesResult, awardsResult, receiptsResult, imageSubmissionsResult] = await Promise.all([
     supabaseAdmin.from("matches").delete().neq("id", "__never__"),
     supabaseAdmin.from("awards").delete().neq("id", "__never__"),
     supabaseAdmin.from("command_receipts").delete().neq("id", "__never__"),
+    supabaseAdmin.from("image_submissions").delete().neq("id", "__never__"),
   ]);
-  for (const result of [matchesResult, awardsResult, receiptsResult]) {
+  for (const result of [matchesResult, awardsResult, receiptsResult, imageSubmissionsResult]) {
     if (result.error) throw result.error;
   }
   await Promise.all([
@@ -1326,7 +1474,7 @@ export async function seedBaseTournamentData() {
     upsertDocument("standings", "handball", { id: "handball", rows: fieldStandings([], "handball") }),
     upsertDocument("standings", "cricket", { id: "cricket", rows: cricketStandings([]) }),
     upsertDocument("standings", "throwball", { id: "throwball", rows: throwballStandings([]) }),
-    upsertDocument("standings", "overall", { id: "overall", rows: S9_TEAMS.map((team, index) => ({ rank: index + 1, teamId: team.id, football: 0, handball: 0, cricket: 0, throwball: 0, total: 0 })) }),
+    upsertDocument("standings", "overall", { id: "overall", rows: S9_TEAMS.map((team, index) => ({ rank: index + 1, teamId: team.id, football: 0, handball: 0, cricket: 0, throwball: 0, leagueWin: 0, leagueTie: 0, timelyArrival: 0, earlyBird: 0, total: 0 })) }),
     upsertDocument("leaderboards", "football", { id: "football", topScorers: [] }),
     upsertDocument("leaderboards", "handball", { id: "handball", topScorers: [] }),
     upsertDocument("leaderboards", "cricket", { id: "cricket", orangeCap: [], purpleCap: [], mostCatches: [] }),
