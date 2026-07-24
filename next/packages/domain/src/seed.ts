@@ -102,7 +102,49 @@ export const S9_PLAYERS: Player[] = [
   ...roster("ivory-elites", rosterNames.ivory, rosterNumbers.ivory),
 ];
 
-export const S9_SEEDED_MATCHES: SeedMatch[] = [];
+function scheduledMatch(
+  id: string,
+  sport: SeedMatch["sport"],
+  matchNumber: string,
+  homeTeamId: string,
+  awayTeamId: string,
+): SeedMatch {
+  return {
+    id,
+    sport,
+    stage: "league",
+    status: "scheduled",
+    homeTeamId,
+    awayTeamId,
+    matchNumber,
+    revision: 0,
+    scoreSummary: sport === "cricket"
+      ? { innings: [] }
+      : { [homeTeamId]: 0, [awayTeamId]: 0 },
+  };
+}
+
+export const S9_SEEDED_MATCHES: SeedMatch[] = [
+  scheduledMatch("football-001", "football", "FB-001", "ivory-elites", "gods-gladiators"),
+  scheduledMatch("football-002", "football", "FB-002", "karuppu-knights", "crimson-warriors"),
+  scheduledMatch("football-003", "football", "FB-003", "gods-gladiators", "crimson-warriors"),
+  scheduledMatch("football-004", "football", "FB-004", "karuppu-knights", "ivory-elites"),
+  scheduledMatch("football-005", "football", "FB-005", "ivory-elites", "crimson-warriors"),
+  scheduledMatch("football-006", "football", "FB-006", "gods-gladiators", "karuppu-knights"),
+
+  scheduledMatch("handball-001", "handball", "HB-001", "crimson-warriors", "karuppu-knights"),
+  scheduledMatch("handball-002", "handball", "HB-002", "gods-gladiators", "ivory-elites"),
+  scheduledMatch("handball-003", "handball", "HB-003", "karuppu-knights", "gods-gladiators"),
+  scheduledMatch("handball-004", "handball", "HB-004", "crimson-warriors", "ivory-elites"),
+
+  scheduledMatch("throwball-001", "throwball", "TB-001", "karuppu-knights", "gods-gladiators"),
+  scheduledMatch("throwball-002", "throwball", "TB-002", "ivory-elites", "crimson-warriors"),
+
+  scheduledMatch("cricket-001", "cricket", "CR-001", "ivory-elites", "karuppu-knights"),
+  scheduledMatch("cricket-002", "cricket", "CR-002", "crimson-warriors", "gods-gladiators"),
+  scheduledMatch("cricket-003", "cricket", "CR-003", "karuppu-knights", "crimson-warriors"),
+  scheduledMatch("cricket-004", "cricket", "CR-004", "ivory-elites", "gods-gladiators"),
+];
 
 export const S9_SPORTS = [
   { id: "football", name: "Football", status: "active" },

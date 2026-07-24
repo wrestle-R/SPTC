@@ -1,9 +1,11 @@
 "use client";
 
 import { S9_PLAYERS, S9_TEAMS } from "@sports-fiesta/domain";
-import { CircleDashed } from "lucide-react";
+import { ChevronDown, ChevronUp, CircleDashed } from "lucide-react";
+import { useState } from "react";
 import { DataError, ContentSkeleton } from "@/components/data-state";
 import { MatchCard } from "@/components/match-card";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { usePublicCollection, usePublicDocument } from "@/lib/public-data";
@@ -26,6 +28,7 @@ const headings = {
 } as const;
 
 export function SportView({ sport }: { sport: keyof typeof headings }) {
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
   const matchesState = usePublicCollection<PublicMatch>("matches");
   const teamsState = usePublicCollection<PublicTeam>("teams");
   const playersState = usePublicCollection<PublicPlayer>("players");
@@ -69,14 +72,31 @@ export function SportView({ sport }: { sport: keyof typeof headings }) {
           </CardContent>
         </Card>
       ) : null}
-      {groups.map((group) => group.matches.length ? (
-        <section key={group.title} className="flex flex-col gap-3">
-          <h2 className="text-lg font-semibold">{group.title}</h2>
-          <div className="grid gap-3 lg:grid-cols-2">
-            {group.matches.map((match) => <MatchCard key={match.id} match={match} teams={teams} players={playersState.data.length ? playersState.data : S9_PLAYERS} />)}
-          </div>
-        </section>
-      ) : null)}
+      {groups.map((group) => {
+        if (!group.matches.length) return null;
+        const expanded = Boolean(expandedGroups[group.title]);
+        const visibleMatches = expanded ? group.matches : group.matches.slice(0, 5);
+        const hiddenCount = group.matches.length - 5;
+        return (
+          <section key={group.title} className="flex flex-col gap-3">
+            <h2 className="text-lg font-semibold">{group.title}</h2>
+            <div className="grid gap-3 lg:grid-cols-2">
+              {visibleMatches.map((match) => <MatchCard key={match.id} match={match} teams={teams} players={playersState.data.length ? playersState.data : S9_PLAYERS} />)}
+            </div>
+            {hiddenCount > 0 ? (
+              <Button
+                type="button"
+                variant="outline"
+                className="self-center"
+                aria-expanded={expanded}
+                onClick={() => setExpandedGroups((current) => ({ ...current, [group.title]: !expanded }))}
+              >
+                {expanded ? <>Show less <ChevronUp data-icon="inline-end" /></> : <>View all ({group.matches.length}) <ChevronDown data-icon="inline-end" /></>}
+              </Button>
+            ) : null}
+          </section>
+        );
+      })}
     </div>
   );
 }
