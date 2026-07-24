@@ -15,8 +15,8 @@ import { TEAM_GRADIENTS, TEAM_JERSEYS, TEAM_TEXT_COLORS } from "@/lib/team-asset
 
 const TEAM_GLOWS: Record<string, string> = {
   "crimson-warriors": "shadow-red-500/30",
-  "gods-gladiators": "shadow-blue-500/30",
-  "karuppu-knights": "shadow-zinc-500/30",
+  "gods-gladiators": "shadow-emerald-500/30",
+  "karuppu-knights": "shadow-zinc-950/50",
   "ivory-elites": "shadow-orange-300/30",
 };
 

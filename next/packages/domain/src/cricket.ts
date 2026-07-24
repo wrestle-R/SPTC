@@ -17,6 +17,7 @@ export interface CreateInningsInput {
   bowlerId: PlayerId;
   maxOvers?: number;
   targetScore?: number | null;
+  isSuperOver?: boolean;
 }
 
 const EMPTY_EXTRAS = {
@@ -69,6 +70,9 @@ export function createCricketInnings(input: CreateInningsInput): CricketInningsS
   if (battingLineup.length < 2) {
     throw new Error("A batting roster snapshot needs at least two players.");
   }
+  if (!input.isSuperOver && bowlingLineup.length < (input.maxOvers ?? 5)) {
+    throw new Error("The bowling roster needs at least one eligible bowler for each over.");
+  }
   if (input.strikerId === input.nonStrikerId) {
     throw new Error("Striker and non-striker must be different players.");
   }
@@ -81,6 +85,7 @@ export function createCricketInnings(input: CreateInningsInput): CricketInningsS
     battingLineup: [...battingLineup],
     bowlingLineup: [...bowlingLineup],
     maxOvers: input.maxOvers ?? 5,
+    isSuperOver: input.isSuperOver ?? false,
     targetScore: input.targetScore ?? null,
     score: 0,
     wickets: 0,
@@ -184,6 +189,9 @@ export function recordCricketDelivery(
   if (!state.currentBowlerId) throw new Error("Select a bowler for this over.");
   if (!Number.isInteger(input.runsOffBat) || input.runsOffBat < 0 || input.runsOffBat > 6) {
     throw new Error("Runs off the bat must be a whole number from 0 to 6.");
+  }
+  if (input.dismissal?.type === "lbw") {
+    throw new Error("LBW is not used in this tournament.");
   }
   if ((input.nextStrikerId || input.replacementBatterId) && input.dismissal?.type !== "run-out") {
     throw new Error("Next striker and replacement batter can only be set for a run-out.");
@@ -355,6 +363,9 @@ export function setCricketBowler(state: CricketInningsState, bowlerId: PlayerId)
   }
   if (bowlerId === state.previousOverBowlerId) {
     throw new Error("A bowler cannot bowl consecutive overs.");
+  }
+  if (!state.isSuperOver && (state.bowlers[bowlerId]?.legalBalls ?? 0) >= 6) {
+    throw new Error("Each bowler may bowl only one over in a normal innings.");
   }
   return {
     ...state,

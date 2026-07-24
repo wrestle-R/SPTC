@@ -1,8 +1,10 @@
 import { readFileSync } from "node:fs";
+import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 
 function loadLocalEnv() {
-  const path = resolve(process.cwd(), ".env.local");
+  const path = [".env.local", ".env"].map((file) => resolve(process.cwd(), file)).find(existsSync);
+  if (!path) throw new Error("Create .env.local or .env with the Supabase credentials before seeding.");
   const content = readFileSync(path, "utf8");
   for (const line of content.split(/\r?\n/)) {
     const trimmed = line.trim();

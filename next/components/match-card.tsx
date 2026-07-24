@@ -63,7 +63,7 @@ function throwballScore(match: PublicMatch, teamId: string) {
 
 function displayAccentColor(color?: string | null) {
   if (!color) return "transparent";
-  return ["#22c55e", "#10b981", "#16a34a", "#15803d", "#4ade80"].includes(color.toLowerCase()) ? "#3b82f6" : color;
+  return color;
 }
 
 function TeamScore({

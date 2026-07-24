@@ -3,6 +3,7 @@
 import { S9_TEAMS } from "@sports-fiesta/domain";
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { ContentSkeleton, DataError } from "@/components/data-state";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -10,9 +11,30 @@ import { usePublicDocument } from "@/lib/public-data";
 import type { OverallStandingDocument } from "@/lib/web-types";
 import { motion } from "framer-motion";
 import { Trophy, Medal } from "lucide-react";
-import { TEAM_GRADIENTS, TEAM_JERSEYS } from "@/lib/team-assets";
+
+const TEAM_JERSEYS: Record<string, { front: string; back: string }> = {
+  "crimson-warriors": { front: "/Jersey/red-front-v2.png", back: "/Jersey/red-back-v2.png" },
+  "gods-gladiators": { front: "/Jersey/blue-front-v2.png", back: "/Jersey/blue-back-v2.png" },
+  "karuppu-knights": { front: "/Jersey/black-front-v2.png", back: "/Jersey/black-back-v2.png" },
+  "ivory-elites": { front: "/Jersey/ivory-front-v2.png", back: "/Jersey/ivory-back-v2.png" },
+};
+
+const TEAM_GRADIENTS: Record<string, string> = {
+  "crimson-warriors": "from-red-600 to-orange-500",
+  "gods-gladiators": "from-emerald-700 to-green-400",
+  "karuppu-knights": "from-zinc-950 to-zinc-700",
+  "ivory-elites": "from-amber-100 to-orange-50",
+};
+
+const TEAM_TEXT_COLORS: Record<string, string> = {
+  "crimson-warriors": "text-red-500",
+  "gods-gladiators": "text-emerald-500",
+  "karuppu-knights": "text-zinc-900 dark:text-zinc-100",
+  "ivory-elites": "text-orange-600",
+};
 
 export function TeamStandings() {
+  const router = useRouter();
   const standings = usePublicDocument<OverallStandingDocument>("standings", "overall");
   const rows = S9_TEAMS.map((team, index) => {
     const stored = standings.data?.rows.find((row) => row.teamId === team.id);
@@ -25,10 +47,7 @@ export function TeamStandings() {
       handball: stored?.handball ?? 0,
       cricket: stored?.cricket ?? 0,
       throwball: stored?.throwball ?? 0,
-      timelyArrival: stored?.timelyArrival ?? 0,
-      earlyBird: stored?.earlyBird ?? 0,
-      leagueWin: stored?.leagueWin ?? 0,
-      leagueTie: stored?.leagueTie ?? 0,
+      activities: (stored?.["womens-games"] ?? 0) + (stored?.["senior-kids"] ?? 0) + (stored?.["junior-kids"] ?? 0) + (stored?.relay ?? 0) + (stored?.bonus ?? 0) + (stored?.adjustments ?? 0) + (stored?.timelyArrival ?? 0) + (stored?.earlyBird ?? 0),
       total: stored?.total ?? 0,
     };
   }).sort((a, b) => b.total - a.total || a.rank - b.rank);
@@ -51,7 +70,7 @@ export function TeamStandings() {
             {rows.map((row, i) => {
               const jersey = TEAM_JERSEYS[row.teamId];
               const gradient = TEAM_GRADIENTS[row.teamId] || "from-zinc-600 to-zinc-400";
-              const bonusSwing = row.timelyArrival + row.earlyBird + row.leagueWin + row.leagueTie;
+              const textColor = TEAM_TEXT_COLORS[row.teamId] || "text-zinc-500";
               return (
                 <motion.div
                   key={row.teamId}
@@ -75,11 +94,8 @@ export function TeamStandings() {
                           </div>
                         )}
                         <div className="min-w-0 flex-1">
-                          <p className="text-4xl font-black tabular-nums tracking-tighter text-foreground drop-shadow-sm">{row.total}</p>
+                          <p className={`text-4xl font-black tabular-nums tracking-tighter ${textColor} drop-shadow-sm`}>{row.total}</p>
                           <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mt-0.5">points</p>
-                          <p className="mt-2 text-xs font-medium text-muted-foreground">
-                            Bonus swing: <span className="font-semibold text-foreground">{bonusSwing}</span>
-                          </p>
                         </div>
                       </div>
                       <p className="mt-4 text-base font-extrabold truncate tracking-tight text-foreground/90 group-hover:text-foreground transition-colors">{row.name}</p>
@@ -90,7 +106,7 @@ export function TeamStandings() {
             })}
           </div>
 
-          <div className="overflow-hidden rounded-2xl">
+          <div>
             <Card className="shadow-none overflow-hidden">
               <CardHeader className="pb-2">
                 <CardTitle className="flex items-center gap-2">
@@ -100,30 +116,44 @@ export function TeamStandings() {
                 <CardDescription>Click a row to view team details.</CardDescription>
               </CardHeader>
               <CardContent className="px-0">
-                <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow className="hover:bg-transparent">
-                      <TableHead className="sticky left-0 z-10 bg-card pl-6 font-bold">Sport / event</TableHead>
-                      {rows.map((row) => <TableHead key={row.teamId} className="min-w-28 text-right font-bold">{row.name}</TableHead>)}
+                      <TableHead className="pl-6 font-bold">Team</TableHead>
+                      <TableHead className="text-right font-bold">Football</TableHead>
+                      <TableHead className="text-right font-bold">Handball</TableHead>
+                      <TableHead className="text-right font-bold">Cricket</TableHead>
+                      <TableHead className="text-right font-bold">Throwball</TableHead>
+                      <TableHead className="text-right font-bold">Activities</TableHead>
+                      <TableHead className="pr-6 text-right font-bold">Total</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {[
-                      ["Football", "football"], ["Handball", "handball"], ["Cricket", "cricket"], ["Throwball", "throwball"],
-                      ["League win", "leagueWin"], ["League tie", "leagueTie"], ["Arrival", "timelyArrival"], ["Early Bird", "earlyBird"], ["Total", "total"],
-                    ].map(([label, key]) => (
+                    {rows.map((row, index) => (
                       <TableRow 
-                        key={key}
-                        className="transition-all hover:bg-muted/50"
+                        key={row.teamId} 
+                        className="border-l-[4px] cursor-pointer transition-all hover:bg-muted/50 hover:shadow-sm" 
+                        style={{ borderLeftColor: row.accentColor }}
+                        onClick={() => router.push(`/teams/${row.teamId}`)}
                       >
-                        <TableCell className="sticky left-0 z-10 bg-card pl-6 font-bold">{label}</TableCell>
-                        {rows.map((row) => <TableCell key={row.teamId} className={`text-right tabular-nums ${key === "total" ? "font-black text-base" : "text-sm"}`}><Link href={`/teams/${row.teamId}`} className="hover:underline">{row[key as keyof typeof row] as number}</Link></TableCell>)}
+                        <TableCell className="pl-6 font-medium">
+                          <span className="flex items-center gap-3">
+                            <span className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold ${index === 0 ? 'bg-amber-500 text-white' : 'bg-muted text-muted-foreground'}`}>
+                              {index + 1}
+                            </span>
+                            <span className="text-sm font-bold">{row.name}</span>
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums text-sm">{row.football}</TableCell>
+                        <TableCell className="text-right tabular-nums text-sm">{row.handball}</TableCell>
+                        <TableCell className="text-right tabular-nums text-sm">{row.cricket}</TableCell>
+                        <TableCell className="text-right tabular-nums text-sm">{row.throwball}</TableCell>
+                        <TableCell className="text-right tabular-nums text-sm">{row.activities}</TableCell>
+                        <TableCell className="pr-6 text-right font-black tabular-nums text-base">{row.total}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
                 </Table>
-                </div>
               </CardContent>
             </Card>
           </div>

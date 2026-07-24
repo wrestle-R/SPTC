@@ -117,6 +117,7 @@ export interface CricketInningsState {
   battingLineup: PlayerId[];
   bowlingLineup: PlayerId[];
   maxOvers: number;
+  isSuperOver?: boolean;
   targetScore: number | null;
   score: number;
   wickets: number;

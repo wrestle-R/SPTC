@@ -34,10 +34,12 @@ import {
   type FieldMatchState,
   type Player,
   type SportRules,
+  type Team,
   type ThrowballMatchState,
   type ThrowballRallyInput,
   type ThrowballStandingInput,
 } from "@sports-fiesta/domain";
+import { activityFixtureId, getActivityEvent, type ActivityFixture, type ActivityResult, type ActivitySportId } from "@/lib/activity-events";
 import {
   calculateLeagueBonusByTeam,
   DEFAULT_PLACEMENT_POINTS_BY_SPORT,
@@ -236,7 +238,19 @@ function cricketStatus(match: MatchDocument, state: CricketInningsState): Cricke
   const second = innings.filter((entry) => !entry.superOver)[1]?.state;
   if (!first || !second) return { status: "innings-break" };
   const resultText = cricketResultText(first, second, teamName);
-  if (!resultText && first.score === second.score) return { status: "super-over", resultText: "Super Over tied - organizer result required" };
+  if (!resultText && first.score === second.score) {
+    const superOvers = innings.filter((entry) => entry.superOver && entry.state.completed);
+    if (superOvers.length % 2 === 1) return { status: "super-over", winnerTeamId: null, resultText: "Super Over innings complete — start the reply." };
+    if (superOvers.length >= 2) {
+      const [firstSuperOver, secondSuperOver] = superOvers.slice(-2).map((entry) => entry.state);
+      if (firstSuperOver.score !== secondSuperOver.score) {
+        const winner = firstSuperOver.score > secondSuperOver.score ? firstSuperOver.battingTeamId : secondSuperOver.battingTeamId;
+        const margin = Math.abs(firstSuperOver.score - secondSuperOver.score);
+        return { winnerTeamId: winner, resultText: `${teamName(winner)} won the Super Over by ${margin} run${margin === 1 ? "" : "s"}` };
+      }
+    }
+    return { status: "super-over", winnerTeamId: null, resultText: "Super Over tied — start another Super Over." };
+  }
   const winnerTeamId = second.score > first.score ? second.battingTeamId : first.battingTeamId;
   return { winnerTeamId, resultText };
 }
@@ -448,9 +462,22 @@ export async function handleUpdateMatch(data: CallableData) {
   const id = asString(data.matchId, "Match");
   const match = await getDocument<MatchDocument>("matches", id);
   if (!match) throw new CommandError(404, "NOT_FOUND", "Match not found.");
-  if (match.status === "live") throw new CommandError(400, "FAILED_PRECONDITION", "A live match cannot be rescheduled.");
+  if (match.status !== "scheduled") throw new CommandError(400, "FAILED_PRECONDITION", "Only scheduled fixtures can be edited.");
+  const fixture = validateFixture({
+    sport: (data.sport ?? match.sport) as "football" | "handball" | "cricket" | "throwball",
+    homeTeamId: data.homeTeamId ? asString(data.homeTeamId, "Home team") : match.homeTeamId,
+    awayTeamId: data.awayTeamId ? asString(data.awayTeamId, "Away team") : match.awayTeamId,
+    stage: (data.stage ?? match.stage) as "league" | "third-place" | "final",
+    maxOvers: data.sport === "cricket" || (!data.sport && match.sport === "cricket") ? 5 : undefined,
+  });
+  const matches = await listDocuments<MatchDocument>("matches");
+  if (matches.some((entry) => entry.id !== id && entry.sport === fixture.sport && entry.stage === fixture.stage && [entry.homeTeamId, entry.awayTeamId].sort().join(":") === [fixture.homeTeamId, fixture.awayTeamId].sort().join(":"))) {
+    throw new CommandError(409, "ALREADY_EXISTS", "This matchup already exists for the stage.");
+  }
   await upsertDocument("matches", id, {
     ...match,
+    ...fixture,
+    scoreSummary: fixture.sport === "cricket" ? { innings: [] } : { [fixture.homeTeamId]: 0, [fixture.awayTeamId]: 0 },
     startsAt: data.startsAt ? asString(data.startsAt, "Start date") : match.startsAt,
     venue: data.venue ? asString(data.venue, "Venue") : match.venue,
     updatedAt: nowIso(),
@@ -529,6 +556,7 @@ export async function handleStartInnings(data: CallableData) {
   return mutateMatch(data, async (match) => {
     if (match.sport !== "cricket") throw new CommandError(400, "FAILED_PRECONDITION", "This is not a cricket match.");
     if (!["scheduled", "innings-break", "super-over"].includes(match.status)) throw new CommandError(400, "FAILED_PRECONDITION", "This cricket innings cannot be started now.");
+    const isSuperOver = data.superOver === true;
     const battingTeamId = asString(data.battingTeamId, "Batting team");
     const bowlingTeamId = asString(data.bowlingTeamId, "Bowling team");
     if (battingTeamId === bowlingTeamId || ![match.homeTeamId, match.awayTeamId].includes(battingTeamId) || ![match.homeTeamId, match.awayTeamId].includes(bowlingTeamId)) {
@@ -541,8 +569,14 @@ export async function handleStartInnings(data: CallableData) {
     await assertRosterPlayer(match, battingTeamId, asString(data.strikerId, "Striker"), "Striker");
     await assertRosterPlayer(match, battingTeamId, asString(data.nonStrikerId, "Non-striker"), "Non-striker");
     await assertRosterPlayer(match, bowlingTeamId, asString(data.bowlerId, "Bowler"), "Bowler");
-    const firstInnings = match.cricket?.innings?.[0]?.state;
-    const targetScore = firstInnings?.completed ? firstInnings.score + 1 : undefined;
+    const previousInnings = match.cricket?.innings?.at(-1);
+    if (isSuperOver && previousInnings?.superOver && battingTeamId !== previousInnings.state.bowlingTeamId) {
+      throw new CommandError(400, "INVALID_ARGUMENT", "The other team must bat in the Super Over reply.");
+    }
+    const firstInnings = match.cricket?.innings?.find((entry) => !entry.superOver)?.state;
+    const targetScore = isSuperOver
+      ? previousInnings?.superOver && previousInnings.state.completed ? previousInnings.state.score + 1 : undefined
+      : firstInnings?.completed ? firstInnings.score + 1 : undefined;
     const initial = {
       battingTeamId,
       bowlingTeamId,
@@ -551,12 +585,13 @@ export async function handleStartInnings(data: CallableData) {
       strikerId: asString(data.strikerId, "Striker"),
       nonStrikerId: asString(data.nonStrikerId, "Non-striker"),
       bowlerId: asString(data.bowlerId, "Bowler"),
-      maxOvers: rules.cricket.maxOvers ?? 5,
+      maxOvers: isSuperOver ? 1 : rules.cricket.maxOvers ?? 5,
       targetScore,
+      isSuperOver,
     };
     let state: CricketInningsState;
     try { state = createCricketInnings(initial); } catch (error) { throw new CommandError(400, "INVALID_ARGUMENT", (error as Error).message); }
-    const innings = [...(match.cricket?.innings ?? []), { initial, state, superOver: data.superOver === true }];
+    const innings = [...(match.cricket?.innings ?? []), { initial, state, superOver: isSuperOver }];
     return { match: { ...match, status: "live", cricket: { innings, currentInnings: innings.length - 1 }, scoreSummary: inningsSummary(innings) } };
   });
 }
@@ -587,7 +622,20 @@ export async function handleSelectCricketBowler(data: CallableData) {
   return mutateMatch(data, (match) => {
     if (match.sport !== "cricket" || match.status !== "live") throw new CommandError(400, "FAILED_PRECONDITION", "The cricket match is not live.");
     const { index, innings } = currentCricketInnings(match);
-    try { innings[index] = { ...innings[index], state: applyCricketBowler(innings[index].state, asString(data.playerId, "Bowler")) }; } catch (error) { throw new CommandError(400, "FAILED_PRECONDITION", (error as Error).message); }
+    const bowlerId = asString(data.playerId, "Bowler");
+    const current = innings[index].state;
+    if (current.isSuperOver) {
+      const eligibleBowlers = current.bowlingLineup;
+      const previousSuperOverBowlers = innings
+        .filter((candidate, candidateIndex) => candidateIndex !== index && candidate.superOver && candidate.state.bowlingTeamId === current.bowlingTeamId && candidate.state.events.length)
+        .map((candidate) => candidate.state.events[0]?.bowlerId)
+        .filter((id): id is string => Boolean(id));
+      const usedInCycle = new Set(previousSuperOverBowlers);
+      if (usedInCycle.size < eligibleBowlers.length && usedInCycle.has(bowlerId)) {
+        throw new CommandError(400, "FAILED_PRECONDITION", "That bowler has already bowled a Super Over. Choose another eligible bowler until the rotation resets.");
+      }
+    }
+    try { innings[index] = { ...innings[index], state: applyCricketBowler(current, bowlerId) }; } catch (error) { throw new CommandError(400, "FAILED_PRECONDITION", (error as Error).message); }
     return { match: cricketMatch(match, innings, index) };
   });
 }
@@ -811,6 +859,202 @@ export async function handleConfirmAward(data: CallableData) {
     confirmed: true,
     updatedAt: nowIso(),
   });
+  return { id };
+}
+
+export async function handleSaveActivityResult(data: CallableData) {
+  const sport = asString(data.sport, "Activity sport") as ActivitySportId;
+  const eventId = asString(data.eventId, "Activity event");
+  const event = getActivityEvent(sport, eventId);
+  if (!event) throw new CommandError(400, "INVALID_ARGUMENT", "Choose a valid activity event.");
+  const fixtureId = activityFixtureId(sport, eventId);
+  const fixture = await getDocument<ActivityFixture & JsonDocument>("awards", fixtureId);
+  if (!fixture) throw new CommandError(400, "FAILED_PRECONDITION", "Create this event fixture before recording results.");
+  if (fixture.status !== "live" && fixture.status !== "completed") throw new CommandError(400, "FAILED_PRECONDITION", "Start this event before recording results.");
+  if (!data.placements || typeof data.placements !== "object" || Array.isArray(data.placements)) {
+    throw new CommandError(400, "INVALID_ARGUMENT", "Record the finishing order first.");
+  }
+  const placements = Object.fromEntries(Object.entries(data.placements as Record<string, unknown>).map(([place, value]) => [place, String(value ?? "").trim()]));
+  const winners = event.points.map((_, index) => placements[String(index + 1)]);
+  if (winners.some((value) => !value) || new Set(winners).size !== winners.length) {
+    throw new CommandError(400, "INVALID_ARGUMENT", "Each finishing place must have a different selection.");
+  }
+
+  const [teams, players] = await Promise.all([
+    listDocuments<JsonDocument>("teams"),
+    listDocuments<Player & JsonDocument>("players"),
+  ]);
+  let lineups: Record<string, string[]> | undefined;
+  if (event.kind === "individual") {
+    if (winners.some((playerId) => !players.some((player) => player.id === playerId && player.active))) {
+      throw new CommandError(400, "INVALID_ARGUMENT", "Every winner must be an active player.");
+    }
+  } else {
+    if (winners.some((teamId) => !teams.some((team) => team.id === teamId))) {
+      throw new CommandError(400, "INVALID_ARGUMENT", "Every relay result must be a valid team.");
+    }
+    const rawLineups = data.lineups && typeof data.lineups === "object" && !Array.isArray(data.lineups) ? data.lineups as Record<string, unknown> : {};
+    lineups = {};
+    for (const teamId of winners) {
+      const lineup = Array.isArray(rawLineups[teamId]) ? rawLineups[teamId].map(String) : [];
+      if (!lineup.length || new Set(lineup).size !== lineup.length) {
+        throw new CommandError(400, "INVALID_ARGUMENT", "Each placed relay team needs a valid lineup.");
+      }
+      if (lineup.some((playerId) => !players.some((player) => player.id === playerId && player.teamId === teamId && player.active))) {
+        throw new CommandError(400, "INVALID_ARGUMENT", "A relay lineup can only contain active players from that team.");
+      }
+      lineups[teamId] = lineup;
+    }
+  }
+
+  const id = `activity-result:${sport}:${eventId}`;
+  const result: ActivityResult & JsonDocument = { id, type: "activity-result", confirmed: true, sport, eventId, kind: event.kind, placements, ...(lineups ? { lineups } : {}), updatedAt: nowIso() };
+  await upsertDocument("awards", id, result);
+  await upsertDocument("awards", fixtureId, { ...fixture, status: "completed", updatedAt: nowIso() });
+  await handleRefreshProjections();
+  return { id };
+}
+
+export async function handleDeleteActivityResult(data: CallableData) {
+  const sport = asString(data.sport, "Activity sport") as ActivitySportId;
+  const eventId = asString(data.eventId, "Activity event");
+  if (!getActivityEvent(sport, eventId)) throw new CommandError(400, "INVALID_ARGUMENT", "Choose a valid activity event.");
+  const fixtureId = activityFixtureId(sport, eventId);
+  const fixture = await getDocument<ActivityFixture & JsonDocument>("awards", fixtureId);
+  if (!fixture) throw new CommandError(404, "NOT_FOUND", "Event fixture not found.");
+  const resultId = `activity-result:${sport}:${eventId}`;
+  if (!await getDocument<JsonDocument>("awards", resultId)) throw new CommandError(404, "NOT_FOUND", "Event result not found.");
+  await deleteDocument("awards", resultId);
+  await upsertDocument("awards", fixtureId, { ...fixture, status: "live", updatedAt: nowIso() });
+  await handleRefreshProjections();
+  return { id: resultId, deleted: true };
+}
+
+export async function handleDeleteActivityFixture(data: CallableData) {
+  const sport = asString(data.sport, "Activity sport") as ActivitySportId;
+  const eventId = asString(data.eventId, "Activity event");
+  if (!getActivityEvent(sport, eventId)) throw new CommandError(400, "INVALID_ARGUMENT", "Choose a valid activity event.");
+  const fixtureId = activityFixtureId(sport, eventId);
+  if (!await getDocument<JsonDocument>("awards", fixtureId)) throw new CommandError(404, "NOT_FOUND", "Event fixture not found.");
+  await Promise.all([
+    deleteDocument("awards", `activity-result:${sport}:${eventId}`),
+    deleteDocument("awards", fixtureId),
+  ]);
+  await handleRefreshProjections();
+  return { id: fixtureId, deleted: true };
+}
+
+export async function handleCreateActivityFixture(data: CallableData) {
+  const sport = asString(data.sport, "Activity sport") as ActivitySportId;
+  const eventId = asString(data.eventId, "Activity event");
+  const event = getActivityEvent(sport, eventId);
+  if (!event) throw new CommandError(400, "INVALID_ARGUMENT", "Choose a valid activity event.");
+  const id = activityFixtureId(sport, eventId);
+  if (await getDocument<JsonDocument>("awards", id)) throw new CommandError(409, "ALREADY_EXISTS", "This event fixture has already been created.");
+  let lineups: Record<string, string[]> | undefined;
+  if (event.kind === "relay") {
+    const rawLineups = data.lineups && typeof data.lineups === "object" && !Array.isArray(data.lineups) ? data.lineups as Record<string, unknown> : null;
+    if (!rawLineups) throw new CommandError(400, "INVALID_ARGUMENT", "Build every relay team lineup before creating the fixture.");
+    const [teams, players] = await Promise.all([listDocuments<Team & JsonDocument>("teams"), listDocuments<Player & JsonDocument>("players")]);
+    lineups = {};
+    for (const team of teams) {
+      const rawLineup = rawLineups[team.id];
+      const lineup: string[] = Array.isArray(rawLineup) ? rawLineup.map((playerId: unknown) => String(playerId)) : [];
+      if (!lineup.length || new Set(lineup).size !== lineup.length) throw new CommandError(400, "INVALID_ARGUMENT", "Every relay team needs at least one unique player in its lineup.");
+      if (lineup.some((playerId) => !players.some((player) => player.id === playerId && player.teamId === team.id && player.active))) throw new CommandError(400, "INVALID_ARGUMENT", "A relay lineup can only contain active players from that team.");
+      lineups[team.id] = lineup;
+    }
+  }
+  const timestamp = nowIso();
+  const fixture: ActivityFixture & JsonDocument = { id, type: "activity-fixture", sport, eventId, status: "scheduled", ...(lineups ? { lineups } : {}), createdAt: timestamp, updatedAt: timestamp };
+  await upsertDocument("awards", id, fixture);
+  return { id };
+}
+
+export async function handleStartActivityFixture(data: CallableData) {
+  const sport = asString(data.sport, "Activity sport") as ActivitySportId;
+  const eventId = asString(data.eventId, "Activity event");
+  const id = activityFixtureId(sport, eventId);
+  const fixture = await getDocument<ActivityFixture & JsonDocument>("awards", id);
+  if (!fixture) throw new CommandError(404, "NOT_FOUND", "Create this event fixture first.");
+  if (fixture.status !== "scheduled") throw new CommandError(400, "FAILED_PRECONDITION", "This event cannot be started again.");
+  await upsertDocument("awards", id, { ...fixture, status: "live", updatedAt: nowIso() });
+  return { id };
+}
+
+export async function handleSaveTeamBonus(data: CallableData) {
+  const kind = asString(data.kind, "Bonus type");
+  if (!["timely-arrival", "early-bird-bonus", "combined-team-game"].includes(kind)) throw new CommandError(400, "INVALID_ARGUMENT", "Choose a valid bonus type.");
+  const teamId = asString(data.teamId, "Team");
+  const teams = await listDocuments<JsonDocument>("teams");
+  if (!teams.some((team) => team.id === teamId)) throw new CommandError(400, "INVALID_ARGUMENT", "Choose a valid team.");
+  const points = kind === "early-bird-bonus" ? [100] : kind === "timely-arrival" ? [100, 60, 40, 20] : [100, 75, 50, 25];
+  const place = kind === "early-bird-bonus" ? 1 : Number(data.place);
+  if (!Number.isInteger(place) || place < 1 || place > points.length) throw new CommandError(400, "INVALID_ARGUMENT", "Choose a valid finishing place.");
+  if (kind !== "early-bird-bonus") {
+    const awards = await listDocuments<JsonDocument>("awards");
+    if (awards.some((award) => award.type === "team-bonus" && award.sport === kind && Number(award.place) === place && award.teamId !== teamId)) {
+      throw new CommandError(409, "ALREADY_EXISTS", "That place has already been awarded to another team.");
+    }
+  }
+  const id = `team-bonus:${kind}:${teamId}`;
+  await upsertDocument("awards", id, { id, type: "team-bonus", confirmed: true, sport: kind, teamId, place, points: points[place - 1], updatedAt: nowIso() });
+  await handleRefreshProjections();
+  return { id };
+}
+
+export async function handleSaveManualPointsAdjustment(data: CallableData) {
+  const teamId = asString(data.teamId, "Team");
+  const reason = asString(data.reason, "Reason", 500);
+  const points = Number(data.points);
+  if (!Number.isInteger(points) || points === 0 || Math.abs(points) > 1000) {
+    throw new CommandError(400, "INVALID_ARGUMENT", "Points must be a whole number from -1000 to 1000, excluding zero.");
+  }
+  const teams = await listDocuments<JsonDocument>("teams");
+  if (!teams.some((team) => team.id === teamId)) {
+    throw new CommandError(400, "INVALID_ARGUMENT", "Choose a valid team.");
+  }
+  const id = newId();
+  const timestamp = nowIso();
+  await upsertDocument("awards", id, {
+    id,
+    type: "manual-points-adjustment",
+    confirmed: true,
+    teamId,
+    points,
+    reason,
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  });
+  await handleRefreshProjections();
+  return { id };
+}
+
+export async function handleDeleteManualPointsAdjustment(data: CallableData) {
+  const id = asString(data.id, "Adjustment");
+  const adjustment = await getDocument<JsonDocument>("awards", id);
+  if (!adjustment || adjustment.type !== "manual-points-adjustment") {
+    throw new CommandError(404, "NOT_FOUND", "Point adjustment not found.");
+  }
+  await deleteDocument("awards", id);
+  await handleRefreshProjections();
+  return { id, deleted: true };
+}
+
+export async function handleSaveSportPlacement(data: CallableData) {
+  const sport = asString(data.sport, "Sport");
+  if (!["football", "handball", "cricket", "throwball"].includes(sport)) throw new CommandError(400, "INVALID_ARGUMENT", "Choose a valid sport.");
+  const teamId = asString(data.teamId, "Team");
+  const place = Number(data.place);
+  if (!Number.isInteger(place) || place < 1 || place > 4) throw new CommandError(400, "INVALID_ARGUMENT", "Choose a place from first to fourth.");
+  const [teams, awards] = await Promise.all([listDocuments<JsonDocument>("teams"), listDocuments<JsonDocument>("awards")]);
+  if (!teams.some((team) => team.id === teamId)) throw new CommandError(400, "INVALID_ARGUMENT", "Choose a valid team.");
+  if (awards.some((award) => award.type === "sport-placement" && award.sport === sport && Number(award.place) === place && award.teamId !== teamId)) {
+    throw new CommandError(409, "ALREADY_EXISTS", "That place has already been awarded to another team.");
+  }
+  const id = `sport-placement:${sport}:${teamId}`;
+  await upsertDocument("awards", id, { id, type: "sport-placement", sport, teamId, place, confirmed: true, updatedAt: nowIso() });
+  await handleRefreshProjections();
   return { id };
 }
 
@@ -1098,9 +1342,10 @@ function throwballLeaders(matches: MatchRow[]) {
 }
 
 export async function handleRefreshProjections() {
-  const [matches, awards, tournament, imageSubmissions] = await Promise.all([
+  const [matches, awards, players, tournament, imageSubmissions] = await Promise.all([
     listDocuments<MatchRow>("matches"),
     listDocuments<JsonDocument>("awards"),
+    listDocuments<Player & JsonDocument>("players"),
     getDocument<JsonDocument>("tournament_settings", "sports-fiesta-s9"),
     listDocuments<ImageSubmissionDocument>("image_submissions"),
   ]);
@@ -1109,13 +1354,33 @@ export async function handleRefreshProjections() {
   const cricket = cricketStandings(matches);
   const throwball = throwballStandings(matches);
   const placementPoints = (tournament?.placementPoints as Record<string, number[]>) ?? { ...DEFAULT_PLACEMENT_POINTS_BY_SPORT };
+  const coreSports = ["football", "handball", "cricket", "throwball"] as const;
   const placements = awards.filter((award) => award.type === "sport-placement" && award.confirmed && award.teamId && award.sport && award.place);
-  const leagueBonuses = calculateLeagueBonusByTeam(S9_TEAMS.map((team) => team.id), {
-    football,
-    handball,
-    cricket,
-    throwball,
-  });
+  const leagueBonuses = calculateLeagueBonusByTeam(S9_TEAMS.map((team) => team.id), { football, handball, cricket, throwball });
+  const activityResults = awards.filter((award) => award.type === "activity-result" && award.confirmed) as unknown as ActivityResult[];
+  const activitySportIds = ["womens-games", "senior-kids", "junior-kids", "relay"] as const;
+  const activityScores = new Map(S9_TEAMS.map((team) => [team.id, Object.fromEntries(activitySportIds.map((sport) => [sport, 0])) as Record<string, number>]));
+  const bonusScores = new Map(S9_TEAMS.map((team) => [team.id, 0]));
+  const adjustmentScores = new Map(S9_TEAMS.map((team) => [team.id, 0]));
+  for (const award of awards.filter((item) => item.type === "team-bonus" && item.confirmed && item.teamId)) {
+    const points = Number(award.points);
+    if (Number.isFinite(points) && bonusScores.has(String(award.teamId))) bonusScores.set(String(award.teamId), bonusScores.get(String(award.teamId))! + points);
+  }
+  for (const adjustment of awards.filter((item) => item.type === "manual-points-adjustment" && item.confirmed && item.teamId)) {
+    const points = Number(adjustment.points);
+    if (Number.isFinite(points) && adjustmentScores.has(String(adjustment.teamId))) {
+      adjustmentScores.set(String(adjustment.teamId), adjustmentScores.get(String(adjustment.teamId))! + points);
+    }
+  }
+  for (const result of activityResults) {
+    const event = getActivityEvent(result.sport, result.eventId);
+    if (!event) continue;
+    for (const [index, points] of event.points.entries()) {
+      const winnerId = result.placements[String(index + 1)];
+      const teamId = result.kind === "relay" ? winnerId : players.find((player) => player.id === winnerId)?.teamId;
+      if (teamId && activityScores.has(teamId)) activityScores.get(teamId)![result.sport] += points;
+    }
+  }
   const bonusByTeam = imageSubmissions.reduce((acc, submission) => {
     const bucket = acc[submission.teamId] ?? { timelyArrival: 0, earlyBird: 0 };
     if (submission.type === "timely-arrival") bucket.timelyArrival += Number(submission.pointsAwarded ?? 0);
@@ -1124,10 +1389,13 @@ export async function handleRefreshProjections() {
     return acc;
   }, {} as Record<string, { timelyArrival: number; earlyBird: number }>);
   const overall = S9_TEAMS.map((team) => {
-    const sportScores = Object.fromEntries(["football", "handball", "cricket", "throwball"].map((sport) => {
+    const sportScores = Object.fromEntries(coreSports.map((sport) => {
       const place = placements.find((row) => row.teamId === team.id && row.sport === sport)?.place;
       return [sport, place ? placementPoints[sport]?.[Number(place) - 1] ?? 0 : 0];
     })) as Record<string, number>;
+    const extraScores = activityScores.get(team.id) ?? {};
+    const bonus = bonusScores.get(team.id) ?? 0;
+    const adjustments = adjustmentScores.get(team.id) ?? 0;
     const teamBonuses = bonusByTeam[team.id] ?? { timelyArrival: 0, earlyBird: 0 };
     const league = leagueBonuses[team.id] ?? { leagueWin: 0, leagueTie: 0 };
     return {
@@ -1137,7 +1405,10 @@ export async function handleRefreshProjections() {
       leagueTie: league.leagueTie,
       timelyArrival: teamBonuses.timelyArrival,
       earlyBird: teamBonuses.earlyBird,
-      total: Object.values(sportScores).reduce((sum, value) => sum + value, 0)
+      ...extraScores,
+      bonus,
+      adjustments,
+      total: [...Object.values(sportScores), ...Object.values(extraScores), bonus, adjustments].reduce((sum, value) => sum + value, 0)
         + league.leagueWin
         + league.leagueTie
         + teamBonuses.timelyArrival
@@ -1189,10 +1460,15 @@ export async function seedBaseTournamentData() {
     ...S9_PLAYERS.map((player) => upsertDocument("players", player.id, player)),
     ...S9_SPORTS.map((sport) => upsertDocument("sports", sport.id, { ...sport, fixturesConfirmed: false })),
   ]);
-  const { error } = await supabaseAdmin.from("matches").delete().neq("id", "__never__");
-  if (error) throw error;
-  const clearImageSubmissions = await supabaseAdmin.from("image_submissions").delete().neq("id", "__never__");
-  if (clearImageSubmissions.error) throw clearImageSubmissions.error;
+  const [matchesResult, awardsResult, receiptsResult, imageSubmissionsResult] = await Promise.all([
+    supabaseAdmin.from("matches").delete().neq("id", "__never__"),
+    supabaseAdmin.from("awards").delete().neq("id", "__never__"),
+    supabaseAdmin.from("command_receipts").delete().neq("id", "__never__"),
+    supabaseAdmin.from("image_submissions").delete().neq("id", "__never__"),
+  ]);
+  for (const result of [matchesResult, awardsResult, receiptsResult, imageSubmissionsResult]) {
+    if (result.error) throw result.error;
+  }
   await Promise.all([
     upsertDocument("standings", "football", { id: "football", rows: fieldStandings([], "football") }),
     upsertDocument("standings", "handball", { id: "handball", rows: fieldStandings([], "handball") }),
