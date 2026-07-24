@@ -46,8 +46,14 @@ describe("finalized rosters", () => {
     expect(new Set(S9_PLAYERS.map((player) => player.id)).size).toBe(77);
   });
 
-  it("keeps match seed data empty for a clean Supabase migration", () => {
-    expect(S9_SEEDED_MATCHES).toEqual([]);
+  it("contains the 16 confirmed preliminary fixtures", () => {
+    expect(S9_SEEDED_MATCHES).toHaveLength(16);
+    expect(S9_SEEDED_MATCHES.filter((match) => match.sport === "football")).toHaveLength(6);
+    expect(S9_SEEDED_MATCHES.filter((match) => match.sport === "handball")).toHaveLength(4);
+    expect(S9_SEEDED_MATCHES.filter((match) => match.sport === "throwball")).toHaveLength(2);
+    expect(S9_SEEDED_MATCHES.filter((match) => match.sport === "cricket")).toHaveLength(4);
+    expect(S9_SEEDED_MATCHES.every((match) => match.status === "scheduled")).toBe(true);
+    expect(new Set(S9_SEEDED_MATCHES.map((match) => match.matchNumber)).size).toBe(16);
   });
 
   it("marks throwball as an active sport", () => {

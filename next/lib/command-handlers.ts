@@ -20,6 +20,7 @@ import {
   rankFieldStandings,
   resolveShootoutToss as applyShootoutToss,
   S9_PLAYERS,
+  S9_SEEDED_MATCHES,
   S9_SPORTS,
   S9_TEAMS,
   startShootout as applyStartShootout,
@@ -1488,6 +1489,11 @@ export async function seedBaseTournamentData() {
     if (result.error) throw result.error;
   }
   await Promise.all([
+    ...S9_SEEDED_MATCHES.map((match) => upsertDocument("matches", match.id, {
+      ...match,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    })),
     upsertDocument("standings", "football", { id: "football", rows: fieldStandings([], "football") }),
     upsertDocument("standings", "handball", { id: "handball", rows: fieldStandings([], "handball") }),
     upsertDocument("standings", "cricket", { id: "cricket", rows: cricketStandings([]) }),
@@ -1502,5 +1508,5 @@ export async function seedBaseTournamentData() {
     upsertDocument("brackets", "cricket", { id: "cricket", finalists: [] }),
     upsertDocument("brackets", "throwball", { id: "throwball", finalists: [] }),
   ]);
-  return { ok: true, teams: S9_TEAMS.length, players: S9_PLAYERS.length, matches: 0 };
+  return { ok: true, teams: S9_TEAMS.length, players: S9_PLAYERS.length, matches: S9_SEEDED_MATCHES.length };
 }
