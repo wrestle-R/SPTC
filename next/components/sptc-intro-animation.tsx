@@ -4,10 +4,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useState } from "react";
 
 export function SptcIntroAnimation() {
-  const [visible, setVisible] = useState(() =>
-    typeof window === "undefined" || !window.matchMedia("(prefers-reduced-motion: reduce)").matches,
-  );
-
+  const [visible, setVisible] = useState(true);
   useEffect(() => {
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
     if (reducedMotion.matches) return;
@@ -41,7 +38,8 @@ export function SptcIntroAnimation() {
           aria-label="Sports Fiesta intro"
         >
           <motion.svg viewBox="0 0 520 220" className="sptc-intro__logo" aria-hidden="true">
-            <text x="260" y="140" textAnchor="middle">Sports Fiesta 9</text>
+            <text className="sptc-intro__name" x="235" y="140" textAnchor="middle">Sports Fiesta</text>
+            <text className="sptc-intro__nine" x="440" y="140" textAnchor="middle">9</text>
           </motion.svg>
         </motion.div>
       ) : null}
