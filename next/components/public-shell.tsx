@@ -25,7 +25,7 @@ export function PublicShell({ children }: { children: React.ReactNode }) {
           </nav>
           <p className="text-sm text-muted-foreground">
             Made with love by{" "}
-            <span className="font-semibold text-blue-400">Daniel</span>{" "}
+            <Link href="https://russeldanielpaul.is-a.dev" className="font-semibold text-blue-400 transition-colors hover:text-blue-300">Daniel</Link>{" "}
             and <span className="font-semibold text-pink-400">Patrick</span>
           </p>
         </div>

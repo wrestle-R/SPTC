@@ -159,3 +159,35 @@
 @utility rotate-y-180 {
   transform: rotateY(180deg);
 }
+
+.sptc-intro {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  cursor: pointer;
+  color: #d4c9be;
+  background: #030303;
+}
+
+.sptc-intro__field {
+  position: absolute;
+  inset: 0;
+  opacity: 0.42;
+  background: radial-gradient(circle at 50% 45%, rgba(220, 158, 54, 0.14), transparent 30%), linear-gradient(115deg, transparent 48%, rgba(255, 255, 255, 0.035) 49%, transparent 50%);
+}
+
+.sptc-intro__logo { position: relative; width: min(94vw, 520px); height: auto; overflow: visible; }
+.sptc-intro__logo text { fill: none; stroke: #d4c9be; stroke-width: 1.2px; stroke-dasharray: 1600; stroke-dashoffset: 1600; paint-order: stroke fill; font-family: "Snell Roundhand", "Segoe Script", "URW Chancery L", "Apple Chancery", cursive; font-size: 82px; font-style: normal; font-weight: 600; letter-spacing: -3px; animation: sptc-wordmark-write 1.45s cubic-bezier(0.22, 0.8, 0.25, 1) forwards; }
+
+@keyframes sptc-wordmark-write { 0% { stroke-dashoffset: 1600; fill: transparent; } 80% { stroke-dashoffset: 0; fill: transparent; } 100% { stroke-dashoffset: 0; fill: #d4c9be; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .sptc-intro__logo text { stroke-dashoffset: 0; fill: #d4c9be; animation: none; }
+}
+
+@media (max-width: 420px) {
+  .sptc-intro__logo text { font-size: 70px; letter-spacing: -2px; }
+}
