@@ -19,8 +19,8 @@ describe("finalized rosters", () => {
   it("contains the exact approved team names and accent colors", () => {
     expect(S9_TEAMS.map(({ name, accentColor }) => ({ name, accentColor }))).toEqual([
       { name: "Crimson Warriors", accentColor: "#ef4444" },
-      { name: "God's Gladiators", accentColor: "#3b82f6" },
-      { name: "Karuppu Knights", accentColor: "#a1a1aa" },
+      { name: "God's Gladiators", accentColor: "#00a86b" },
+      { name: "Karuppu Knights", accentColor: "#18181b" },
       { name: "Ivory Elites", accentColor: "#f8fafc" },
     ]);
   });

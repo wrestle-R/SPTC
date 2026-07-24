@@ -105,7 +105,7 @@ describe("five-over cricket scoring", () => {
     }
     state = recordCricketDelivery(state, {
       runsOffBat: 0,
-      dismissal: { type: "bowled", playerOutId: state.strikerId },
+      dismissal: { type: "bowled", playerOutId: state.strikerId! },
     });
 
     expect(state.legalBalls).toBe(6);
@@ -265,7 +265,7 @@ describe("five-over cricket scoring", () => {
     let state = innings();
     for (let ball = 1; ball <= 30; ball += 1) {
       if (state.currentBowlerId === null) {
-        state = setCricketBowler(state, ball % 12 === 7 ? "g2" : "g1");
+        state = setCricketBowler(state, `g${Math.floor(state.legalBalls / 6) + 1}`);
       }
       state = recordCricketDelivery(state, { runsOffBat: 0 });
     }
@@ -280,7 +280,7 @@ describe("five-over cricket scoring", () => {
       battingTeamId: "red",
       bowlingTeamId: "green",
       battingLineup: nine,
-      bowlingLineup: ["g1", "g2"],
+      bowlingLineup: ["g1", "g2", "g3", "g4", "g5"],
       strikerId: "a",
       nonStrikerId: "b",
       bowlerId: "g1",
@@ -288,7 +288,7 @@ describe("five-over cricket scoring", () => {
 
     for (const playerId of ["a", "c", "d", "e", "f", "g", "h", "i"]) {
       if (!state.currentBowlerId) state = setCricketBowler(state, "g2");
-      state = recordCricketDelivery(state, { runsOffBat: 0, dismissal: { type: "bowled", playerOutId: state.strikerId ?? playerId } });
+      state = recordCricketDelivery(state, { runsOffBat: 0, dismissal: { type: "bowled", playerOutId: state.strikerId! } });
       if (!state.completed) state = setNextBatter(state, playerId === "a" ? "c" : nine[nine.indexOf(playerId) + 1]);
     }
 
@@ -301,6 +301,7 @@ describe("five-over cricket scoring", () => {
       battingTeamId: "red",
       bowlingTeamId: "green",
       battingLineup: battingOrder,
+      bowlingLineup: ["g1", "g2", "g3", "g4", "g5"],
       strikerId: "a",
       nonStrikerId: "b",
       bowlerId: "g1",

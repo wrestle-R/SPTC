@@ -171,15 +171,16 @@ function CricketConsole({ match, players, teams, pending, run, completeMatch, co
   if (!current) return <Card className="shadow-none max-sm:border-0 max-sm:bg-transparent"><CardContent className="py-12 text-center text-muted-foreground">Start the first innings to open scoring.</CardContent></Card>;
   const battingPlayers = players.filter((player) => current.battingLineup.includes(player.id));
   const bowlingPlayers = players.filter((player) => current.bowlingLineup.includes(player.id));
-  return <div className="grid gap-3 xl:grid-cols-[1.15fr_0.85fr] sm:gap-4">
-    <OrganizerCricketScorecard entries={entries} currentIndex={currentIndex} teamName={teamName} playerName={playerName} />
+  return <div className="flex flex-col gap-4 sm:gap-6">
+    <div className="hidden lg:block"><OrganizerCricketScorecard entries={entries} currentIndex={currentIndex} teamName={teamName} playerName={playerName} /></div>
     <Card className="shadow-none max-sm:border-0 max-sm:bg-transparent"><CardHeader><CardTitle>Ball-by-ball scoring</CardTitle><CardDescription>Score controls stay synced with the full scorecard.</CardDescription></CardHeader><CardContent className="max-sm:px-0">
       {!current.strikerId ? <ParticipantSelect label="Next batter" players={battingPlayers.filter((player) => player.id !== current.nonStrikerId && !current.batters[player.id]?.dismissal)} pending={pending} onSelect={(playerId) => run("selectNextBatter", { playerId })} /> : null}
       {!current.currentBowlerId ? <ParticipantSelect label="Bowler for this over" players={bowlingPlayers.filter((player) => player.id !== current.previousOverBowlerId)} pending={pending} onSelect={(playerId) => run("selectCricketBowler", { playerId })} /> : null}
-      {current.strikerId && current.currentBowlerId && !current.completed ? <DeliveryControls current={current} pending={pending} run={run} battingPlayers={battingPlayers} bowlingPlayers={bowlingPlayers} playerName={playerName} /> : null}
-      <div className="mt-5 flex flex-wrap gap-2"><Button variant="outline" onClick={() => run("undoLastEvent")} disabled={pending || current.events.length === 0}><RotateCcw data-icon="inline-start" /> Undo last ball</Button><Button variant="destructive" onClick={() => run("endInnings")} disabled={pending || current.completed}><Square data-icon="inline-start" /> End innings</Button></div>
+      {current.strikerId && current.currentBowlerId && !current.completed ? <DeliveryControls current={current} pending={pending} run={run} battingPlayers={battingPlayers} bowlingPlayers={bowlingPlayers} playerName={playerName} battingTeamName={teamName(current.battingTeamId)} /> : null}
+      <div className="mt-5 flex flex-wrap gap-2"><Button variant="outline" onClick={() => run("endInnings")} disabled={pending || current.completed}><Square data-icon="inline-start" /> End innings</Button></div>
       {match.resultText || current.completed ? <MotmPicker players={confirmedPlayers} pending={pending} onComplete={completeMatch} /> : null}
     </CardContent></Card>
+    <details className="group rounded-2xl border bg-muted/10 lg:hidden"><summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-4 text-sm font-semibold marker:content-none"><span>View full scorecard</span><span className="text-muted-foreground transition-transform group-open:rotate-180">⌄</span></summary><div className="border-t p-3"><OrganizerCricketScorecard entries={entries} currentIndex={currentIndex} teamName={teamName} playerName={playerName} /></div></details>
   </div>;
 }
 
@@ -288,7 +289,7 @@ function CricketInningsSetup({ match, players, teams, pending, run, superOver }:
   const bowlingLineup = players.filter((player) => player.teamId === bowling).map((player) => player.id);
   const [striker, setStriker] = useState(""); const [nonStriker, setNonStriker] = useState(""); const [bowler, setBowler] = useState("");
   const options = (ids: string[]) => players.filter((player) => ids.includes(player.id)).map((player) => ({ value: player.id, label: playerLabel(player) }));
-  return <Card className="shadow-none max-sm:border-0 max-sm:bg-transparent"><CardHeader><CardTitle>{superOver ? "Start Super Over" : previous ? "Start next innings" : "Start first innings"}</CardTitle><CardDescription>Select the opening participants from the team rosters.</CardDescription></CardHeader><CardContent className="max-sm:px-0"><FieldGroup className="grid md:grid-cols-2"><SimpleSelect label="Batting team" value={batting} setValue={setBatting} items={match.homeTeamId === match.awayTeamId ? [] : [{ value: match.homeTeamId, label: teams.find((team) => team.id === match.homeTeamId)?.name ?? "Home team" }, { value: match.awayTeamId, label: teams.find((team) => team.id === match.awayTeamId)?.name ?? "Away team" }]} /><SimpleSelect label="Striker" value={striker} setValue={setStriker} items={options(battingLineup)} /><SimpleSelect label="Non-striker" value={nonStriker} setValue={setNonStriker} items={options(battingLineup).filter((item) => item.value !== striker)} /><SimpleSelect label="Opening bowler" value={bowler} setValue={setBowler} items={options(bowlingLineup)} /><Button className="md:col-span-2" size="lg" disabled={pending || !striker || !nonStriker || !bowler || striker === nonStriker} onClick={() => run("startInnings", { battingTeamId: batting, bowlingTeamId: bowling, strikerId: striker, nonStrikerId: nonStriker, bowlerId: bowler, superOver })}>Start innings</Button></FieldGroup></CardContent></Card>;
+  return <Card className="shadow-none max-sm:border-0 max-sm:bg-transparent"><CardHeader><CardTitle>{superOver ? "Start Super Over" : previous ? "Start next innings" : "Start first innings"}</CardTitle><CardDescription>Select the opening participants from the team rosters.</CardDescription></CardHeader><CardContent className="max-sm:px-0"><FieldGroup className="grid md:grid-cols-2"><SimpleSelect label="Batting team" value={batting} setValue={setBatting} items={match.homeTeamId === match.awayTeamId ? [] : [{ value: match.homeTeamId, label: teams.find((team) => team.id === match.homeTeamId)?.name ?? "Home team" }, { value: match.awayTeamId, label: teams.find((team) => team.id === match.awayTeamId)?.name ?? "Away team" }]} /><PlayerSelect label="Striker" value={striker} setValue={setStriker} items={options(battingLineup)} /><PlayerSelect label="Non-striker" value={nonStriker} setValue={setNonStriker} items={options(battingLineup).filter((item) => item.value !== striker)} /><PlayerSelect label="Opening bowler" value={bowler} setValue={setBowler} items={options(bowlingLineup)} /><Button className="md:col-span-2" size="lg" disabled={pending || !striker || !nonStriker || !bowler || striker === nonStriker} onClick={() => run("startInnings", { battingTeamId: batting, bowlingTeamId: bowling, strikerId: striker, nonStrikerId: nonStriker, bowlerId: bowler, superOver })}>Start innings</Button></FieldGroup></CardContent></Card>;
 }
 
 function cricketEventLabel(event: CricketDelivery) {
@@ -304,8 +305,7 @@ function cricketEventLabel(event: CricketDelivery) {
   return parts.length ? parts.join(" + ") : String(event.totalRuns);
 }
 
-function DeliveryControls({ current, pending, run, battingPlayers, bowlingPlayers, playerName }: { current: NonNullable<NonNullable<PublicMatch["cricket"]>["innings"][number]["state"]>; pending: boolean; run: RunCommand; battingPlayers: Player[]; bowlingPlayers: Player[]; playerName: (id?: string | null) => string }) {
-  const [extraRuns, setExtraRuns] = useState(1);
+function DeliveryControls({ current, pending, run, battingPlayers, bowlingPlayers, playerName, battingTeamName }: { current: NonNullable<NonNullable<PublicMatch["cricket"]>["innings"][number]["state"]>; pending: boolean; run: RunCommand; battingPlayers: Player[]; bowlingPlayers: Player[]; playerName: (id?: string | null) => string; battingTeamName: string }) {
   const [dismissal, setDismissal] = useState<DismissalType | "">("");
   const [fielderId, setFielderId] = useState("");
   const [runOutRuns, setRunOutRuns] = useState(0);
@@ -315,6 +315,10 @@ function DeliveryControls({ current, pending, run, battingPlayers, bowlingPlayer
   const [runOutIncomingBatterId, setRunOutIncomingBatterId] = useState("");
   const [runOutNextStrikerId, setRunOutNextStrikerId] = useState("");
   const [runOutOpen, setRunOutOpen] = useState(false);
+  const [extrasOpen, setExtrasOpen] = useState(false);
+  const [wicketOpen, setWicketOpen] = useState(false);
+  const [noBallSelected, setNoBallSelected] = useState(false);
+  const [runningExtra, setRunningExtra] = useState<"bye" | "leg-bye" | null>(null);
   const needsFielder = dismissal === "caught" || dismissal === "stumped";
   const delivery = (data: Record<string, unknown>) => run("recordCricketDelivery", { delivery: data });
   const activeBatters = [
@@ -333,6 +337,11 @@ function DeliveryControls({ current, pending, run, battingPlayers, bowlingPlayer
   ].includes(runOutNextStrikerId)
     ? runOutNextStrikerId
     : survivingBatterId;
+  const striker = current.strikerId ? current.batters[current.strikerId] : null;
+  const nonStriker = current.batters[current.nonStrikerId] ?? null;
+  const bowler = current.currentBowlerId ? current.bowlers[current.currentBowlerId] : null;
+  const bowlerOvers = bowler ? `${Math.floor(bowler.legalBalls / 6)}.${bowler.legalBalls % 6}` : "0.0";
+  const runRate = current.legalBalls ? (current.score / (current.legalBalls / 6)).toFixed(2) : "0.00";
 
   const openRunOutModal = () => {
     const defaultOutBatterId = current.strikerId ?? current.nonStrikerId;
@@ -343,6 +352,7 @@ function DeliveryControls({ current, pending, run, battingPlayers, bowlingPlayer
     setRunOutFielderId("");
     setRunOutIncomingBatterId(eligibleIncomingBatters[0]?.id ?? "");
     setRunOutNextStrikerId(nextSurvivingBatterId);
+    setWicketOpen(false);
     setRunOutOpen(true);
   };
 
@@ -375,50 +385,53 @@ function DeliveryControls({ current, pending, run, battingPlayers, bowlingPlayer
       ? [{ value: selectedIncomingBatterId, label: `Incoming batter · ${playerName(selectedIncomingBatterId)}` }]
       : []),
   ];
+  const recordExtra = (data: Record<string, unknown>) => {
+    delivery(data);
+    setExtrasOpen(false);
+  };
+  const recordBatRuns = (runs: number) => {
+    delivery(noBallSelected
+      ? { runsOffBat: runs, extraType: "no-ball" satisfies CricketExtraType, extraRuns: 1 }
+      : runningExtra
+        ? { runsOffBat: 0, extraType: runningExtra satisfies CricketExtraType, extraRuns: runs }
+        : { runsOffBat: runs });
+    setNoBallSelected(false);
+    setRunningExtra(null);
+  };
+  const selectRunningExtra = (type: "bye" | "leg-bye") => {
+    setRunningExtra(type);
+    setNoBallSelected(false);
+    setExtrasOpen(false);
+  };
   return (
-    <div className="flex flex-col gap-5">
-      <div>
-        <p className="mb-2 text-sm font-medium">Runs</p>
-        <div className="grid grid-cols-4 gap-2 sm:grid-cols-7">{[0, 1, 2, 3, 4, 5, 6].map((runs) => <Button key={runs} variant={runs === 4 || runs === 6 ? "default" : "outline"} className="h-12 text-base" disabled={pending} onClick={() => delivery({ runsOffBat: runs })}>{runs}</Button>)}</div>
-      </div>
-      <div>
-        <p className="mb-2 text-sm font-medium">Extras</p>
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3"><Button variant="outline" disabled={pending} onClick={() => delivery({ runsOffBat: 0, extraType: "wide", extraRuns: 1 })}>Wide +1</Button><Button variant="outline" disabled={pending} onClick={() => delivery({ runsOffBat: 0, extraType: "no-ball", extraRuns: 1 })}>No ball +1</Button><Button variant="outline" disabled={pending} onClick={() => delivery({ runsOffBat: 0, extraType: "dead-ball" })}>Dead ball</Button></div>
-        <div className="mt-2">
-          <p className="mb-2 text-xs font-medium text-muted-foreground">No ball + bat runs</p>
-          <div className="grid grid-cols-4 gap-2 sm:grid-cols-7">
-            {[0, 1, 2, 3, 4, 5, 6].map((runs) => (
-              <Button
-                key={`no-ball-${runs}`}
-                variant={runs === 4 || runs === 6 ? "default" : "outline"}
-                className="h-11 text-sm"
-                disabled={pending}
-                onClick={() => delivery({ runsOffBat: runs, extraType: "no-ball", extraRuns: 1 })}
-              >
-                Nb + {runs}
-              </Button>
-            ))}
-          </div>
-        </div>
-        <div className="mt-2 grid grid-cols-[90px_1fr_1fr] gap-2"><Input type="number" min="1" max="6" value={extraRuns} onChange={(event) => setExtraRuns(Number(event.target.value))} aria-label="Extra runs" /><Button variant="outline" onClick={() => delivery({ runsOffBat: 0, extraType: "bye" satisfies CricketExtraType, extraRuns })}>Bye</Button><Button variant="outline" onClick={() => delivery({ runsOffBat: 0, extraType: "leg-bye" satisfies CricketExtraType, extraRuns })}>Leg bye</Button></div>
-      </div>
-      <div>
-        <p className="mb-2 text-sm font-medium">Record wicket</p>
-        <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
-          <SimpleSelect label="Dismissal" hideLabel value={dismissal} setValue={(value) => { setDismissal(value as DismissalType); setFielderId(""); }} items={["bowled", "caught", "stumped", "run-out", "hit-wicket", "retired-hurt", "retired-out", "obstructing-field"].map((value) => ({ value, label: value.replaceAll("-", " ") }))} />
-          <Button variant="destructive" disabled={pending || !dismissal || (needsFielder && !fielderId)} onClick={recordWicket}>Record wicket</Button>
-        </div>
-        {needsFielder ? <div className="mt-2"><SimpleSelect label={dismissal === "caught" ? "Catcher" : "Keeper"} value={fielderId} setValue={setFielderId} items={bowlingPlayers.map((player) => ({ value: player.id, label: playerLabel(player) }))} /></div> : null}
-      </div>
+    <div className="flex flex-col gap-3 sm:gap-4">
+      <section className="overflow-hidden rounded-2xl border bg-muted/20">
+        <div className="grid grid-cols-2 divide-x border-b"><div className="min-w-0 p-3"><p className="text-[10px] font-bold uppercase tracking-[0.14em] text-primary">Striker</p><p className="mt-1 truncate text-sm font-semibold">{playerName(current.strikerId)}</p><p className="text-xs text-muted-foreground">{striker?.runs ?? 0} ({striker?.balls ?? 0})</p></div><div className="min-w-0 p-3"><p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">Non-striker</p><p className="mt-1 truncate text-sm font-semibold">{playerName(current.nonStrikerId)}</p><p className="text-xs text-muted-foreground">{nonStriker?.runs ?? 0} ({nonStriker?.balls ?? 0})</p></div></div>
+        <div className="flex items-center justify-between gap-3 p-3"><div className="min-w-0"><p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">Bowler</p><p className="mt-1 truncate text-sm font-semibold">{playerName(current.currentBowlerId)}</p></div><p className="shrink-0 text-sm font-semibold tabular-nums">{bowlerOvers} · {bowler?.runs ?? 0}/{bowler?.wickets ?? 0}</p></div>
+      </section>
+      <section className="rounded-2xl border bg-muted/20 p-4 lg:hidden"><p className="text-sm font-medium text-muted-foreground">{battingTeamName} batting</p><p className="mt-1 text-5xl font-bold tracking-tight tabular-nums">{current.score}/{current.wickets}</p><p className="mt-1 text-sm font-medium text-muted-foreground">{current.overs} ov · RR {runRate}</p></section>
+      <section className="rounded-2xl border bg-muted/20 p-3 sm:p-5">
+        <div className="mb-3 px-1 sm:mb-4"><p className="text-xs font-bold uppercase tracking-[0.16em] text-muted-foreground">Score this ball</p><h3 className="mt-1 text-lg font-semibold">Tap runs off the bat</h3></div>
+        <div className="grid grid-cols-3 gap-2 sm:grid-cols-7">{[0, 1, 2, 3, 4, 6, 5].map((runs) => <Button key={runs} variant={runs === 1 || runs === 4 || runs === 6 ? "default" : "outline"} className={`h-20 text-3xl font-bold sm:h-24 sm:text-4xl ${runs === 5 ? "col-span-3 sm:col-span-1" : ""}`} disabled={pending} onClick={() => recordBatRuns(runs)}><span>{runs}</span><span className="sr-only"> runs</span></Button>)}</div>
+        <div className="mt-3 grid grid-cols-2 gap-2"><Button variant="outline" className="h-12" disabled={pending} onClick={() => delivery({ runsOffBat: 0, extraType: "wide", extraRuns: 1 })}>Wide +1</Button><Button variant={noBallSelected ? "default" : "outline"} className="h-12" disabled={pending} onClick={() => { setNoBallSelected((value) => !value); setRunningExtra(null); }}>{noBallSelected ? "No ball selected" : "No ball"}</Button><Button variant={runningExtra ? "default" : "outline"} className="h-12" disabled={pending} onClick={() => setExtrasOpen(true)}>{runningExtra ? `${runningExtra === "bye" ? "Bye" : "Leg bye"} selected` : "Other extras"}</Button><Button variant="destructive" className="h-12" disabled={pending} onClick={() => setWicketOpen(true)}>Wicket</Button></div>
+        <p className="mt-3 px-1 text-center text-xs text-muted-foreground">{noBallSelected ? "Now choose bat runs above. No ball + 6 = 7 total runs." : runningExtra ? `Now choose the ${runningExtra === "bye" ? "bye" : "leg-bye"} runs above.` : "Each tap saves the ball straight away."}</p>
+        <Button variant="ghost" className="mt-1 w-full text-muted-foreground" disabled={pending || current.events.length === 0} onClick={() => run("undoLastEvent")}><RotateCcw data-icon="inline-start" />Undo last ball</Button>
+      </section>
+      <Dialog open={extrasOpen} onOpenChange={setExtrasOpen}>
+        <DialogContent className="max-sm:top-auto max-sm:bottom-0 max-sm:max-w-none max-sm:-translate-y-0 max-sm:rounded-b-none sm:max-w-md"><DialogHeader><DialogTitle>Other extras</DialogTitle><DialogDescription>Choose the type, then use the main keypad to enter the runs for byes or leg byes.</DialogDescription></DialogHeader><div className="grid gap-3 py-2"><Button variant="outline" disabled={pending} onClick={() => recordExtra({ runsOffBat: 0, extraType: "wide", extraRuns: 1 })}>Wide +1</Button><Button variant="outline" disabled={pending} onClick={() => recordExtra({ runsOffBat: 0, extraType: "dead-ball" })}>Dead ball</Button><div className="grid grid-cols-2 gap-2"><Button variant="outline" disabled={pending} onClick={() => selectRunningExtra("bye")}>Bye</Button><Button variant="outline" disabled={pending} onClick={() => selectRunningExtra("leg-bye")}>Leg bye</Button></div></div></DialogContent>
+      </Dialog>
+      <Dialog open={wicketOpen} onOpenChange={setWicketOpen}>
+        <DialogContent className="max-sm:top-auto max-sm:bottom-0 max-sm:max-w-none max-sm:-translate-y-0 max-sm:rounded-b-none"><DialogHeader><DialogTitle>Record a wicket</DialogTitle><DialogDescription>Select how the batter was dismissed. Run outs open a guided detail form.</DialogDescription></DialogHeader><div className="grid gap-4 py-2"><SimpleSelect label="Dismissal" value={dismissal} setValue={(value) => { setDismissal(value as DismissalType); setFielderId(""); }} items={["bowled", "caught", "stumped", "run-out", "hit-wicket", "retired-hurt", "retired-out", "obstructing-field"].map((value) => ({ value, label: value.replaceAll("-", " ") }))} />{needsFielder ? <PlayerSelect label={dismissal === "caught" ? "Catcher" : "Keeper"} value={fielderId} setValue={setFielderId} items={bowlingPlayers.map((player) => ({ value: player.id, label: playerLabel(player) }))} /> : null}</div><DialogFooter><DialogClose render={<Button variant="outline" />}>Cancel</DialogClose><Button variant="destructive" disabled={pending || !dismissal || (needsFielder && !fielderId)} onClick={recordWicket}>Continue</Button></DialogFooter></DialogContent>
+      </Dialog>
       <Dialog open={runOutOpen} onOpenChange={setRunOutOpen}>
         <DialogContent>
           <DialogHeader><DialogTitle>Run out details</DialogTitle><DialogDescription>Provide details about the run out to accurately reflect the score and next strike.</DialogDescription></DialogHeader>
           <div className="grid gap-4 py-2">
             <SimpleSelect label="Completed runs" value={String(runOutRuns)} setValue={(value) => setRunOutRuns(Number(value))} items={[0, 1, 2, 3, 4, 5, 6].map((runs) => ({ value: String(runs), label: `${runs} run${runs === 1 ? "" : "s"}` }))} />
-            <SimpleSelect label="Out batter" value={runOutPlayerId} setValue={setRunOutPlayerId} items={activeBatters} />
-            <SimpleSelect label="Fielder" value={runOutFielderId} setValue={setRunOutFielderId} items={bowlingPlayers.map((player) => ({ value: player.id, label: playerLabel(player) }))} />
-            {runOutNeedsReplacement ? <SimpleSelect label="Incoming batter" value={selectedIncomingBatterId} setValue={setRunOutIncomingBatterId} items={eligibleIncomingBatters.map((player) => ({ value: player.id, label: playerLabel(player) }))} /> : null}
-            {runOutNeedsReplacement ? <SimpleSelect label="Next striker" value={selectedNextStrikerId} setValue={setRunOutNextStrikerId} items={nextStrikerItems} /> : null}
+            <PlayerSelect label="Out batter" value={runOutPlayerId} setValue={setRunOutPlayerId} items={activeBatters} />
+            <PlayerSelect label="Fielder" value={runOutFielderId} setValue={setRunOutFielderId} items={bowlingPlayers.map((player) => ({ value: player.id, label: playerLabel(player) }))} />
+            {runOutNeedsReplacement ? <PlayerSelect label="Incoming batter" value={selectedIncomingBatterId} setValue={setRunOutIncomingBatterId} items={eligibleIncomingBatters.map((player) => ({ value: player.id, label: playerLabel(player) }))} /> : null}
+            {runOutNeedsReplacement ? <PlayerSelect label="Next striker" value={selectedNextStrikerId} setValue={setRunOutNextStrikerId} items={nextStrikerItems} /> : null}
             <div className="grid grid-cols-2 gap-2">
               <Button type="button" variant={runOutNoBall ? "default" : "outline"} onClick={() => setRunOutNoBall((value) => !value)} disabled={pending}>
                 {runOutNoBall ? "No ball included" : "Add no ball"}
@@ -435,7 +448,7 @@ function DeliveryControls({ current, pending, run, battingPlayers, bowlingPlayer
   );
 }
 
-function ParticipantSelect({ label, players, pending, onSelect }: { label: string; players: Player[]; pending: boolean; onSelect: (id: string) => void }) { const [value, setValue] = useState(""); return <div className="mb-5 rounded-md border p-4"><FieldGroup><SimpleSelect label={label} value={value} setValue={setValue} items={players.map((player) => ({ value: player.id, label: playerLabel(player) }))} /><Button disabled={pending || !value} onClick={() => onSelect(value)}>Confirm {label.toLowerCase()}</Button></FieldGroup></div>; }
+function ParticipantSelect({ label, players, pending, onSelect }: { label: string; players: Player[]; pending: boolean; onSelect: (id: string) => void }) { const [value, setValue] = useState(""); return <div className="mb-5 rounded-md border p-4"><FieldGroup><PlayerSelect label={label} value={value} setValue={setValue} items={players.map((player) => ({ value: player.id, label: playerLabel(player) }))} /><Button disabled={pending || !value} onClick={() => onSelect(value)}>Confirm {label.toLowerCase()}</Button></FieldGroup></div>; }
 
 function ThrowballConsole({ match, players, teams, pending, run, completeMatch, confirmedPlayers, teamName, playerName }: { match: PublicMatch; players: Player[]; teams: Team[]; pending: boolean; run: RunCommand; completeMatch: (playerId?: string) => void; confirmedPlayers: Player[]; teamName: (id: string) => string; playerName: (id?: string | null) => string }) {
   const state = match.throwball;
@@ -601,11 +614,11 @@ function ThrowballConsole({ match, players, teams, pending, run, completeMatch, 
             </div>
             {pointType === "successful-attack" ? (
               <>
-                <SimpleSelect label="Attacking player" value={attackingPlayerId} setValue={setAttackingPlayerId} items={scoringTeamPlayers.map((player) => ({ value: player.id, label: playerLabel(player) }))} />
-                <SimpleSelect label="Dropped by" value={droppedByPlayerId} setValue={setDroppedByPlayerId} items={[{ value: "", label: "None / not tracked" }, ...opponentPlayers.map((player) => ({ value: player.id, label: playerLabel(player) }))]} />
+                <PlayerSelect label="Attacking player" value={attackingPlayerId} setValue={setAttackingPlayerId} items={scoringTeamPlayers.map((player) => ({ value: player.id, label: playerLabel(player) }))} />
+                <PlayerSelect label="Dropped by" value={droppedByPlayerId} setValue={setDroppedByPlayerId} items={[{ value: "", label: "None / not tracked" }, ...opponentPlayers.map((player) => ({ value: player.id, label: playerLabel(player) }))]} />
               </>
             ) : (
-              <SimpleSelect label="Opponent player" value={opponentPlayerId} setValue={setOpponentPlayerId} items={opponentPlayers.map((player) => ({ value: player.id, label: playerLabel(player) }))} />
+              <PlayerSelect label="Opponent player" value={opponentPlayerId} setValue={setOpponentPlayerId} items={opponentPlayers.map((player) => ({ value: player.id, label: playerLabel(player) }))} />
             )}
             <Button size="lg" disabled={pending} onClick={recordPoint}>Record point</Button>
             <div className="flex flex-wrap gap-2">
@@ -781,7 +794,7 @@ function FieldConsole({ match, players, teams, pending, run, completeMatch, conf
                 </div>
 
                 <SimpleSelect label="Team" value={teamId} setValue={(value) => { setTeamId(value); setPlayerId(""); }} items={teams.filter((team) => [match.homeTeamId, match.awayTeamId].includes(team.id)).map((team) => ({ value: team.id, label: team.name }))} />
-                <SimpleSelect label="Player" value={playerId} setValue={setPlayerId} items={eligible.map((player) => ({ value: player.id, label: playerLabel(player) }))} />
+                <PlayerSelect label="Player" value={playerId} setValue={setPlayerId} items={eligible.map((player) => ({ value: player.id, label: playerLabel(player) }))} />
                 <Button size="lg" disabled={pending || !teamId || !playerId} onClick={() => run("recordFieldEvent", { event: { type, teamId, playerId } })}>Record event</Button>
               </>
             ) : null}
@@ -816,7 +829,7 @@ function FieldConsole({ match, players, teams, pending, run, completeMatch, conf
                       <p className="font-semibold">Next attempt</p>
                       <p className="text-sm text-muted-foreground">{shootoutCurrentTeamId ? `${teamName(shootoutCurrentTeamId)} shoots now.` : "Waiting for the next attempt."}</p>
                     </div>
-                    {shootoutCurrentTeamId ? <SimpleSelect label="Shooter" value={shootoutPlayerId} setValue={setShootoutPlayerId} items={shootoutEligiblePlayers.map((player) => ({ value: player.id, label: playerLabel(player) }))} /> : null}
+                    {shootoutCurrentTeamId ? <PlayerSelect label="Shooter" value={shootoutPlayerId} setValue={setShootoutPlayerId} items={shootoutEligiblePlayers.map((player) => ({ value: player.id, label: playerLabel(player) }))} /> : null}
                     <div className="flex flex-wrap gap-2">
                       <Button size="lg" disabled={pending || !shootoutCurrentTeamId || !shootoutPlayerId} onClick={() => { run("recordFieldEvent", { event: { type: "shootout-goal", teamId: shootoutCurrentTeamId, playerId: shootoutPlayerId } }); setShootoutPlayerId(""); }}>Scored</Button>
                       <Button variant="outline" size="lg" disabled={pending || !shootoutCurrentTeamId || !shootoutPlayerId} onClick={() => { run("recordFieldEvent", { event: { type: "shootout-miss", teamId: shootoutCurrentTeamId, playerId: shootoutPlayerId } }); setShootoutPlayerId(""); }}>Missed</Button>
@@ -857,10 +870,58 @@ function MotmPicker({ players, pending, onComplete }: { players: Player[]; pendi
     <div className="rounded-md border p-4">
       <FieldGroup>
         <div><p className="font-semibold">Man of the Match</p><p className="text-sm text-muted-foreground">Select the award winner before completing.</p></div>
-        <SimpleSelect label="Award winner" value={value} setValue={setValue} items={ordered.map((player) => ({ value: player.id, label: playerLabel(player) }))} />
+        <PlayerSelect label="Award winner" value={value} setValue={setValue} items={ordered.map((player) => ({ value: player.id, label: playerLabel(player) }))} />
         <Button variant="destructive" onClick={() => onComplete(value)} disabled={pending || !value}><Trophy data-icon="inline-start" /> End match</Button>
       </FieldGroup>
     </div>
+  );
+}
+
+function PlayerSelect({ label, value, setValue, items, hideLabel = false }: { label: string; value: string; setValue: (value: string) => void; items: Array<{ value: string; label: string }>; hideLabel?: boolean }) {
+  const [open, setOpen] = useState(false);
+  const [searching, setSearching] = useState(false);
+  const [query, setQuery] = useState("");
+  const selected = items.find((item) => item.value === value);
+  const filteredItems = items.filter((item) => item.label.toLowerCase().includes(query.trim().toLowerCase()));
+
+  function closePicker(nextOpen: boolean) {
+    setOpen(nextOpen);
+    if (!nextOpen) {
+      setSearching(false);
+      setQuery("");
+    }
+  }
+
+  return (
+    <Field>
+      {hideLabel ? null : <FieldLabel>{label}</FieldLabel>}
+      <Button type="button" variant="outline" className="h-10 w-full justify-between font-normal" onClick={() => setOpen(true)}>
+        <span className={selected ? "truncate capitalize" : "truncate text-muted-foreground"}>{selected?.label ?? `Choose ${label.toLowerCase()}`}</span>
+        <span aria-hidden="true" className="text-muted-foreground">⌄</span>
+      </Button>
+      <Dialog open={open} onOpenChange={closePicker}>
+        <DialogContent className="max-h-[80dvh] overflow-y-auto max-sm:top-auto max-sm:bottom-0 max-sm:max-w-none max-sm:-translate-y-0 max-sm:rounded-b-none">
+          <DialogHeader>
+            <DialogTitle>Choose {label.toLowerCase()}</DialogTitle>
+            <DialogDescription>Tap a player to select them.</DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-3">
+            {searching ? (
+              <Input autoFocus value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search players" aria-label={`Search ${label.toLowerCase()}`} />
+            ) : (
+              <Button type="button" variant="outline" className="justify-start" onClick={() => setSearching(true)}>Search players</Button>
+            )}
+            <div className="grid max-h-80 gap-2 overflow-y-auto pr-1">
+              {filteredItems.length ? filteredItems.map((item) => (
+                <Button key={item.value || "none"} type="button" variant={item.value === value ? "secondary" : "outline"} className="h-auto min-h-11 justify-start whitespace-normal py-3 text-left capitalize" onClick={() => { setValue(item.value); closePicker(false); }}>
+                  {item.label}
+                </Button>
+              )) : <p className="px-1 py-4 text-sm text-muted-foreground">No players found.</p>}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </Field>
   );
 }
 

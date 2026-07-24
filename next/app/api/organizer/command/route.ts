@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
 import { CommandError } from "@/lib/supabase-admin";
 import {
-  handleConfirmAward, handleConfirmFixtures, handleCreateMatch,
+  handleConfirmAward, handleConfirmFixtures, handleCreateActivityFixture, handleCreateMatch, handleDeleteActivityFixture, handleDeleteActivityResult, handleDeleteManualPointsAdjustment,
   handleEditMatchEvent, handleEndInnings, handleEndMatch, handleRecordCricketDelivery, handleRecordFieldSportEvent,
   handleRecordThrowballRally,
-  handleRefreshProjections, handleResolveShootoutToss, handleSavePlayer, handleSaveTeam, handleSaveTournamentSettings, handleSelectCricketBowler,
-  handleSelectNextBatter, handleSetPlacementPoints, handleSetToss, handleStartInnings, handleStartMatch,
+  handleRefreshProjections, handleResolveShootoutToss, handleSaveActivityResult, handleSaveManualPointsAdjustment, handleSavePlayer, handleSaveSportPlacement, handleSaveTeam, handleSaveTeamBonus, handleSaveTournamentSettings, handleSelectCricketBowler,
+  handleSelectNextBatter, handleSetPlacementPoints, handleSetToss, handleStartActivityFixture, handleStartInnings, handleStartMatch,
   handleStartShootout,
   handleUndoLastEvent, handleUpdateMatch, handleDeleteMatch,
 } from "@/lib/command-handlers";
@@ -51,6 +51,15 @@ async function dispatch(command: string, data: Record<string, unknown>): Promise
     case "endInnings": return handleEndInnings(data);
     case "endMatch": return handleEndMatch(data);
     case "confirmAward": return handleConfirmAward(data);
+    case "saveActivityResult": return handleSaveActivityResult(data);
+    case "deleteActivityResult": return handleDeleteActivityResult(data);
+    case "deleteActivityFixture": return handleDeleteActivityFixture(data);
+    case "createActivityFixture": return handleCreateActivityFixture(data);
+    case "startActivityFixture": return handleStartActivityFixture(data);
+    case "saveTeamBonus": return handleSaveTeamBonus(data);
+    case "saveManualPointsAdjustment": return handleSaveManualPointsAdjustment(data);
+    case "deleteManualPointsAdjustment": return handleDeleteManualPointsAdjustment(data);
+    case "saveSportPlacement": return handleSaveSportPlacement(data);
     case "setPlacementPoints": return handleSetPlacementPoints(data);
     case "refreshProjections": return handleRefreshProjections();
     default: throw new CommandError(400, "INVALID_ARGUMENT", `Unknown command: ${command}`);

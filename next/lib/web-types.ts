@@ -37,6 +37,12 @@ export interface OverallStandingRow {
   handball: number;
   cricket: number;
   throwball: number;
+  "womens-games"?: number;
+  "senior-kids"?: number;
+  "junior-kids"?: number;
+  relay?: number;
+  bonus?: number;
+  adjustments?: number;
   total: number;
 }
 

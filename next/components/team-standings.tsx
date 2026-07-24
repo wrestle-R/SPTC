@@ -21,15 +21,15 @@ const TEAM_JERSEYS: Record<string, { front: string; back: string }> = {
 
 const TEAM_GRADIENTS: Record<string, string> = {
   "crimson-warriors": "from-red-600 to-orange-500",
-  "gods-gladiators": "from-blue-600 to-cyan-500",
-  "karuppu-knights": "from-zinc-700 to-slate-500",
+  "gods-gladiators": "from-emerald-700 to-green-400",
+  "karuppu-knights": "from-zinc-950 to-zinc-700",
   "ivory-elites": "from-amber-100 to-orange-50",
 };
 
 const TEAM_TEXT_COLORS: Record<string, string> = {
   "crimson-warriors": "text-red-500",
-  "gods-gladiators": "text-blue-500",
-  "karuppu-knights": "text-zinc-500",
+  "gods-gladiators": "text-emerald-500",
+  "karuppu-knights": "text-zinc-900 dark:text-zinc-100",
   "ivory-elites": "text-orange-600",
 };
 
@@ -47,6 +47,7 @@ export function TeamStandings() {
       handball: stored?.handball ?? 0,
       cricket: stored?.cricket ?? 0,
       throwball: stored?.throwball ?? 0,
+      activities: (stored?.["womens-games"] ?? 0) + (stored?.["senior-kids"] ?? 0) + (stored?.["junior-kids"] ?? 0) + (stored?.relay ?? 0) + (stored?.bonus ?? 0) + (stored?.adjustments ?? 0),
       total: stored?.total ?? 0,
     };
   }).sort((a, b) => b.total - a.total || a.rank - b.rank);
@@ -123,6 +124,7 @@ export function TeamStandings() {
                       <TableHead className="text-right font-bold">Handball</TableHead>
                       <TableHead className="text-right font-bold">Cricket</TableHead>
                       <TableHead className="text-right font-bold">Throwball</TableHead>
+                      <TableHead className="text-right font-bold">Activities</TableHead>
                       <TableHead className="pr-6 text-right font-bold">Total</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -146,6 +148,7 @@ export function TeamStandings() {
                         <TableCell className="text-right tabular-nums text-sm">{row.handball}</TableCell>
                         <TableCell className="text-right tabular-nums text-sm">{row.cricket}</TableCell>
                         <TableCell className="text-right tabular-nums text-sm">{row.throwball}</TableCell>
+                        <TableCell className="text-right tabular-nums text-sm">{row.activities}</TableCell>
                         <TableCell className="pr-6 text-right font-black tabular-nums text-base">{row.total}</TableCell>
                       </TableRow>
                     ))}

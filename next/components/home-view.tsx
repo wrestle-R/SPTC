@@ -1,7 +1,7 @@
 "use client";
 
 import { S9_TEAMS } from "@sports-fiesta/domain";
-import { ArrowRight, ArrowUpRight, CheckCircle2, Clock, Radio, Users } from "lucide-react";
+import { ArrowRight, ArrowUpRight, CheckCircle2, Clock, Flag, Medal, Radio, Sparkles, Timer, Users } from "lucide-react";
 import { TbPlayFootball, TbPlayHandball, TbCricket } from "react-icons/tb";
 import { MdSportsVolleyball } from "react-icons/md";
 import Link from "next/link";
@@ -10,25 +10,35 @@ import { MatchCard } from "@/components/match-card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { usePublicCollection } from "@/lib/public-data";
-import type { PublicMatch, PublicTeam } from "@/lib/web-types";
+import { TeamPointsChart } from "@/components/team-points-chart";
+import { getActivityEvent, getActivitySport, type ActivityFixture, type ActivityRecord } from "@/lib/activity-events";
+import { usePublicCollection, usePublicDocument } from "@/lib/public-data";
+import type { OverallStandingDocument, PublicMatch, PublicTeam } from "@/lib/web-types";
 
 const sportLinks = [
   { href: "/football", label: "Football", icon: TbPlayFootball, color: "text-orange-400", bg: "bg-orange-500/15", glow: "from-orange-500/15", line: "stroke-orange-400/25" },
   { href: "/handball", label: "Handball", icon: TbPlayHandball, color: "text-teal-400", bg: "bg-teal-500/15", glow: "from-teal-500/15", line: "stroke-teal-400/25" },
   { href: "/cricket", label: "Cricket", icon: TbCricket, color: "text-amber-400", bg: "bg-amber-500/15", glow: "from-amber-500/15", line: "stroke-amber-400/25" },
   { href: "/throwball", label: "Throwball", icon: MdSportsVolleyball, color: "text-rose-400", bg: "bg-rose-500/15", glow: "from-rose-500/15", line: "stroke-rose-400/25" },
+  { href: "/events/womens-games", label: "Women’s Games", icon: Sparkles, color: "text-fuchsia-300", bg: "bg-fuchsia-500/15", glow: "from-fuchsia-500/15", line: "stroke-fuchsia-300/25" },
+  { href: "/events/senior-kids", label: "Senior Kids", icon: Medal, color: "text-lime-300", bg: "bg-lime-500/15", glow: "from-lime-500/15", line: "stroke-lime-300/25" },
+  { href: "/events/junior-kids", label: "Junior Kids", icon: Flag, color: "text-sky-300", bg: "bg-sky-500/15", glow: "from-sky-500/15", line: "stroke-sky-300/25" },
+  { href: "/events/relay", label: "Relay", icon: Timer, color: "text-violet-300", bg: "bg-violet-500/15", glow: "from-violet-500/15", line: "stroke-violet-300/25" },
 ] as const;
 
 export function HomeView() {
   const matchesState = usePublicCollection<PublicMatch>("matches");
   const teamsState = usePublicCollection<PublicTeam>("teams");
+  const activitiesState = usePublicCollection<ActivityRecord>("awards");
+  const standingsState = usePublicDocument<OverallStandingDocument>("standings", "overall");
   const teams = teamsState.data.length ? teamsState.data : S9_TEAMS;
   const matches = matchesState.data;
+  const liveActivities = activitiesState.data.filter((record): record is ActivityFixture => record.type === "activity-fixture" && record.status === "live");
 
   const liveMatches = matches
     .filter((match) => ["live", "innings-break", "super-over"].includes(match.status))
     .slice(0, 2);
+  const liveCount = liveMatches.length + liveActivities.length;
 
   const completedMatches = matches
     .filter((match) => match.status === "completed")
@@ -72,11 +82,13 @@ export function HomeView() {
             <CardHeader>
               <Radio />
               <CardDescription>Live now</CardDescription>
-              <CardTitle className="text-3xl">{liveMatches.length}</CardTitle>
+              <CardTitle className="text-3xl">{liveCount}</CardTitle>
             </CardHeader>
           </Card>
         </div>
       </section>
+
+      <TeamPointsChart teams={teams} standings={standingsState.data} />
 
       <section className="flex flex-col gap-3" aria-label="Events">
         <p className="text-sm font-semibold uppercase tracking-wider text-primary">Events</p>
@@ -103,10 +115,10 @@ export function HomeView() {
         </div>
       </section>
 
-      {matchesState.loading || teamsState.loading ? <ContentSkeleton rows={2} /> : null}
-      {matchesState.error ? <DataError message={matchesState.error} retry={matchesState.retry} /> : null}
+      {matchesState.loading || teamsState.loading || activitiesState.loading ? <ContentSkeleton rows={2} /> : null}
+      {matchesState.error || activitiesState.error ? <DataError message={matchesState.error ?? activitiesState.error ?? "Unable to load live fixtures."} retry={matchesState.error ? matchesState.retry : activitiesState.retry} /> : null}
 
-      {!matchesState.loading && !matchesState.error ? (
+      {!matchesState.loading && !activitiesState.loading && !matchesState.error && !activitiesState.error ? (
         <>
           <section className="flex flex-col gap-3" aria-labelledby="live-heading">
             <div className="flex items-center justify-between gap-4">
@@ -114,11 +126,12 @@ export function HomeView() {
                 <div className="flex h-2 w-2 rounded-full bg-red-500 animate-pulse" />
                 <h2 id="live-heading" className="text-xl font-bold">Live Now</h2>
               </div>
-              {liveMatches.length ? <Badge variant="destructive">{liveMatches.length} live</Badge> : <Badge variant="outline">No live match</Badge>}
+              {liveCount ? <Badge variant="destructive">{liveCount} live</Badge> : <Badge variant="outline">No live match</Badge>}
             </div>
-            {liveMatches.length ? (
+            {liveCount ? (
               <div className="grid gap-3 lg:grid-cols-2">
                 {liveMatches.map((match, i) => <MatchCard key={match.id} match={match} teams={teams} featured={i === 0} />)}
+                {liveActivities.map((fixture) => <LiveActivityCard key={fixture.id} fixture={fixture} />)}
               </div>
             ) : (
               <Card className="shadow-none border-dashed">
@@ -159,4 +172,10 @@ export function HomeView() {
       ) : null}
     </div>
   );
+}
+
+function LiveActivityCard({ fixture }: { fixture: ActivityFixture }) {
+  const sport = getActivitySport(fixture.sport);
+  const event = getActivityEvent(fixture.sport, fixture.eventId);
+  return <Link href={`/events/${fixture.sport}`} className="block rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><Card className="group border-rose-500/30 bg-rose-500/5 transition-all hover:-translate-y-0.5 hover:border-rose-500/60 hover:shadow-md"><CardContent className="p-5"><div className="mb-4 flex items-center justify-between"><span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{sport?.label ?? "Special event"}</span><Badge variant="destructive"><span className="mr-1.5 size-1.5 animate-pulse rounded-full bg-current" />Live</Badge></div><p className="text-xl font-bold tracking-tight">{event?.name ?? "Event in progress"}</p><p className="mt-2 text-sm text-muted-foreground">{event?.kind === "relay" ? "Relay lineups are announced." : "Results will be posted once the event ends."}</p><div className="mt-4 flex items-center justify-between border-t pt-3 text-sm text-muted-foreground"><span>{event?.kind === "relay" ? "Team relay" : "Individual event"}</span><span className="font-medium text-primary">View live event <ArrowRight className="ml-1 inline size-3.5 transition-transform group-hover:translate-x-1" /></span></div></CardContent></Card></Link>;
 }

@@ -9,8 +9,8 @@ export const brand = {
 
 export const teamColors = {
   "crimson-warriors": "#ef4444",
-  "gods-gladiators": "#3b82f6",
-  "karuppu-knights": "#cbd5e1",
+  "gods-gladiators": "#00a86b",
+  "karuppu-knights": "#18181b",
   "ivory-elites": "#f8fafc",
 } as const;
 

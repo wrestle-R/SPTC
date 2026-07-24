@@ -19,15 +19,15 @@ const TEAM_JERSEYS: Record<string, { front: string; back: string }> = {
 
 const TEAM_GRADIENTS: Record<string, string> = {
   "crimson-warriors": "from-red-600 via-red-500 to-orange-500",
-  "gods-gladiators": "from-blue-600 via-blue-500 to-cyan-500",
-  "karuppu-knights": "from-zinc-700 via-zinc-600 to-slate-500",
+  "gods-gladiators": "from-emerald-700 via-emerald-500 to-green-400",
+  "karuppu-knights": "from-zinc-950 via-zinc-900 to-zinc-700",
   "ivory-elites": "from-amber-100 via-orange-50 to-rose-50",
 };
 
 const TEAM_GLOWS: Record<string, string> = {
   "crimson-warriors": "shadow-red-500/30",
-  "gods-gladiators": "shadow-blue-500/30",
-  "karuppu-knights": "shadow-zinc-500/30",
+  "gods-gladiators": "shadow-emerald-500/30",
+  "karuppu-knights": "shadow-zinc-950/50",
   "ivory-elites": "shadow-orange-300/30",
 };
 

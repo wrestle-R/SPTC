@@ -13,21 +13,18 @@ export function PublicShell({ children }: { children: React.ReactNode }) {
             <Link href="/handball" className="font-medium text-muted-foreground transition-colors hover:text-foreground">Handball</Link>
             <Link href="/cricket" className="font-medium text-muted-foreground transition-colors hover:text-foreground">Cricket</Link>
             <Link href="/throwball" className="font-medium text-muted-foreground transition-colors hover:text-foreground">Throwball</Link>
+            <Link href="/events/womens-games" className="font-medium text-muted-foreground transition-colors hover:text-foreground">Women’s Games</Link>
+            <Link href="/events/senior-kids" className="font-medium text-muted-foreground transition-colors hover:text-foreground">Senior Kids</Link>
+            <Link href="/events/junior-kids" className="font-medium text-muted-foreground transition-colors hover:text-foreground">Junior Kids</Link>
+            <Link href="/events/relay" className="font-medium text-muted-foreground transition-colors hover:text-foreground">Relay</Link>
             <span className="hidden text-muted-foreground/30 sm:inline">|</span>
             <Link href="/teams" className="font-medium text-muted-foreground transition-colors hover:text-foreground">Standings</Link>
             <Link href="/leaderboards" className="font-medium text-muted-foreground transition-colors hover:text-foreground">Leaders</Link>
           </nav>
           <p className="text-sm text-muted-foreground">
             Made with love by{" "}
-            <a
-              href="https://russel.is-a.dev"
-              target="_blank"
-              rel="noreferrer"
-              className="font-medium text-foreground underline-offset-4 transition-colors hover:text-primary hover:underline"
-            >
-              Russel
-            </a>{" "}
-            and Patrick
+            <span className="font-semibold text-blue-400">Daniel</span>{" "}
+            and <span className="font-semibold text-pink-400">Patrick</span>
           </p>
         </div>
       </footer>
