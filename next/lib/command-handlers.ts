@@ -1483,11 +1483,18 @@ export async function handleRefreshProjections() {
   const throwball = throwballStandings(matches);
   const placementPoints = (tournament?.placementPoints as Record<string, number[]>) ?? { ...DEFAULT_PLACEMENT_POINTS_BY_SPORT };
   const coreSports = ["football", "handball", "cricket", "throwball"] as const;
+  const completedLeagueSports = new Set(
+    coreSports.filter((sport) => {
+      const leagueMatches = matches.filter((match) => match.sport === sport && match.stage === "league");
+      return leagueMatches.length > 0
+        && leagueMatches.every((match) => match.status === "completed" && Boolean(match.resultText));
+    }),
+  );
   const leaderboardPlacements = deriveSportPlacementsFromLeaderboards([
-    ...football.map((row) => ({ sport: "football", teamId: row.teamId, rank: row.rank, played: row.played })),
-    ...handball.map((row) => ({ sport: "handball", teamId: row.teamId, rank: row.rank, played: row.played })),
-    ...cricket.map((row) => ({ sport: "cricket", teamId: row.teamId, rank: row.rank, played: row.played })),
-    ...throwball.map((row) => ({ sport: "throwball", teamId: row.teamId, rank: row.rank, played: row.played })),
+    ...(completedLeagueSports.has("football") ? football.map((row) => ({ sport: "football", teamId: row.teamId, rank: row.rank, played: row.played })) : []),
+    ...(completedLeagueSports.has("handball") ? handball.map((row) => ({ sport: "handball", teamId: row.teamId, rank: row.rank, played: row.played })) : []),
+    ...(completedLeagueSports.has("cricket") ? cricket.map((row) => ({ sport: "cricket", teamId: row.teamId, rank: row.rank, played: row.played })) : []),
+    ...(completedLeagueSports.has("throwball") ? throwball.map((row) => ({ sport: "throwball", teamId: row.teamId, rank: row.rank, played: row.played })) : []),
   ]);
   const leagueBonuses = calculateLeagueBonusByTeam(S9_TEAMS.map((team) => team.id), { football, handball, cricket, throwball });
   const activityResults = awards.filter((award) => award.type === "activity-result" && award.confirmed) as unknown as ActivityResult[];
