@@ -361,12 +361,6 @@ export function setCricketBowler(state: CricketInningsState, bowlerId: PlayerId)
   if (state.bowlingLineup.length > 1) {
     assertRosterSnapshotMember(state.bowlingLineup, bowlerId, "Bowler");
   }
-  if (bowlerId === state.previousOverBowlerId) {
-    throw new Error("A bowler cannot bowl consecutive overs.");
-  }
-  if (!state.isSuperOver && (state.bowlers[bowlerId]?.legalBalls ?? 0) >= 6) {
-    throw new Error("Each bowler may bowl only one over in a normal innings.");
-  }
   return {
     ...state,
     currentBowlerId: bowlerId,
@@ -383,7 +377,7 @@ export function setCricketBowler(state: CricketInningsState, bowlerId: PlayerId)
 export function setNextBatter(state: CricketInningsState, playerId: PlayerId) {
   if (state.strikerId) throw new Error("A striker is already selected.");
   assertRosterSnapshotMember(state.battingLineup, playerId, "Batter");
-  if (playerId === state.nonStrikerId || state.batters[playerId]?.dismissal) {
+  if (playerId === state.nonStrikerId) {
     throw new Error("That batter is not available.");
   }
   const overEnded = state.legalBalls > 0 && state.legalBalls % 6 === 0;

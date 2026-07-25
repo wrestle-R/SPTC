@@ -64,7 +64,7 @@ describe("five-over cricket scoring", () => {
     expect(next.bowlers.g1).toMatchObject({ legalBalls: 0, runs: 5, noBalls: 1 });
   });
 
-  it("finishes an over, swaps ends, and requires a new bowler", () => {
+  it("finishes an over, swaps ends, and allows the same bowler again", () => {
     let state = innings();
     for (let ball = 0; ball < 6; ball += 1) {
       state = recordCricketDelivery(state, { runsOffBat: 0 });
@@ -73,7 +73,7 @@ describe("five-over cricket scoring", () => {
     expect(state.overs).toBe("1.0");
     expect(state.strikerId).toBe("b");
     expect(state.currentBowlerId).toBeNull();
-    expect(() => setCricketBowler(state, "g1")).toThrow(/consecutive overs/i);
+    expect(setCricketBowler(state, "g1").currentBowlerId).toBe("g1");
     expect(setCricketBowler(state, "g2").currentBowlerId).toBe("g2");
   });
 
@@ -96,6 +96,15 @@ describe("five-over cricket scoring", () => {
     expect(wicket.strikerId).toBeNull();
     expect(() => recordCricketDelivery(wicket, { runsOffBat: 1 })).toThrow(/next batter/i);
     expect(setNextBatter(wicket, "c").strikerId).toBe("c");
+  });
+
+  it("allows a batter who has already batted to be selected again", () => {
+    const wicket = recordCricketDelivery(innings(), {
+      runsOffBat: 0,
+      dismissal: { type: "bowled", playerOutId: "a" },
+    });
+
+    expect(setNextBatter(wicket, "a").strikerId).toBe("a");
   });
 
   it("puts the surviving non-striker on strike after a wicket on the last ball of the over", () => {
