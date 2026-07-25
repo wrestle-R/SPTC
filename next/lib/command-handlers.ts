@@ -650,17 +650,6 @@ export async function handleSelectCricketBowler(data: CallableData) {
     const { index, innings } = currentCricketInnings(match);
     const bowlerId = asString(data.playerId, "Bowler");
     const current = innings[index].state;
-    if (current.isSuperOver) {
-      const eligibleBowlers = current.bowlingLineup;
-      const previousSuperOverBowlers = innings
-        .filter((candidate, candidateIndex) => candidateIndex !== index && candidate.superOver && candidate.state.bowlingTeamId === current.bowlingTeamId && candidate.state.events.length)
-        .map((candidate) => candidate.state.events[0]?.bowlerId)
-        .filter((id): id is string => Boolean(id));
-      const usedInCycle = new Set(previousSuperOverBowlers);
-      if (usedInCycle.size < eligibleBowlers.length && usedInCycle.has(bowlerId)) {
-        throw new CommandError(400, "FAILED_PRECONDITION", "That bowler has already bowled a Super Over. Choose another eligible bowler until the rotation resets.");
-      }
-    }
     try { innings[index] = { ...innings[index], state: applyCricketBowler(current, bowlerId) }; } catch (error) { throw new CommandError(400, "FAILED_PRECONDITION", (error as Error).message); }
     return { match: cricketMatch(match, innings, index) };
   });

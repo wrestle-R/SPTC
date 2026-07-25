@@ -11,7 +11,7 @@ const rosterNames = {
     "Patrick Joshua", "Edben Kruze", "Jeshurun Edwin", "John Rajesh", "Febin Jagdish",
     "Jeffrey Jebakumar", "Eric Edison", "Jabez Singh", "Richard", "Ditto Lazar", "Benson Wilson", "Joselin Daniel",
     "Rheanna Robinson", "Maria Antony", "Andrea Joyal", "Jyotimani Wilson", "Esther Robins",
-    "Sumitha Jackson", "Candice Jebastin", "Judith John",
+    "Sumitha Jackson", "Candice Jebastin", "Judith John", "Edwin Jesudas",
   ],
   knights: [
     "Jonathan Kirubaharan", "Jerome Jebakumar", "Terry Aldrin", "Jagdish", "Leroy Kinskumar",
@@ -29,7 +29,7 @@ const rosterNames = {
 
 const rosterNumbers = {
   crimson: [10, 99, 8, 7, 29, 17, 7, null, 6, 3, 1, 3, 16, 44, 10, 4, 13, 17, 29, 20, null],
-  gladiators: [9, 22, 10, 1, 12, 7, 4, 28, null, 1, 18, 7, 11, 14, 13, 9, 2, 17, 5, 23],
+  gladiators: [9, 22, 10, 1, 12, 7, 4, 28, null, 1, 18, 7, 11, 14, 13, 9, 2, 17, 5, 23, null],
   knights: [17, 22, 2, 3, 14, 15, 1, null, 10, 28, 13, 29, 24, 7, null, 16, 5, 12, 5],
   ivory: [10, 14, 11, 8, 9, 7, 29, 9, null, 4, 5, 21, 7, 22, 32, 24, 4, 17, 6, null, 7, null],
 } as const satisfies Record<keyof typeof rosterNames, readonly (number | null)[]>;
